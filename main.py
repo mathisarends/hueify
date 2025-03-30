@@ -20,6 +20,8 @@ async def usage_example_1():
     
     await lamp_controller.turn_on()
     
+    await room_controller.activate_scene("Verträumter Sonnenuntergang")
+    
 
 if __name__ == "__main__":
     # Wählen Sie eines der Beispiele aus

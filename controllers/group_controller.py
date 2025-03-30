@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Literal, Optional, TypedDict
 import asyncio
 from bridge import HueBridge
+from controllers.group_scene_controller import GroupSceneController
 
 
 class GroupState(TypedDict, total=False):
@@ -101,6 +102,8 @@ class GroupController:
         self.group_identifier = group_identifier
         self._group_id: Optional[str] = None
         self._group_info: Optional[GroupInfo] = None
+        
+        self._scene_controller: Optional[GroupSceneController] = None
     
     async def initialize(self) -> None:
         """Initialize the controller by resolving the group ID."""
@@ -150,6 +153,25 @@ class GroupController:
         group_state = self._group_info.get("state", {}).copy()
         group_action = self._group_info.get("action", {}).copy()
         return {**group_state, **group_action}
+    
+    @property
+    def scenes(self) -> GroupSceneController:
+        """
+        Get the scene controller for this group.
+        """
+        if not self._group_id:
+            raise RuntimeError(GroupController.NOT_INITIALIZED_ERROR_MSG)
+            
+        if not self._scene_controller:
+            self._scene_controller = GroupSceneController(self.bridge, self._group_id)
+            
+        return self._scene_controller
+    
+    async def activate_scene(self, scene_name: str) -> List[Dict[str, Any]]:
+        """
+        Convenience method to activate a scene by name.
+        """
+        return await self.scenes.activate_scene_by_name(scene_name)
     
     async def set_state(self, state: Dict[str, Any], transition_time: Optional[int] = None) -> List[Dict[str, Any]]:
         """Update the state of this group.
