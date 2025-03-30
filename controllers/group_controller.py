@@ -309,7 +309,6 @@ class GroupsManager:
         group_id = await self._resolve_group_identifier(group_identifier)
         
         if not group_id:
-            # Group not found, generate helpful error message with alternatives
             available_groups = await self.get_available_groups_formatted()
             message = f"Group '{group_identifier}' not found.\n{available_groups}"
             

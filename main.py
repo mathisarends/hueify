@@ -1,7 +1,7 @@
 import asyncio
 import time
 from bridge import HueBridge
-from controllers.group_controller import GroupController, GroupsManager
+from controllers.group_controller import GroupsManager
 
 
 async def usage_example_1():
@@ -24,6 +24,4 @@ async def usage_example_1():
     
 
 if __name__ == "__main__":
-    # Wählen Sie eines der Beispiele aus
     asyncio.run(usage_example_1())
-    # Oder: asyncio.run(usage_example_2())
