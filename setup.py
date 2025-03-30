@@ -8,6 +8,9 @@ setup(
     packages=find_packages(),
     install_requires=[
         "typer[all]",
+        "aiohttp>=3.11.0",
+        "python-dotenv>=1.0.0",
+        "aiohappyeyeballs>=2.6.0",
     ],
     entry_points={
         'console_scripts': [

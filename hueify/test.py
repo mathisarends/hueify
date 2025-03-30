@@ -1,7 +1,7 @@
 import asyncio
 import time
 from hueify.bridge import HueBridge
-from controllers.group_controller import GroupsManager
+from hueify.controllers.group_controller import GroupsManager
 
 
 async def usage_example_1():
