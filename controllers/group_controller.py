@@ -33,17 +33,17 @@ class GroupStateRepository:
     """Repository for storing and retrieving group states."""
     
     def __init__(self) -> None:
-        self._saved_states: Dict[str, Dict[str, GroupState]] = {}
+        self._saved_states: Dict[str, GroupState] = {}
         self._last_off_state_id: Optional[str] = None
     
     @property
-    def saved_states(self) -> Dict[str, Dict[str, GroupState]]:
+    def saved_states(self) -> Dict[str, GroupState]:
         return self._saved_states.copy()
     
-    def save_state(self, state_id: str, group_states: Dict[str, GroupState]) -> None:
-        self._saved_states[state_id] = group_states.copy()
+    def save_state(self, state_id: str, group_state: GroupState) -> None:
+        self._saved_states[state_id] = group_state.copy()
     
-    def get_state(self, state_id: str) -> Optional[Dict[str, GroupState]]:
+    def get_state(self, state_id: str) -> Optional[GroupState]:
         return self._saved_states.get(state_id)
     
     def remove_state(self, state_id: str) -> bool:
@@ -71,23 +71,106 @@ class GroupService:
     async def get_all_groups(self) -> Dict[str, GroupInfo]:
         return await self.bridge.get_request("groups")
     
+    async def get_group(self, group_id: str) -> GroupInfo:
+        return await self.bridge.get_request(f"groups/{group_id}")
+    
     async def set_group_state(self, group_id: str, state: Dict[str, Any]) -> List[Dict[str, Any]]:
         return await self.bridge.put_request(f"groups/{group_id}/action", state)
     
-    async def get_group_state(self, group_id: str) -> GroupState:
-        group_data = await self.bridge.get_request(f"groups/{group_id}")
-        return group_data.get("state", {})
+    async def get_group_id_by_name(self, group_name: str) -> Optional[str]:
+        """Find and return the group ID corresponding to the given name."""
+        groups = await self.get_all_groups()
+        
+        for group_id, group_data in groups.items():
+            if group_data.get("name") == group_name:
+                return group_id
+                
+        return None
 
 
-class GroupSwitch:
-    """Handles turning groups on and off with state persistence."""
+class GroupController:
+    """Controller for managing a specific Philips Hue light group."""
+    NOT_INITIALIZED_ERROR_MSG = "Group controller not initialized. Call initialize() first."
     
-    def __init__(self, group_service: GroupService, state_repository: GroupStateRepository) -> None:
-        self.group_service = group_service
-        self.state_repository = state_repository
+    def __init__(self, bridge: HueBridge, group_identifier: str) -> None:
+        """Initialize the GroupController with a Hue Bridge and a group.
+        """
+        self.bridge = bridge
+        self.group_service = GroupService(bridge)
+        self.state_repository = GroupStateRepository()
+        self.group_identifier = group_identifier
+        self._group_id: Optional[str] = None
+        self._group_info: Optional[GroupInfo] = None
     
-    async def turn_all_on(self, transition_time: int = 4) -> None:
-        """Turn on all groups with a smooth transition, restoring previous state if available.
+    async def initialize(self) -> None:
+        """Initialize the controller by resolving the group ID."""
+        group_id = await self._resolve_group_identifier(self.group_identifier)
+        if not group_id:
+            raise ValueError(f"Group '{self.group_identifier}' not found")
+        
+        self._group_id = group_id
+        await self._refresh_group_info()
+    
+    async def _resolve_group_identifier(self, identifier: str) -> Optional[str]:
+        """Resolve a group identifier to a group ID."""
+        groups = await self.group_service.get_all_groups()
+        if identifier in groups:
+            return identifier
+            
+        return await self.group_service.get_group_id_by_name(identifier)
+    
+    async def _refresh_group_info(self) -> None:
+        """Refresh the cached group information."""
+        if not self._group_id:
+            await self.initialize()
+            
+        self._group_info = await self.group_service.get_group(self._group_id)
+    
+    @property
+    def group_id(self) -> str:
+        """Get the ID of the controlled group."""
+        if not self._group_id:
+            raise RuntimeError(GroupController.NOT_INITIALIZED_ERROR_MSG)
+        return self._group_id
+    
+    @property
+    def name(self) -> str:
+        """Get the name of the controlled group."""
+        if not self._group_info:
+            raise RuntimeError(GroupController.NOT_INITIALIZED_ERROR_MSG)
+        return self._group_info.get("name", "")
+    
+    
+    @property
+    def state(self) -> GroupState:
+        """Get the current state of the group."""
+        if not self._group_info:
+            raise RuntimeError(GroupController.NOT_INITIALIZED_ERROR_MSG)
+        
+        group_state = self._group_info.get("state", {}).copy()
+        group_action = self._group_info.get("action", {}).copy()
+        return {**group_state, **group_action}
+    
+    async def set_state(self, state: Dict[str, Any], transition_time: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Update the state of this group.
+        """
+        if transition_time is not None:
+            state = state.copy()
+            state["transitiontime"] = transition_time
+            
+        result = await self.group_service.set_group_state(self.group_id, state)
+        
+        await self._refresh_group_info()
+        return result
+    
+    async def set_brightness(self, brightness: int, transition_time: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Set the brightness level for this group.
+        """
+        brightness = max(0, min(254, brightness))
+        return await self.set_state({"bri": brightness}, transition_time)
+    
+    async def turn_on(self, transition_time: int = 4) -> List[Dict[str, Any]]:
+        """Turn on this group with a smooth transition, restoring previous state if available.
         """
         last_state_id = self.state_repository.get_last_off_state()
         saved_state = None
@@ -96,295 +179,177 @@ class GroupSwitch:
             saved_state = self.state_repository.get_state(last_state_id)
         
         if saved_state:
-            for group_id, state in saved_state.items():
-                restore_state = self._get_restorable_state(state)
-                # Add transition time to make the restoration smoother
-                restore_state["transitiontime"] = transition_time
-                await self.group_service.set_group_state(group_id, restore_state)
+            restore_state = {
+                k: v
+                for k, v in saved_state.items()
+                if k in ["on", "bri", "hue", "sat", "xy", "ct", "effect", "colormode"]
+            }
             
+            restore_state["transitiontime"] = transition_time
+            
+            result = await self.set_state(restore_state)
             self.state_repository.clear_last_off_state()
+            return result
         else:
-            # No saved state, just turn all groups on with transition
-            groups = await self.group_service.get_all_groups()
-            for group_id in groups:
-                await self.group_service.set_group_state(group_id, {
-                    "on": True,
-                    "transitiontime": transition_time
-                })
+            # No saved state, just turn on
+            return await self.set_state({"on": True}, transition_time)
     
-    async def turn_all_off(self, transition_time: int = 4) -> bool:
-        """Turn off all groups with a smooth transition.
-        """
-        groups = await self.group_service.get_all_groups()
-        group_ids = list(groups.keys())
+    async def turn_off(self, transition_time: int = 4) -> List[Dict[str, Any]]:
+        await self._refresh_group_info()
         
-        # Collect current states
-        states: Dict[str, GroupState] = {}
-        for group_id in group_ids:
-            if group_id in groups:
-                # For groups, we need to merge state and action properties
-                group_state = groups[group_id]["state"].copy()
-                group_action = groups[group_id]["action"].copy()
-                # Action contains the light properties we want to save
-                combined_state = {**group_state, **group_action}
-                states[group_id] = combined_state
-        
-        # Save the states
-        state_id = f"groups_before_off_{asyncio.get_event_loop().time()}"
-        self.state_repository.save_state(state_id, states)
+        # Save the current state
+        current_state = self.state
+        state_id = f"group_{self.group_id}_before_off_{asyncio.get_event_loop().time()}"
+        self.state_repository.save_state(state_id, current_state)
         self.state_repository.set_last_off_state(state_id)
         
-        # Turn off all groups with a smooth transition
-        for group_id in group_ids:
-            await self.group_service.set_group_state(group_id, {
-                "on": False,
-                "transitiontime": transition_time
-            })
-            
-        return True
+        # Turn off with transition
+        return await self.set_state({"on": False}, transition_time)
     
-    def _get_restorable_state(self, state: GroupState) -> Dict[str, Any]:
-        """Extract restorable properties from a group state."""
-        return {
-            k: v
-            for k, v in state.items()
-            if k in ["on", "bri", "hue", "sat", "xy", "ct", "effect", "colormode"]
-        }
-
-
-class GroupController:
-    """Controller for managing Philips Hue light groups with state persistence."""
-    
-    def __init__(self, bridge: HueBridge, group_name: Optional[str] = None) -> None:
-        """Initialize the GroupController with a Hue Bridge and optional default group name.
-        
-        Args:
-            bridge: HueBridge instance for API communication
-            default_group_name: Name of the group to use by default
+    async def save_state(self, save_id: Optional[str] = None) -> str:
+        """Save the current state of this group.
         """
-        self.bridge = bridge
-        self.state_repository = GroupStateRepository()
-        self.group_service = GroupService(bridge)
-        self.group_switch = GroupSwitch(self.group_service, self.state_repository)
-        self.default_group_name = group_name
-        self._group_name_to_id_cache: Dict[str, str] = {}
-    
-    async def get_all_groups(self) -> Dict[str, GroupInfo]:
-        """Retrieve all light groups from the Hue Bridge."""
-        return await self.group_service.get_all_groups()
-    
-    async def set_group_state(self, group_id_or_name: str, state: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Update the state of a specific light group.
-        """
-        group_id = await self._resolve_group_identifier(group_id_or_name)
-        if not group_id:
-            raise ValueError(f"Group '{group_id_or_name}' not found")
-            
-        return await self.group_service.set_group_state(group_id, state)
-    
-    async def set_group_brightness(self, group_id_or_name: str, brightness: int) -> List[Dict[str, Any]]:
-        """Set the brightness level for a specific light group.
-        """
-        brightness = max(0, min(254, brightness))
-        return await self.set_group_state(group_id_or_name, {"bri": brightness})
+        # Make sure we have the latest state
+        await self._refresh_group_info()
         
-    async def _resolve_group_identifier(self, group_id_or_name: str) -> Optional[str]:
-        """Resolve a group identifier to a group ID.
-        """
-        # Check if it's already a group ID
-        groups = await self.get_all_groups()
-        if group_id_or_name in groups:
-            return group_id_or_name
-            
-        # Try to resolve as a name
-        group_id = await self.get_group_id_by_name(group_id_or_name)
-        if group_id:
-            return group_id
-            
-        # If still not found and we have a default, use it
-        if self.default_group_name:
-            return await self.get_default_group_id()
-            
-        return None
-    
-    async def get_group_id_by_name(self, group_name: str) -> Optional[str]:
-        """Find and return the group ID corresponding to the given name.
-        
-        Args:
-            group_name: Name of the group to look for
-            
-        Returns:
-            Group ID if found, None otherwise
-        """
-        # Check cache first
-        if group_name in self._group_name_to_id_cache:
-            return self._group_name_to_id_cache[group_name]
-            
-        # Cache miss, fetch from bridge
-        groups = await self.get_all_groups()
-        
-        for group_id, group_data in groups.items():
-            if group_data.get("name") == group_name:
-                # Update cache
-                self._group_name_to_id_cache[group_name] = group_id
-                return group_id
-                
-        return None
-    
-    async def get_default_group_id(self) -> str:
-        """Get the default group ID based on the configured default group name.
-        
-        If a default group name is set and found, its ID is returned.
-        Otherwise, returns "0" (all lights).
-        
-        Returns:
-            Group ID to use by default
-        """
-        if self.default_group_name:
-            group_id = await self.get_group_id_by_name(self.default_group_name)
-            if group_id:
-                return group_id
-                
-        # Fallback to "0" (all lights group)
-        return "0"
-    
-    async def get_active_group(self) -> str:
-        """Find and return the ID of the first active light group.
-        
-        An active group is one that has at least one light turned on.
-        If no active groups are found, returns the default group ID.
-        """
-        groups = await self.get_all_groups()
-
-        # First check if the default group is active
-        default_id = await self.get_default_group_id()
-        if default_id in groups and groups[default_id].get("state", {}).get("any_on", False):
-            return default_id
-
-        # Otherwise find any active group
-        for group_id, group_data in groups.items():
-            if group_data.get("state", {}).get("any_on", False):
-                return group_id
-
-        # No active groups, return default
-        return default_id
-    
-    async def turn_groups_on(self, transition_time: int = 4) -> bool:
-        """Turn on all groups with a smooth transition, restoring previous state if available.
-        
-        Args:
-            transition_time: Transition time in tenths of a second (default: 4 = 0.4 seconds)
-                             The Hue API expects this value in 100ms units
-        
-        Returns:
-            True if operation was successful
-        """
-        await self.group_switch.turn_all_on(transition_time)
-        return True
-    
-    async def turn_groups_off(self, transition_time: int = 4) -> bool:
-        """Turn off all groups with a smooth transition and save their current state.
-        
-        Args:
-            transition_time: Transition time in tenths of a second (default: 4 = 0.4 seconds)
-                             The Hue API expects this value in 100ms units
-        
-        Returns:
-            True if operation was successful
-        """
-        return await self.group_switch.turn_all_off(transition_time)
-    
-    @property
-    def saved_states(self) -> Dict[str, Dict[str, GroupState]]:
-        """Get all saved group states."""
-        return self.state_repository.saved_states
-    
-    async def save_group_states(self, group_identifiers: List[str], save_id: Optional[str] = None) -> str:
-        """Save the current state of specified groups.
-        
-        Args:
-            group_identifiers: List of group IDs or names
-            save_id: Optional identifier for the saved state
-            
-        Returns:
-            Identifier of the saved state
-        """
-        # Resolve all group identifiers to IDs
-        group_ids = []
-        for identifier in group_identifiers:
-            group_id = await self._resolve_group_identifier(identifier)
-            if group_id:
-                group_ids.append(group_id)
-        
-        if not group_ids:
-            raise ValueError("No valid groups found to save")
-            
         if save_id is None:
-            save_id = f"save_{'_'.join(group_ids)}"
+            save_id = f"save_group_{self.group_id}_{asyncio.get_event_loop().time()}"
             
-        groups = await self.group_service.get_all_groups()
-        states: Dict[str, GroupState] = {}
-        
-        for group_id in group_ids:
-            if group_id in groups:
-                # Combine state and action for complete state representation
-                group_state = groups[group_id]["state"].copy()
-                group_action = groups[group_id]["action"].copy()
-                combined_state = {**group_state, **group_action}
-                states[group_id] = combined_state
-                
-        self.state_repository.save_state(save_id, states)
+        # Save the current state
+        self.state_repository.save_state(save_id, self.state)
         return save_id
-        
-    async def save_group_by_name(self, group_name: str, save_id: Optional[str] = None) -> str:
-        """Convenience method to save a single group state by name.
-        
-        Args:
-            group_name: Name of the group to save
-            save_id: Optional identifier for the saved state
-            
-        Returns:
-            Identifier of the saved state
-        """
-        group_id = await self.get_group_id_by_name(group_name)
-        if not group_id:
-            raise ValueError(f"Group '{group_name}' not found")
-            
-        return await self.save_group_states([group_id], save_id)
     
-    async def restore_group_states(self, save_id: str, transition_time: int = 4) -> bool:
-        """Restore previously saved group states with a smooth transition.
-        
-        Args:
-            save_id: Identifier of the saved state to restore
-            transition_time: Transition time in tenths of a second (default: 4 = 0.4 seconds)
-                             The Hue API expects this value in 100ms units
-        
-        Returns:
-            True if restoration was successful, False if the saved state wasn't found
+    async def restore_state(self, save_id: str, transition_time: int = 4) -> bool:
+        """Restore a previously saved state with a smooth transition.
         """
         saved_state = self.state_repository.get_state(save_id)
         if not saved_state:
             return False
             
-        for group_id, state in saved_state.items():
-            restore_state = {
-                k: v
-                for k, v in state.items()
-                if k in ["on", "bri", "hue", "sat", "xy", "ct", "effect", "colormode"]
-            }
-            
-            # Add transition time for a smoother change
-            restore_state["transitiontime"] = transition_time
-            
-            await self.group_service.set_group_state(group_id, restore_state)
-            
-        return True
+        restore_state = {
+            k: v
+            for k, v in saved_state.items()
+            if k in ["on", "bri", "hue", "sat", "xy", "ct", "effect", "colormode"]
+        }
         
+        restore_state["transitiontime"] = transition_time
+        
+        await self.set_state(restore_state)
+        return True
+    
     def clear_saved_state(self, save_id: str) -> bool:
         """Remove a saved state from the repository."""
         return self.state_repository.remove_state(save_id)
     
-    def get_saved_state(self, save_id: str) -> Optional[Dict[str, GroupState]]:
+    def get_saved_state(self, save_id: str) -> Optional[GroupState]:
         """Retrieve a saved state from the repository."""
         return self.state_repository.get_state(save_id)
+    
+    @property
+    def saved_states(self) -> Dict[str, GroupState]:
+        """Get all saved states for this group."""
+        return self.state_repository.saved_states
+    
+    async def is_any_on(self) -> bool:
+        """Check if any lights in the group are on."""
+        await self._refresh_group_info()
+        return self._group_info.get("state", {}).get("any_on", False)
+    
+    async def is_all_on(self) -> bool:
+        """Check if all lights in the group are on."""
+        await self._refresh_group_info()
+        return self._group_info.get("state", {}).get("all_on", False)
+
+
+class GroupsManager:
+    """Manager for all Philips Hue light groups."""
+    
+    def __init__(self, bridge: HueBridge) -> None:
+        """Initialize the GroupsManager with a Hue Bridge."""
+        self.bridge = bridge
+        self.group_service = GroupService(bridge)
+        self._controllers: Dict[str, GroupController] = {}
+        self._groups_cache: Optional[Dict[str, GroupInfo]] = None
+    
+    async def get_all_groups(self) -> Dict[str, GroupInfo]:
+        """Retrieve all light groups from the Hue Bridge."""
+        self._groups_cache = await self.group_service.get_all_groups()
+        return self._groups_cache.copy()
+    
+    async def get_controller(self, group_identifier: str) -> GroupController:
+        """Get or create a controller for a specific group.
+        """
+        if group_identifier in self._controllers:
+            return self._controllers[group_identifier]
+        
+        await self.get_all_groups()
+        
+        group_id = await self._resolve_group_identifier(group_identifier)
+        
+        if not group_id:
+            # Group not found, generate helpful error message with alternatives
+            available_groups = await self.get_available_groups_formatted()
+            message = f"Group '{group_identifier}' not found.\n{available_groups}"
+            
+            raise ValueError(message)
+        
+        if group_id in self._controllers:
+            return self._controllers[group_id]
+        
+        controller = GroupController(self.bridge, group_id)
+        await controller.initialize()
+        
+        self._controllers[group_id] = controller
+        self._controllers[controller.name] = controller
+        
+        return controller
+    
+    async def _resolve_group_identifier(self, identifier: str) -> Optional[str]:
+        """Resolve a group identifier to a group ID.
+        """
+        if not self._groups_cache:
+            await self.get_all_groups()
+            
+        if identifier in self._groups_cache:
+            return identifier
+            
+        for group_id, group_data in self._groups_cache.items():
+            if group_data.get("name") == identifier:
+                return group_id
+        
+        identifier_lower = identifier.lower()
+        for group_id, group_data in self._groups_cache.items():
+            name = group_data.get("name", "")
+            if name.lower() == identifier_lower:
+                return group_id
+                
+        return None
+    
+    async def get_available_groups_formatted(self) -> str:
+        """Get a formatted string listing all available groups organized by type.
+        """
+        if not self._groups_cache:
+            await self.get_all_groups()
+            
+        groups_by_type: Dict[str, List[str]] = {}
+        
+        for _, info in self._groups_cache.items():
+            group_type = info.get("type", "Unknown")
+            group_name = info.get("name", "Unnamed")
+            
+            if group_type not in groups_by_type:
+                groups_by_type[group_type] = []
+            
+            groups_by_type[group_type].append(group_name)
+        
+        for _, names in groups_by_type.items():
+            names.sort()
+        
+        output = "Available groups:\n"
+        
+        for group_type, names in sorted(groups_by_type.items()):
+            output += f"\n{group_type} groups:\n"
+            for name in names:
+                output += f"  - {name}\n"
+                
+        return output
