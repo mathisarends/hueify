@@ -4,7 +4,8 @@ setup(
     name="hueify",
     version="0.1.0",
     description="Hue control CLI tool",
-    author="Dein Name",
+    author="Mathis Arends",
+    url="https://github.com/mathisarends/hueify",
     packages=find_packages(),
     install_requires=[
         "typer[all]",
