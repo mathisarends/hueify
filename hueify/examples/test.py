@@ -3,7 +3,6 @@ import time
 from hueify.bridge import HueBridge
 from hueify.controllers.group_controller import GroupsManager
 
-
 async def usage_example_1():
     """Beispiel für die Verwendung des LightController als Facade."""
     bridge = HueBridge.connect_by_ip()
@@ -24,7 +23,7 @@ async def usage_example_1():
     
     time.sleep(5)
     
-    await room_controller.decrease_brightness(decrement=50)
+    await room_controller.increase_brightness_percentage(30)
     
 
 if __name__ == "__main__":

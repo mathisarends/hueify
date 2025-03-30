@@ -5,7 +5,6 @@ import asyncio
 from hueify.bridge import HueBridge
 from hueify.controllers.group_scene_controller import GroupSceneController
 
-
 class GroupState(TypedDict, total=False):
     on: bool
     bri: int
@@ -76,7 +75,7 @@ class GroupService:
     async def get_group(self, group_id: str) -> GroupInfo:
         return await self.bridge.get_request(f"groups/{group_id}")
     
-    async def set_group_state(self, group_id: str, state: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def set_group_state(self, group_id: str, state: GroupState) -> List[Dict[str, Any]]:
         return await self.bridge.put_request(f"groups/{group_id}/action", state)
     
     async def get_group_id_by_name(self, group_name: str) -> Optional[str]:
@@ -88,6 +87,94 @@ class GroupService:
                 return group_id
                 
         return None
+
+
+class GroupControllerFactory:
+    """Factory for creating GroupController instances."""
+    
+    def __init__(self, bridge: HueBridge) -> None:
+        self.bridge = bridge
+        self.group_service = GroupService(bridge)
+        self._controllers_cache: Dict[str, GroupController] = {}
+        self._groups_cache: Optional[Dict[str, GroupInfo]] = None
+        
+    async def get_cached_groups(self) -> Dict[str, GroupInfo]:
+        """Get the current cached groups."""
+        if not self._groups_cache:
+            await self._refresh_groups_cache()
+        return self._groups_cache.copy()
+    
+    async def get_controller(self, group_identifier: str) -> GroupController:
+        """Returns an existing controller or creates a new one."""
+        if group_identifier in self._controllers_cache:
+            return self._controllers_cache[group_identifier]
+        
+        group_id = await self._resolve_group_identifier(group_identifier)
+        
+        if not group_id:
+            available_groups = await self.get_available_groups_formatted()
+            message = f"Group '{group_identifier}' not found.\n{available_groups}"
+            raise ValueError(message)
+        
+        controller = GroupController(self.bridge, group_id)
+        await controller.initialize()
+        
+        self._controllers_cache[group_id] = controller
+        self._controllers_cache[controller.name] = controller
+        
+        return controller
+    
+    async def _resolve_group_identifier(self, identifier: str) -> Optional[str]:
+        """Resolves the group ID from an identifier (name or ID)."""
+        if not self._groups_cache:
+            await self._refresh_groups_cache()
+            
+        if identifier in self._groups_cache:
+            return identifier
+        
+        for group_id, group_data in self._groups_cache.items():
+            if group_data.get("name") == identifier:
+                return group_id
+        
+        identifier_lower = identifier.lower()
+        for group_id, group_data in self._groups_cache.items():
+            name = group_data.get("name", "")
+            if name.lower() == identifier_lower:
+                return group_id
+                
+        return None
+    
+    async def _refresh_groups_cache(self) -> None:
+        """Refreshes the groups cache."""
+        self._groups_cache = await self.group_service.get_all_groups()
+    
+    async def get_available_groups_formatted(self) -> str:
+        """Returns a formatted overview of all available groups."""
+        if not self._groups_cache:
+            await self._refresh_groups_cache()
+            
+        groups_by_type: Dict[str, List[str]] = {}
+        
+        for _, info in self._groups_cache.items():
+            group_type = info.get("type", "Unknown")
+            group_name = info.get("name", "Unnamed")
+            
+            if group_type not in groups_by_type:
+                groups_by_type[group_type] = []
+            
+            groups_by_type[group_type].append(group_name)
+        
+        for _, names in groups_by_type.items():
+            names.sort()
+        
+        output = "Available groups:\n"
+        
+        for group_type, names in sorted(groups_by_type.items()):
+            output += f"\n{group_type} groups:\n"
+            for name in names:
+                output += f"  - {name}\n"
+                
+        return output
 
 
 class GroupController:
@@ -174,7 +261,7 @@ class GroupController:
         """
         return await self.scenes.activate_scene_by_name(scene_name)
     
-    async def set_state(self, state: Dict[str, Any], transition_time: Optional[int] = None) -> List[Dict[str, Any]]:
+    async def set_state(self, state: GroupState, transition_time: Optional[int] = None) -> List[Dict[str, Any]]:
         """Update the state of this group.
         """
         if transition_time is not None:
@@ -186,46 +273,62 @@ class GroupController:
         await self._refresh_group_info()
         return result
     
-    async def set_brightness(self, brightness: int, transition_time: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Set the brightness level for this group.
-        """
-        brightness = max(0, min(254, brightness))
-        return await self.set_state({"bri": brightness}, transition_time)
-    
-    
-    async def increase_brightness(self, increment: int = 30, transition_time: int = 4) -> List[Dict[str, Any]]:
-        """Erhöht die Helligkeit der Gruppe um den angegebenen Wert.
-        """
+    async def get_current_brightness_percentage(self) -> int:
+        """Returns the current brightness as a percentage value (0-100)."""
         await self._refresh_group_info()
         current_state = self.state
         
         if not current_state.get("on", False):
-            return await self.set_state({"on": True, "bri": min(increment, 254)}, transition_time)
+            return 0
         
         current_brightness = current_state.get("bri", 0)
+        return round(current_brightness * 100 / 254)
         
-        new_brightness = min(current_brightness + increment, 254)
+    async def set_brightness_percentage(self, percentage: int, transition_time: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Sets the brightness of the group to a percentage value.
         
-        return await self.set_brightness(new_brightness, transition_time)
-
-
-    async def decrease_brightness(self, decrement: int = 30, transition_time: int = 4) -> List[Dict[str, Any]]:
-        """Verringert die Helligkeit der Gruppe um den angegebenen Wert.
+        Args:
+            percentage: Brightness in percent (0-100)
+            transition_time: Transition time in 100ms units
         """
-        await self._refresh_group_info()
-        current_state = self.state
+        percentage = max(0, min(100, percentage))
         
-        if not current_state.get("on", False):
+        if percentage == 0:
+            return await self.turn_off(transition_time if transition_time is not None else 4)
+        
+        # Convert from percent (0-100) to Hue brightness (0-254)
+        brightness = round(percentage * 254 / 100)
+        
+        state: GroupState = {"on": True, "bri": brightness}
+        return await self.set_state(state, transition_time)
+    
+    
+    async def increase_brightness_percentage(self, increment: int = 10, transition_time: int = 4) -> List[Dict[str, Any]]:
+        """Increases the brightness of the group by the specified percentage.
+        """
+        current_percentage = await self.get_current_brightness_percentage()
+        
+        if current_percentage == 0:
+            return await self.set_brightness_percentage(min(increment, 100), transition_time)
+        
+        new_percentage = min(current_percentage + increment, 100)
+        
+        return await self.set_brightness_percentage(new_percentage, transition_time)
+
+    async def decrease_brightness_percentage(self, decrement: int = 10, transition_time: int = 4) -> List[Dict[str, Any]]:
+        """Decreases the brightness of the group by the specified percentage.
+        """
+        current_percentage = await self.get_current_brightness_percentage()
+        
+        if current_percentage == 0:
             return []
         
-        current_brightness = current_state.get("bri", 0)
+        new_percentage = max(current_percentage - decrement, 0)
         
-        new_brightness = max(current_brightness - decrement, 1)
-        
-        if new_brightness <= 5:
+        if new_percentage <= 2:
             return await self.turn_off(transition_time)
         
-        return await self.set_brightness(new_brightness, transition_time)
+        return await self.set_brightness_percentage(new_percentage, transition_time)
     
     
     async def turn_on(self, transition_time: int = 4) -> List[Dict[str, Any]]:
@@ -238,7 +341,7 @@ class GroupController:
             saved_state = self.state_repository.get_state(last_state_id)
         
         if saved_state:
-            restore_state = {
+            restore_state: GroupState = {
                 k: v
                 for k, v in saved_state.items()
                 if k in ["on", "bri", "hue", "sat", "xy", "ct", "effect", "colormode"]
@@ -251,7 +354,8 @@ class GroupController:
             return result
         else:
             # No saved state, just turn on
-            return await self.set_state({"on": True}, transition_time)
+            state: GroupState = {"on": True}
+            return await self.set_state(state, transition_time)
     
     async def turn_off(self, transition_time: int = 4) -> List[Dict[str, Any]]:
         await self._refresh_group_info()
@@ -262,19 +366,17 @@ class GroupController:
         self.state_repository.save_state(state_id, current_state)
         self.state_repository.set_last_off_state(state_id)
         
-        # Turn off with transition
-        return await self.set_state({"on": False}, transition_time)
+        state: GroupState = {"on": False}
+        return await self.set_state(state, transition_time)
     
     async def save_state(self, save_id: Optional[str] = None) -> str:
         """Save the current state of this group.
         """
-        # Make sure we have the latest state
         await self._refresh_group_info()
         
         if save_id is None:
             save_id = f"save_group_{self.group_id}_{asyncio.get_event_loop().time()}"
             
-        # Save the current state
         self.state_repository.save_state(save_id, self.state)
         return save_id
     
@@ -285,7 +387,7 @@ class GroupController:
         if not saved_state:
             return False
             
-        restore_state = {
+        restore_state: GroupState = {
             k: v
             for k, v in saved_state.items()
             if k in ["on", "bri", "hue", "sat", "xy", "ct", "effect", "colormode"]
@@ -327,87 +429,16 @@ class GroupsManager:
         """Initialize the GroupsManager with a Hue Bridge."""
         self.bridge = bridge
         self.group_service = GroupService(bridge)
-        self._controllers: Dict[str, GroupController] = {}
-        self._groups_cache: Optional[Dict[str, GroupInfo]] = None
+        self.controller_factory = GroupControllerFactory(bridge)
     
     async def get_all_groups(self) -> Dict[str, GroupInfo]:
         """Retrieve all light groups from the Hue Bridge."""
-        self._groups_cache = await self.group_service.get_all_groups()
-        return self._groups_cache.copy()
+        return await self.controller_factory.get_cached_groups()
     
     async def get_controller(self, group_identifier: str) -> GroupController:
-        """Get or create a controller for a specific group.
-        """
-        if group_identifier in self._controllers:
-            return self._controllers[group_identifier]
-        
-        await self.get_all_groups()
-        
-        group_id = await self._resolve_group_identifier(group_identifier)
-        
-        if not group_id:
-            available_groups = await self.get_available_groups_formatted()
-            message = f"Group '{group_identifier}' not found.\n{available_groups}"
-            
-            raise ValueError(message)
-        
-        if group_id in self._controllers:
-            return self._controllers[group_id]
-        
-        controller = GroupController(self.bridge, group_id)
-        await controller.initialize()
-        
-        self._controllers[group_id] = controller
-        self._controllers[controller.name] = controller
-        
-        return controller
-    
-    async def _resolve_group_identifier(self, identifier: str) -> Optional[str]:
-        """Resolve a group identifier to a group ID.
-        """
-        if not self._groups_cache:
-            await self.get_all_groups()
-            
-        if identifier in self._groups_cache:
-            return identifier
-            
-        for group_id, group_data in self._groups_cache.items():
-            if group_data.get("name") == identifier:
-                return group_id
-        
-        identifier_lower = identifier.lower()
-        for group_id, group_data in self._groups_cache.items():
-            name = group_data.get("name", "")
-            if name.lower() == identifier_lower:
-                return group_id
-                
-        return None
+        """Get a controller for the specified group."""
+        return await self.controller_factory.get_controller(group_identifier)
     
     async def get_available_groups_formatted(self) -> str:
-        """Get a formatted string listing all available groups organized by type.
-        """
-        if not self._groups_cache:
-            await self.get_all_groups()
-            
-        groups_by_type: Dict[str, List[str]] = {}
-        
-        for _, info in self._groups_cache.items():
-            group_type = info.get("type", "Unknown")
-            group_name = info.get("name", "Unnamed")
-            
-            if group_type not in groups_by_type:
-                groups_by_type[group_type] = []
-            
-            groups_by_type[group_type].append(group_name)
-        
-        for _, names in groups_by_type.items():
-            names.sort()
-        
-        output = "Available groups:\n"
-        
-        for group_type, names in sorted(groups_by_type.items()):
-            output += f"\n{group_type} groups:\n"
-            for name in names:
-                output += f"  - {name}\n"
-                
-        return output
+        """Get a formatted overview of all available groups."""
+        return await self.controller_factory.get_available_groups_formatted()

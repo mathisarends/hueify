@@ -7,7 +7,6 @@ from hueify.bridge import HueBridge
 @dataclass
 class SceneInfo:
     """Information about a scene."""
-    
     id: str
     name: str = ""
     group_id: str = ""
@@ -41,7 +40,7 @@ class SceneService:
         """Get all scenes associated with a specific group."""
         all_scenes = await self.get_all_scenes()
         return {
-            scene_id: scene_data 
+            scene_id: scene_data
             for scene_id, scene_data in all_scenes.items()
             if scene_data.get("group") == group_id
         }
