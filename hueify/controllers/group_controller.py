@@ -192,6 +192,42 @@ class GroupController:
         brightness = max(0, min(254, brightness))
         return await self.set_state({"bri": brightness}, transition_time)
     
+    
+    async def increase_brightness(self, increment: int = 30, transition_time: int = 4) -> List[Dict[str, Any]]:
+        """Erhöht die Helligkeit der Gruppe um den angegebenen Wert.
+        """
+        await self._refresh_group_info()
+        current_state = self.state
+        
+        if not current_state.get("on", False):
+            return await self.set_state({"on": True, "bri": min(increment, 254)}, transition_time)
+        
+        current_brightness = current_state.get("bri", 0)
+        
+        new_brightness = min(current_brightness + increment, 254)
+        
+        return await self.set_brightness(new_brightness, transition_time)
+
+
+    async def decrease_brightness(self, decrement: int = 30, transition_time: int = 4) -> List[Dict[str, Any]]:
+        """Verringert die Helligkeit der Gruppe um den angegebenen Wert.
+        """
+        await self._refresh_group_info()
+        current_state = self.state
+        
+        if not current_state.get("on", False):
+            return []
+        
+        current_brightness = current_state.get("bri", 0)
+        
+        new_brightness = max(current_brightness - decrement, 1)
+        
+        if new_brightness <= 5:
+            return await self.turn_off(transition_time)
+        
+        return await self.set_brightness(new_brightness, transition_time)
+    
+    
     async def turn_on(self, transition_time: int = 4) -> List[Dict[str, Any]]:
         """Turn on this group with a smooth transition, restoring previous state if available.
         """
