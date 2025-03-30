@@ -1,14 +1,18 @@
 from __future__ import annotations
 
-import asyncio
 import os
 from typing import Any, Optional
-
 import aiohttp
 from dotenv import load_dotenv
 
+load_dotenv()
+
 class HueBridge:
     """Base class for communication with the Hue Bridge."""
+    
+    # Default environment variable names
+    ENV_USER_ID = "HUE_USER_ID"
+    ENV_BRIDGE_IP = "HUE_BRIDGE_IP"
 
     def __init__(self, ip: str, user: str) -> None:
         """
@@ -34,12 +38,17 @@ class HueBridge:
     async def connect(cls) -> HueBridge:
         """
         Connects to the first discovered Hue Bridge using stored credentials.
+        Raises:
+            ValueError: If no bridge is found or user ID isn't available
         """
         bridges = await BridgeDiscovery.discover_bridges()
         if not bridges:
             raise ValueError("No Hue Bridge found")
 
-        ip, user_id = BridgeDiscovery.get_credentials()
+        user_id = os.getenv(cls.ENV_USER_ID)
+        if not user_id:
+            raise ValueError(f"No user ID found. Set {cls.ENV_USER_ID} environment variable.")
+
         return cls(ip=bridges[0]["internalipaddress"], user=user_id)
 
     @classmethod
@@ -48,11 +57,15 @@ class HueBridge:
     ) -> HueBridge:
         """
         Connects to a Hue Bridge using a specific IP address and user ID.
+        Falls back to environment variables if parameters are not provided.
         """
-        if ip is None or user_id is None:
-            fallback_ip, fallback_user = BridgeDiscovery.get_credentials()
-            ip = ip or fallback_ip
-            user_id = user_id or fallback_user
+        ip = ip or os.getenv(cls.ENV_BRIDGE_IP)
+        user_id = user_id or os.getenv(cls.ENV_USER_ID)
+        
+        if not ip:
+            raise ValueError(f"No IP address provided. Set {cls.ENV_BRIDGE_IP} environment variable or pass IP.")
+        if not user_id:
+            raise ValueError(f"No user ID provided. Set {cls.ENV_USER_ID} environment variable or pass user ID.")
 
         return cls(ip=ip, user=user_id)
 
@@ -73,7 +86,6 @@ class HueBridge:
                 return await response.json()
 
 
-
 class BridgeDiscovery:
     """Responsible for discovering and configuring Hue Bridges."""
 
@@ -85,17 +97,3 @@ class BridgeDiscovery:
         async with aiohttp.ClientSession() as session:
             async with session.get("https://discovery.meethue.com/") as response:
                 return await response.json()
-
-    @staticmethod
-    def get_credentials() -> tuple[str, str]:
-        """
-        Loads the Hue Bridge IP and user ID from environment variables.
-        """
-        load_dotenv()
-        bridge_ip = os.getenv("HUE_BRIDGE_IP")
-        user_id = os.getenv("HUE_USER_ID")
-
-        if not user_id:
-            raise ValueError("HUE_USER_ID not found in .env file")
-
-        return bridge_ip, user_id
