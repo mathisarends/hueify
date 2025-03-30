@@ -10,8 +10,8 @@ setup(
         "typer[all]",
     ],
     entry_points={
-        "console_scripts": [
-            "hueify = hueify.cli:app",
+        'console_scripts': [
+            'hueify=hueify.cli:app',
         ],
     },
     include_package_data=True,

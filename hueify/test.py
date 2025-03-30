@@ -1,6 +1,6 @@
 import asyncio
 import time
-from bridge import HueBridge
+from hueify.bridge import HueBridge
 from controllers.group_controller import GroupsManager
 
 

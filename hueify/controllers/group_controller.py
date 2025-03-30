@@ -1,8 +1,9 @@
 from __future__ import annotations
 from typing import Any, Dict, List, Literal, Optional, TypedDict
 import asyncio
-from bridge import HueBridge
-from controllers.group_scene_controller import GroupSceneController
+
+from hueify.bridge import HueBridge
+from hueify.controllers.group_scene_controller import GroupSceneController
 
 
 class GroupState(TypedDict, total=False):

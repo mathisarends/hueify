@@ -1,27 +1,28 @@
 from __future__ import annotations
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
-from bridge import HueBridge
+from hueify.bridge import HueBridge
 
 
+@dataclass
 class SceneInfo:
     """Information about a scene."""
     
-    def __init__(self, scene_id: str, data: Dict[str, Any]) -> None:
-        self.id = scene_id
-        self.name = data.get("name", "")
-        self.group_id = data.get("group", "")
-        self.type = data.get("type", "")
-        self.lights = data.get("lights", [])
-        self.owner = data.get("owner", "")
-        self.recycle = data.get("recycle", False)
-        self.locked = data.get("locked", False)
-        self.appdata = data.get("appdata", {})
-        self.picture = data.get("picture", "")
-        self.image = data.get("image", "")
-        self.lastupdated = data.get("lastupdated", "")
-        self.version = data.get("version", 0)
-        self._data = data
-    
+    id: str
+    name: str = ""
+    group_id: str = ""
+    type: str = ""
+    lights: List[str] = field(default_factory=list)
+    owner: str = ""
+    recycle: bool = False
+    locked: bool = False
+    appdata: Dict[str, Any] = field(default_factory=dict)
+    picture: str = ""
+    image: str = ""
+    lastupdated: str = ""
+    version: int = 0
+    _data: Dict[str, Any] = field(default_factory=dict)
+
     def __str__(self) -> str:
         return f"Scene: {self.name} (ID: {self.id})"
 
