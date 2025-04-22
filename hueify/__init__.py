@@ -1,4 +1,4 @@
 from .bridge import HueBridge
-from .controllers.group_controller import GroupsManager
+from .controllers.group.groups_manager import GroupsManager
 
 __all__ = ["HueBridge", "GroupsManager"]
