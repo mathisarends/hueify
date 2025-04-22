@@ -7,9 +7,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 class HueBridge:
     """
-    Provides methods for interacting with a Philips Hue Bridge, including 
+    Provides methods for interacting with a Philips Hue Bridge, including
     connection management and HTTP communication via the Hue API.
     """
 
@@ -26,7 +27,7 @@ class HueBridge:
         """
         self.ip = ip
         self.user = user
-    
+
     @staticmethod
     async def discover_bridges() -> list[dict[str, str]]:
         """
@@ -52,7 +53,7 @@ class HueBridge:
     @classmethod
     async def connect(cls) -> HueBridge:
         """
-        Discover available Hue Bridges and connect to the first one using 
+        Discover available Hue Bridges and connect to the first one using
         credentials stored in environment variables.
 
         Returns:
@@ -67,7 +68,9 @@ class HueBridge:
 
         user_id = os.getenv(cls.ENV_USER_ID)
         if not user_id:
-            raise ValueError(f"No user ID found. Set {cls.ENV_USER_ID} environment variable.")
+            raise ValueError(
+                f"No user ID found. Set {cls.ENV_USER_ID} environment variable."
+            )
 
         return cls(ip=bridges[0]["internalipaddress"], user=user_id)
 
@@ -90,11 +93,15 @@ class HueBridge:
         """
         ip = ip or os.getenv(cls.ENV_BRIDGE_IP)
         user_id = user_id or os.getenv(cls.ENV_USER_ID)
-        
+
         if not ip:
-            raise ValueError(f"No IP address provided. Set {cls.ENV_BRIDGE_IP} environment variable or pass IP.")
+            raise ValueError(
+                f"No IP address provided. Set {cls.ENV_BRIDGE_IP} environment variable or pass IP."
+            )
         if not user_id:
-            raise ValueError(f"No user ID provided. Set {cls.ENV_USER_ID} environment variable or pass user ID.")
+            raise ValueError(
+                f"No user ID provided. Set {cls.ENV_USER_ID} environment variable or pass user ID."
+            )
 
         return cls(ip=ip, user=user_id)
 
@@ -126,7 +133,7 @@ class HueBridge:
         async with aiohttp.ClientSession() as session:
             async with session.put(f"{self.url}/{endpoint}", json=data) as response:
                 return await response.json()
-            
+
     def __repr__(self) -> str:
         """
         Return a short representation of the HueBridge instance.

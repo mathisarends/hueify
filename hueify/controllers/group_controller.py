@@ -6,6 +6,23 @@ from hueify.bridge import HueBridge
 from hueify.controllers.group_scene_controller import GroupSceneController
 
 class GroupState(TypedDict, total=False):
+    """
+    TypedDict representing the state of a Philips Hue light group.
+    
+    Attributes:
+        on: Boolean indicating if the group is on
+        bri: Brightness level (0-254)
+        hue: Hue value (0-65535)
+        sat: Saturation value (0-254)
+        xy: CIE color space coordinates [x, y]
+        ct: Color temperature in mireds (153-500)
+        alert: Alert effect type ('none', 'select', 'lselect')
+        effect: Effect type ('none', 'colorloop')
+        colormode: Color mode ('hs', 'xy', 'ct')
+        any_on: Boolean indicating if any light in the group is on
+        all_on: Boolean indicating if all lights in the group are on
+        transitiontime: Transition time in 100ms units (optional)
+    """
     on: bool
     bri: int
     hue: int
@@ -21,6 +38,18 @@ class GroupState(TypedDict, total=False):
 
 
 class GroupInfo(TypedDict):
+    """
+    TypedDict representing information about a Philips Hue light group.
+    
+    Attributes:
+        name: Name of the group
+        lights: List of light IDs in the group
+        type: Type of the group
+        state: Current state of the group
+        recycle: Whether the group is marked for recycling
+        class_: Class of the group
+        action: Dictionary of actions applicable to the group
+    """
     name: str
     lights: List[str]
     type: str
@@ -31,55 +60,153 @@ class GroupInfo(TypedDict):
 
 
 class GroupStateRepository:
-    """Repository for storing and retrieving group states."""
+    """
+    Repository for storing and retrieving group states.
+    
+    This class provides methods to save, retrieve, and manage light group states,
+    enabling features like state restoration when turning lights back on.
+    """
     
     def __init__(self) -> None:
+        """
+        Initialize an empty group state repository.
+        """
         self._saved_states: Dict[str, GroupState] = {}
         self._last_off_state_id: Optional[str] = None
     
     @property
     def saved_states(self) -> Dict[str, GroupState]:
+        """
+        Get a copy of all saved states.
+        
+        Returns:
+            A dictionary mapping state IDs to their corresponding group states
+        """
         return self._saved_states.copy()
     
     def save_state(self, state_id: str, group_state: GroupState) -> None:
+        """
+        Save a group state with the specified ID.
+        
+        Args:
+            state_id: Unique identifier for the state
+            group_state: The group state to save
+        """
         self._saved_states[state_id] = group_state.copy()
     
     def get_state(self, state_id: str) -> Optional[GroupState]:
+        """
+        Retrieve a saved state by its ID.
+        
+        Args:
+            state_id: ID of the state to retrieve
+            
+        Returns:
+            The saved state if found, None otherwise
+        """
         return self._saved_states.get(state_id)
     
     def remove_state(self, state_id: str) -> bool:
+        """
+        Remove a saved state by its ID.
+        
+        Args:
+            state_id: ID of the state to remove
+            
+        Returns:
+            True if the state was found and removed, False otherwise
+        """
         if state_id in self._saved_states:
             del self._saved_states[state_id]
             return True
         return False
     
     def set_last_off_state(self, state_id: str) -> None:
+        """
+        Set the ID of the last saved state before turning off.
+        
+        Args:
+            state_id: ID of the state to set as the last off state
+        """
         self._last_off_state_id = state_id
     
     def get_last_off_state(self) -> Optional[str]:
+        """
+        Get the ID of the last saved state before turning off.
+        
+        Returns:
+            The ID of the last off state if available, None otherwise
+        """
         return self._last_off_state_id
     
     def clear_last_off_state(self) -> None:
+        """
+        Clear the stored last off state ID.
+        """
         self._last_off_state_id = None
 
 
 class GroupService:
-    """Service for interacting with bridge APIs to control groups."""
+    """
+    Service for interacting with the Philips Hue bridge API to control groups.
+    
+    This class provides methods to get information about groups and modify
+    their states through the bridge API.
+    """
     
     def __init__(self, bridge: HueBridge) -> None:
+        """
+        Initialize the GroupService with a Hue Bridge.
+        
+        Args:
+            bridge: The HueBridge instance to use for API requests
+        """
         self.bridge = bridge
     
     async def get_all_groups(self) -> Dict[str, GroupInfo]:
+        """
+        Retrieve all groups from the Hue Bridge.
+        
+        Returns:
+            A dictionary mapping group IDs to their corresponding group information
+        """
         return await self.bridge.get_request("groups")
     
     async def get_group(self, group_id: str) -> GroupInfo:
+        """
+        Retrieve information about a specific group.
+        
+        Args:
+            group_id: ID of the group to retrieve
+            
+        Returns:
+            Group information for the specified ID
+        """
         return await self.bridge.get_request(f"groups/{group_id}")
     
     async def set_group_state(self, group_id: str, state: GroupState) -> List[Dict[str, Any]]:
+        """
+        Set the state of a specific group.
+        
+        Args:
+            group_id: ID of the group to modify
+            state: The state to apply to the group
+            
+        Returns:
+            A list of responses from the Hue Bridge API
+        """
         return await self.bridge.put_request(f"groups/{group_id}/action", state)
     
     async def get_group_id_by_name(self, group_name: str) -> Optional[str]:
-        """Find and return the group ID corresponding to the given name."""
+        """
+        Find and return the group ID corresponding to the given name.
+        
+        Args:
+            group_name: Name of the group to find
+            
+        Returns:
+            The group ID if found, None otherwise
+        """
         groups = await self.get_all_groups()
         
         for group_id, group_data in groups.items():
@@ -90,22 +217,49 @@ class GroupService:
 
 
 class GroupControllerFactory:
-    """Factory for creating GroupController instances."""
+    """
+    Factory for creating and managing GroupController instances.
+    
+    This class provides methods to create and retrieve group controllers,
+    with caching to avoid creating duplicate controllers for the same group.
+    """
     
     def __init__(self, bridge: HueBridge) -> None:
+        """
+        Initialize the GroupControllerFactory with a Hue Bridge.
+        
+        Args:
+            bridge: The HueBridge instance to use for creating controllers
+        """
         self.bridge = bridge
         self.group_service = GroupService(bridge)
         self._controllers_cache: Dict[str, GroupController] = {}
         self._groups_cache: Optional[Dict[str, GroupInfo]] = None
         
     async def get_cached_groups(self) -> Dict[str, GroupInfo]:
-        """Get the current cached groups."""
+        """
+        Get the current cached groups, refreshing the cache if necessary.
+        
+        Returns:
+            A dictionary mapping group IDs to their corresponding group information
+        """
         if not self._groups_cache:
             await self._refresh_groups_cache()
         return self._groups_cache.copy()
     
     async def get_controller(self, group_identifier: str) -> GroupController:
-        """Returns an existing controller or creates a new one."""
+        """
+        Returns an existing controller or creates a new one for the specified group.
+        
+        Args:
+            group_identifier: Name or ID of the group
+            
+        Returns:
+            A GroupController instance for the specified group
+            
+        Raises:
+            ValueError: If the group identifier cannot be resolved to a valid group
+        """
         if group_identifier in self._controllers_cache:
             return self._controllers_cache[group_identifier]
         
@@ -125,7 +279,15 @@ class GroupControllerFactory:
         return controller
     
     async def _resolve_group_identifier(self, identifier: str) -> Optional[str]:
-        """Resolves the group ID from an identifier (name or ID)."""
+        """
+        Resolves the group ID from an identifier (name or ID).
+        
+        Args:
+            identifier: Name or ID of the group
+            
+        Returns:
+            The group ID if found, None otherwise
+        """
         if not self._groups_cache:
             await self._refresh_groups_cache()
             
@@ -145,11 +307,18 @@ class GroupControllerFactory:
         return None
     
     async def _refresh_groups_cache(self) -> None:
-        """Refreshes the groups cache."""
+        """
+        Refreshes the groups cache by fetching the latest groups from the bridge.
+        """
         self._groups_cache = await self.group_service.get_all_groups()
     
     async def get_available_groups_formatted(self) -> str:
-        """Returns a formatted overview of all available groups."""
+        """
+        Returns a formatted overview of all available groups, organized by type.
+        
+        Returns:
+            A formatted string with group information
+        """
         if not self._groups_cache:
             await self._refresh_groups_cache()
             
@@ -178,11 +347,22 @@ class GroupControllerFactory:
 
 
 class GroupController:
-    """Controller for managing a specific Philips Hue light group."""
+    """
+    Controller for managing a specific Philips Hue light group.
+    
+    This class provides methods to control and manage a specific light group,
+    including turning it on/off, adjusting brightness, saving and restoring states,
+    and accessing scene functionality.
+    """
     NOT_INITIALIZED_ERROR_MSG = "Group controller not initialized. Call initialize() first."
     
     def __init__(self, bridge: HueBridge, group_identifier: str) -> None:
-        """Initialize the GroupController with a Hue Bridge and a group.
+        """
+        Initialize the GroupController with a Hue Bridge and a group identifier.
+        
+        Args:
+            bridge: The HueBridge instance to use for API requests
+            group_identifier: Name or ID of the group to control
         """
         self.bridge = bridge
         self.group_service = GroupService(bridge)
@@ -194,7 +374,12 @@ class GroupController:
         self._scene_controller: Optional[GroupSceneController] = None
     
     async def initialize(self) -> None:
-        """Initialize the controller by resolving the group ID."""
+        """
+        Initialize the controller by resolving the group ID and loading initial info.
+        
+        Raises:
+            ValueError: If the group identifier cannot be resolved to a valid group
+        """
         group_id = await self._resolve_group_identifier(self.group_identifier)
         if not group_id:
             raise ValueError(f"Group '{self.group_identifier}' not found")
@@ -203,7 +388,15 @@ class GroupController:
         await self._refresh_group_info()
     
     async def _resolve_group_identifier(self, identifier: str) -> Optional[str]:
-        """Resolve a group identifier to a group ID."""
+        """
+        Resolve a group identifier to a group ID.
+        
+        Args:
+            identifier: Name or ID of the group
+            
+        Returns:
+            The group ID if found, None otherwise
+        """
         groups = await self.group_service.get_all_groups()
         if identifier in groups:
             return identifier
@@ -211,7 +404,9 @@ class GroupController:
         return await self.group_service.get_group_id_by_name(identifier)
     
     async def _refresh_group_info(self) -> None:
-        """Refresh the cached group information."""
+        """
+        Refresh the cached group information from the bridge.
+        """
         if not self._group_id:
             await self.initialize()
             
@@ -219,14 +414,30 @@ class GroupController:
     
     @property
     def group_id(self) -> str:
-        """Get the ID of the controlled group."""
+        """
+        Get the ID of the controlled group.
+        
+        Returns:
+            The group ID
+            
+        Raises:
+            RuntimeError: If the controller is not initialized
+        """
         if not self._group_id:
             raise RuntimeError(GroupController.NOT_INITIALIZED_ERROR_MSG)
         return self._group_id
     
     @property
     def name(self) -> str:
-        """Get the name of the controlled group."""
+        """
+        Get the name of the controlled group.
+        
+        Returns:
+            The group name
+            
+        Raises:
+            RuntimeError: If the controller is not initialized
+        """
         if not self._group_info:
             raise RuntimeError(GroupController.NOT_INITIALIZED_ERROR_MSG)
         return self._group_info.get("name", "")
@@ -234,7 +445,15 @@ class GroupController:
     
     @property
     def state(self) -> GroupState:
-        """Get the current state of the group."""
+        """
+        Get the current state of the group.
+        
+        Returns:
+            The current group state
+            
+        Raises:
+            RuntimeError: If the controller is not initialized
+        """
         if not self._group_info:
             raise RuntimeError(GroupController.NOT_INITIALIZED_ERROR_MSG)
         
@@ -246,6 +465,12 @@ class GroupController:
     def scenes(self) -> GroupSceneController:
         """
         Get the scene controller for this group.
+        
+        Returns:
+            A GroupSceneController instance for this group
+            
+        Raises:
+            RuntimeError: If the controller is not initialized
         """
         if not self._group_id:
             raise RuntimeError(GroupController.NOT_INITIALIZED_ERROR_MSG)
@@ -258,11 +483,25 @@ class GroupController:
     async def activate_scene(self, scene_name: str) -> List[Dict[str, Any]]:
         """
         Convenience method to activate a scene by name.
+        
+        Args:
+            scene_name: Name of the scene to activate
+            
+        Returns:
+            A list of responses from the Hue Bridge API
         """
         return await self.scenes.activate_scene_by_name(scene_name)
     
     async def set_state(self, state: GroupState, transition_time: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Update the state of this group.
+        """
+        Update the state of this group.
+        
+        Args:
+            state: The state to apply to the group
+            transition_time: Transition time in 100ms units (optional)
+            
+        Returns:
+            A list of responses from the Hue Bridge API
         """
         if transition_time is not None:
             state = state.copy()
@@ -274,7 +513,12 @@ class GroupController:
         return result
     
     async def get_current_brightness_percentage(self) -> int:
-        """Returns the current brightness as a percentage value (0-100)."""
+        """
+        Returns the current brightness as a percentage value (0-100).
+        
+        Returns:
+            The current brightness percentage
+        """
         await self._refresh_group_info()
         current_state = self.state
         
@@ -285,11 +529,15 @@ class GroupController:
         return round(current_brightness * 100 / 254)
         
     async def set_brightness_percentage(self, percentage: int, transition_time: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Sets the brightness of the group to a percentage value.
+        """
+        Sets the brightness of the group to a percentage value.
         
         Args:
             percentage: Brightness in percent (0-100)
             transition_time: Transition time in 100ms units
+            
+        Returns:
+            A list of responses from the Hue Bridge API
         """
         percentage = max(0, min(100, percentage))
         
@@ -304,7 +552,15 @@ class GroupController:
     
     
     async def increase_brightness_percentage(self, increment: int = 10, transition_time: int = 4) -> List[Dict[str, Any]]:
-        """Increases the brightness of the group by the specified percentage.
+        """
+        Increases the brightness of the group by the specified percentage.
+        
+        Args:
+            increment: Percentage to increase brightness by (default: 10)
+            transition_time: Transition time in 100ms units (default: 4)
+            
+        Returns:
+            A list of responses from the Hue Bridge API
         """
         current_percentage = await self.get_current_brightness_percentage()
         
@@ -316,7 +572,15 @@ class GroupController:
         return await self.set_brightness_percentage(new_percentage, transition_time)
 
     async def decrease_brightness_percentage(self, decrement: int = 10, transition_time: int = 4) -> List[Dict[str, Any]]:
-        """Decreases the brightness of the group by the specified percentage.
+        """
+        Decreases the brightness of the group by the specified percentage.
+        
+        Args:
+            decrement: Percentage to decrease brightness by (default: 10)
+            transition_time: Transition time in 100ms units (default: 4)
+            
+        Returns:
+            A list of responses from the Hue Bridge API
         """
         current_percentage = await self.get_current_brightness_percentage()
         
@@ -332,7 +596,14 @@ class GroupController:
     
     
     async def turn_on(self, transition_time: int = 4) -> List[Dict[str, Any]]:
-        """Turn on this group with a smooth transition, restoring previous state if available.
+        """
+        Turn on this group with a smooth transition, restoring previous state if available.
+        
+        Args:
+            transition_time: Transition time in 100ms units (default: 4)
+            
+        Returns:
+            A list of responses from the Hue Bridge API
         """
         last_state_id = self.state_repository.get_last_off_state()
         saved_state = None
@@ -357,6 +628,15 @@ class GroupController:
         return await self.set_state(state, transition_time)
     
     async def turn_off(self, transition_time: int = 4) -> List[Dict[str, Any]]:
+        """
+        Turn off this group with a smooth transition, saving the current state.
+        
+        Args:
+            transition_time: Transition time in 100ms units (default: 4)
+            
+        Returns:
+            A list of responses from the Hue Bridge API
+        """
         await self._refresh_group_info()
         
         # Save the current state
@@ -369,7 +649,14 @@ class GroupController:
         return await self.set_state(state, transition_time)
     
     async def save_state(self, save_id: Optional[str] = None) -> str:
-        """Save the current state of this group.
+        """
+        Save the current state of this group.
+        
+        Args:
+            save_id: ID to use for the saved state (generated if None)
+            
+        Returns:
+            The ID of the saved state
         """
         await self._refresh_group_info()
         
@@ -380,7 +667,15 @@ class GroupController:
         return save_id
     
     async def restore_state(self, save_id: str, transition_time: int = 4) -> bool:
-        """Restore a previously saved state with a smooth transition.
+        """
+        Restore a previously saved state with a smooth transition.
+        
+        Args:
+            save_id: ID of the state to restore
+            transition_time: Transition time in 100ms units (default: 4)
+            
+        Returns:
+            True if the state was restored successfully, False otherwise
         """
         saved_state = self.state_repository.get_state(save_id)
         if not saved_state:
@@ -398,46 +693,108 @@ class GroupController:
         return True
     
     def clear_saved_state(self, save_id: str) -> bool:
-        """Remove a saved state from the repository."""
+        """
+        Remove a saved state from the repository.
+        
+        Args:
+            save_id: ID of the state to remove
+            
+        Returns:
+            True if the state was found and removed, False otherwise
+        """
         return self.state_repository.remove_state(save_id)
     
     def get_saved_state(self, save_id: str) -> Optional[GroupState]:
-        """Retrieve a saved state from the repository."""
+        """
+        Retrieve a saved state from the repository.
+        
+        Args:
+            save_id: ID of the state to retrieve
+            
+        Returns:
+            The saved state if found, None otherwise
+        """
         return self.state_repository.get_state(save_id)
     
     @property
     def saved_states(self) -> Dict[str, GroupState]:
-        """Get all saved states for this group."""
+        """
+        Get all saved states for this group.
+        
+        Returns:
+            A dictionary mapping state IDs to their corresponding group states
+        """
         return self.state_repository.saved_states
     
     async def is_any_on(self) -> bool:
-        """Check if any lights in the group are on."""
+        """
+        Check if any lights in the group are on.
+        
+        Returns:
+            True if any light in the group is on, False otherwise
+        """
         await self._refresh_group_info()
         return self._group_info.get("state", {}).get("any_on", False)
     
     async def is_all_on(self) -> bool:
-        """Check if all lights in the group are on."""
+        """
+        Check if all lights in the group are on.
+        
+        Returns:
+            True if all lights in the group are on, False otherwise
+        """
         await self._refresh_group_info()
         return self._group_info.get("state", {}).get("all_on", False)
 
 
 class GroupsManager:
-    """Manager for all Philips Hue light groups."""
+    """
+    Manager for all Philips Hue light groups.
+    
+    This class provides methods to retrieve information about all available groups
+    and get controllers for specific groups.
+    """
     
     def __init__(self, bridge: HueBridge) -> None:
-        """Initialize the GroupsManager with a Hue Bridge."""
+        """
+        Initialize the GroupsManager with a Hue Bridge.
+        
+        Args:
+            bridge: The HueBridge instance to use for API requests
+        """
         self.bridge = bridge
         self.group_service = GroupService(bridge)
         self.controller_factory = GroupControllerFactory(bridge)
     
     async def get_all_groups(self) -> Dict[str, GroupInfo]:
-        """Retrieve all light groups from the Hue Bridge."""
+        """
+        Retrieve all light groups from the Hue Bridge.
+        
+        Returns:
+            A dictionary mapping group IDs to their corresponding group information
+        """
         return await self.controller_factory.get_cached_groups()
     
     async def get_controller(self, group_identifier: str) -> GroupController:
-        """Get a controller for the specified group."""
+        """
+        Get a controller for the specified group.
+        
+        Args:
+            group_identifier: Name or ID of the group
+            
+        Returns:
+            A GroupController instance for the specified group
+            
+        Raises:
+            ValueError: If the group identifier cannot be resolved to a valid group
+        """
         return await self.controller_factory.get_controller(group_identifier)
     
     async def get_available_groups_formatted(self) -> str:
-        """Get a formatted overview of all available groups."""
+        """
+        Get a formatted overview of all available groups.
+        
+        Returns:
+            A formatted string with group information
+        """
         return await self.controller_factory.get_available_groups_formatted()
