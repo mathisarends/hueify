@@ -9,7 +9,6 @@ Hueify is a Python library for convenient control of Philips Hue lighting system
 - **Scene Support**: Activate and manage scenes
 - **State Management**: Save and restore light states
 - **Brightness Control**: Convenient methods for percentage-based brightness adjustment
-- **CLI Integration**: Can be used as a command-line tool or as an importable library
 
 ## Installation
 

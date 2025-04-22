@@ -352,10 +352,9 @@ class GroupController:
             result = await self.set_state(restore_state)
             self.state_repository.clear_last_off_state()
             return result
-        else:
-            # No saved state, just turn on
-            state: GroupState = {"on": True}
-            return await self.set_state(state, transition_time)
+        
+        state: GroupState = {"on": True}
+        return await self.set_state(state, transition_time)
     
     async def turn_off(self, transition_time: int = 4) -> List[Dict[str, Any]]:
         await self._refresh_group_info()

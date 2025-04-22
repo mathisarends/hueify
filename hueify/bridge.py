@@ -8,40 +8,60 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class HueBridge:
-    """Base class for communication with the Hue Bridge."""
-    
-    # Default environment variable names
+    """
+    Provides methods for interacting with a Philips Hue Bridge, including 
+    connection management and HTTP communication via the Hue API.
+    """
+
     ENV_USER_ID = "HUE_USER_ID"
     ENV_BRIDGE_IP = "HUE_BRIDGE_IP"
 
     def __init__(self, ip: str, user: str) -> None:
         """
-        Initializes the HueBridge with an IP address and a user ID.
+        Create a HueBridge instance using a static IP address and user ID.
+
+        Args:
+            ip: The IP address of the Hue Bridge.
+            user: The authorized user ID for the Hue API.
         """
         self.ip = ip
         self.user = user
+    
+    @staticmethod
+    async def discover_bridges() -> list[dict[str, str]]:
+        """
+        Query the Philips Hue discovery service to find bridges in the local network.
 
-    def __repr__(self) -> str:
+        Returns:
+            A list of bridge information dictionaries containing at least 'internalipaddress'.
         """
-        Returns a string representation of the HueBridge.
-        """
-        return f"<HueBridge {self.ip}>"
+        async with aiohttp.ClientSession() as session:
+            async with session.get("https://discovery.meethue.com/") as response:
+                return await response.json()
 
     @property
     def url(self) -> str:
         """
-        Returns the base URL for API requests.
+        Construct the base API URL for the connected Hue Bridge.
+
+        Returns:
+            The full base URL for API communication.
         """
         return f"http://{self.ip}/api/{self.user}"
 
     @classmethod
     async def connect(cls) -> HueBridge:
         """
-        Connects to the first discovered Hue Bridge using stored credentials.
+        Discover available Hue Bridges and connect to the first one using 
+        credentials stored in environment variables.
+
+        Returns:
+            An instance of HueBridge.
+
         Raises:
-            ValueError: If no bridge is found or user ID isn't available
+            ValueError: If no bridge is found or required environment variables are missing.
         """
-        bridges = await BridgeDiscovery.discover_bridges()
+        bridges = await HueBridge.discover_bridges()
         if not bridges:
             raise ValueError("No Hue Bridge found")
 
@@ -56,8 +76,17 @@ class HueBridge:
         cls, ip: Optional[str] = None, user_id: Optional[str] = None
     ) -> HueBridge:
         """
-        Connects to a Hue Bridge using a specific IP address and user ID.
-        Falls back to environment variables if parameters are not provided.
+        Manually connect to a Hue Bridge using provided or environment-based credentials.
+
+        Args:
+            ip: Optional IP address of the Hue Bridge.
+            user_id: Optional Hue API user ID.
+
+        Returns:
+            An instance of HueBridge.
+
+        Raises:
+            ValueError: If either the IP address or user ID is missing.
         """
         ip = ip or os.getenv(cls.ENV_BRIDGE_IP)
         user_id = user_id or os.getenv(cls.ENV_USER_ID)
@@ -71,7 +100,13 @@ class HueBridge:
 
     async def get_request(self, endpoint: str) -> Any:
         """
-        Sends a GET request to the Hue Bridge.
+        Send an HTTP GET request to the specified Hue Bridge endpoint.
+
+        Args:
+            endpoint: Relative API endpoint to request.
+
+        Returns:
+            Parsed JSON response from the bridge.
         """
         async with aiohttp.ClientSession() as session:
             async with session.get(f"{self.url}/{endpoint}") as response:
@@ -79,21 +114,21 @@ class HueBridge:
 
     async def put_request(self, endpoint: str, data: dict) -> Any:
         """
-        Sends a PUT request with data to the Hue Bridge.
+        Send an HTTP PUT request with a JSON payload to the Hue Bridge.
+
+        Args:
+            endpoint: Relative API endpoint to update.
+            data: Dictionary of data to send in the request body.
+
+        Returns:
+            Parsed JSON response from the bridge.
         """
         async with aiohttp.ClientSession() as session:
             async with session.put(f"{self.url}/{endpoint}", json=data) as response:
                 return await response.json()
-
-
-class BridgeDiscovery:
-    """Responsible for discovering and configuring Hue Bridges."""
-
-    @staticmethod
-    async def discover_bridges() -> list[dict[str, str]]:
+            
+    def __repr__(self) -> str:
         """
-        Discovers available Hue Bridges on the local network.
+        Return a short representation of the HueBridge instance.
         """
-        async with aiohttp.ClientSession() as session:
-            async with session.get("https://discovery.meethue.com/") as response:
-                return await response.json()
+        return f"<HueBridge {self.ip}>"
