@@ -1,4 +1,5 @@
 from __future__ import annotations
+import random
 from typing import Any, Dict, List, Literal, Optional, TypedDict
 import asyncio
 
@@ -798,46 +799,139 @@ class GroupController:
         """
         return self.state_repository.saved_states
     
-    # Hier mit reinpacken, ob der Zustand gespeichert werden soll: (will man doch lieber manuell machen oder nicht?) | Weiterhin jede Lampe hier muss einzelne betrachtet werden tats#chliche:
-    # TODO: Hier haben die jetzt alle die gleiche Farbe was nciht sehr ästehtisch ist.
-    async def subtle_light_change(self, 
-                                hue_shift: int = 1000,
-                                sat_adjustment: int = 0,
-                                transition_time: int = 10) -> str:
+    # TODO: Das soll hier das Standardverhalten von State sein.
+    async def subtle_individual_light_changes(self, 
+                                           base_hue_shift: int = 1000,
+                                           hue_variation: int = 500,
+                                           sat_adjustment: int = 0,
+                                           sat_variation: int = 10,
+                                           transition_time: int = 10) -> str:
         """
-        Creates a subtle change to the light color without affecting brightness.
+        Creates subtle and varied color changes to individual lights in the group
+        without affecting their brightness.
         
         Args:
-            hue_shift: Amount to shift the hue value by (default: 1000)
-            sat_adjustment: Amount to adjust saturation by (default: 0)
+            base_hue_shift: Base amount to shift hue values (default: 1000)
+            hue_variation: Random variation to add/subtract from base_hue_shift (default: 500)
+            sat_adjustment: Base amount to adjust saturation (default: 0)
+            sat_variation: Random variation to add/subtract from sat_adjustment (default: 10)
             transition_time: Transition time in 100ms units (default: 10)
             
         Returns:
-            The ID of the saved state for this color change
+            The ID of the saved state for this color change operation
         """
-        current_state = self.state
+        current_group_state = self.state
+        state_id = f"individual_color_{self.group_id}_{int(asyncio.get_event_loop().time())}"
+        self.state_repository.save_state(state_id, current_group_state)
         
-        state_id = f"color_scheme_{self.group_id}_{int(asyncio.get_event_loop().time())}"
+        light_ids = await self.get_lights_in_group()
         
-        self.state_repository.save_state(state_id, current_state)
+        individual_light_states = {}
         
-        if not current_state.get("on", False):
-            return state_id
+        for light_id in light_ids:
+            light_state = await self.get_light_state(light_id)
+            
+            individual_light_states[light_id] = light_state
+            
+            if not light_state.get("on", False):
+                continue
+            
+            new_light_state = {"on": True}
+            
+            if "hue" in light_state:
+                individual_hue_shift = base_hue_shift + random.randint(-hue_variation, hue_variation)
+                new_light_state["hue"] = (light_state["hue"] + individual_hue_shift) % 65536
+            
+            if "sat" in light_state and (sat_adjustment != 0 or sat_variation != 0):
+                individual_sat_adjustment = sat_adjustment + random.randint(-sat_variation, sat_variation)
+                new_light_state["sat"] = max(0, min(254, light_state["sat"] + individual_sat_adjustment))
+            
+            if "colormode" in light_state:
+                new_light_state["colormode"] = light_state["colormode"]
+            
+            new_light_state["transitiontime"] = transition_time
+            
+            await self.set_light_state(light_id, new_light_state)
         
-        new_state: GroupState = {"on": True}
-        
-        if "hue" in current_state:
-            new_state["hue"] = (current_state["hue"] + hue_shift) % 65536
-        
-        if "sat" in current_state and sat_adjustment != 0:
-            new_state["sat"] = max(0, min(254, current_state["sat"] + sat_adjustment))
-        
-        if "colormode" in current_state:
-            new_state["colormode"] = current_state["colormode"]
-        
-        await self.set_state(new_state, transition_time)
+        special_key = f"{state_id}_individual_lights"
+        self.state_repository.save_state(special_key, {"light_states": individual_light_states})
         
         return state_id
+    
+    async def restore_individual_light_states(self, state_id: str, transition_time: int = 4) -> bool:
+        """
+        Restore previously saved individual light states.
+        
+        Args:
+            state_id: ID of the state to restore
+            transition_time: Transition time in 100ms units (default: 4)
+            
+        Returns:
+            True if states were restored successfully, False otherwise
+        """
+        # Check if this was an individual light state save
+        special_key = f"{state_id}_individual_lights"
+        individual_states = self.state_repository.get_state(special_key)
+        
+        if individual_states and "light_states" in individual_states:
+            light_states = individual_states["light_states"]
+            
+            for light_id, original_state in light_states.items():
+                # Extract only the color-related properties for restoration
+                restore_state = {
+                    k: v for k, v in original_state.items()
+                    if k in ["on", "bri", "hue", "sat", "xy", "ct", "effect", "colormode"]
+                }
+                
+                # Apply transition time
+                restore_state["transitiontime"] = transition_time
+                
+                # Apply original state to this light
+                await self.set_light_state(light_id, restore_state)
+                
+            return True
+        
+        return await self.restore_state(state_id, transition_time)
+    
+    async def get_lights_in_group(self) -> List[str]:
+        """
+        Get a list of light IDs that belong to this group.
+        
+        Returns:
+            List of light IDs in the group
+        """
+        await self._refresh_group_info()
+        if not self._group_info:
+            raise RuntimeError(self.NOT_INITIALIZED_ERROR_MSG)
+        
+        return self._group_info.get("lights", [])
+    
+    async def get_light_state(self, light_id: str) -> Dict[str, Any]:
+        """
+        Get the current state of a specific light.
+        
+        Args:
+            light_id: ID of the light
+            
+        Returns:
+            The current state of the light
+        """
+        light_info = await self.bridge.get_request(f"lights/{light_id}")
+        return light_info.get("state", {})
+    
+    async def set_light_state(self, light_id: str, state: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Set the state of a specific light.
+        
+        Args:
+            light_id: ID of the light
+            state: The state to apply to the light
+            
+        Returns:
+            Response from the Hue Bridge API
+        """
+        return await self.bridge.put_request(f"lights/{light_id}/state", state)
+
 
 class GroupsManager:
     """

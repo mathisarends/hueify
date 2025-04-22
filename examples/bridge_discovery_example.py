@@ -6,7 +6,7 @@ prints the IP addresses of any bridges found.
 """
 
 import asyncio
-from hueify.bridge import HueBridge
+from hueify import HueBridge
 
 
 async def main():
