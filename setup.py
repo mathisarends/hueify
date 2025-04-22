@@ -11,11 +11,6 @@ setup(
         "aiohttp>=3.11.0",
         "python-dotenv>=1.0.0",
     ],
-    entry_points={
-        "console_scripts": [
-            "hueify=hueify.cli:app",
-        ],
-    },
     include_package_data=True,
     python_requires=">=3.7",
     license="MIT",

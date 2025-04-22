@@ -2,6 +2,7 @@ import asyncio
 import time
 from hueify import HueBridge, GroupsManager
 
+
 async def usage_example_1():
     """Beispiel für die Verwendung des LightController als Facade."""
     try:
