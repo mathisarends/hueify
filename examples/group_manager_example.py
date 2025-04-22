@@ -21,7 +21,10 @@ async def usage_example_1():
 
         await lamp_controller.turn_on()
 
-        await room_controller.activate_scene("Majestätischer Morgen")
+        await room_controller.activate_scene(scene_name="Majestätischer Morgen")
+
+        state = room_controller.state
+        print(f"Room state: {state}")
 
         time.sleep(5)
 
@@ -29,7 +32,7 @@ async def usage_example_1():
 
     except ValueError as e:
         print(f"Fehler: {e}")
-        
+
 
 if __name__ == "__main__":
     asyncio.run(usage_example_1())

@@ -189,20 +189,35 @@ class GroupService:
         """
         return await self.bridge.get_request(f"groups/{group_id}")
 
-    async def set_group_state(
-        self, group_id: str, state: GroupState
-    ) -> List[Dict[str, Any]]:
+    async def set_group_state(self, group_id: str, state: GroupState) -> List[Dict[str, Any]]:
         """
-        Set the state of a specific group.
-
+        Set the state of a specific group with improved handling.
+        
         Args:
             group_id: ID of the group to modify
             state: The state to apply to the group
-
+            
         Returns:
             A list of responses from the Hue Bridge API
         """
-        return await self.bridge.put_request(f"groups/{group_id}/action", state)
+        # Kopiere den Zustand, um das Original nicht zu verändern
+        state_copy = state.copy()
+        
+        # Prüfe, ob ein 'on'-Status festgelegt wurde
+        explicit_on_state = "on" in state_copy
+        on_state = state_copy.pop("on", True) if explicit_on_state else True
+        
+        results = []
+        
+        # Wenn andere Zustandsänderungen vorhanden sind, wende sie an
+        if state_copy:
+            results.append(await self.bridge.put_request(f"groups/{group_id}/action", state_copy))
+        
+        # Wenn der on-Status explizit gesetzt werden soll, tue dies in einem separaten Aufruf
+        if explicit_on_state:
+            results.append(await self.bridge.put_request(f"groups/{group_id}/action", {"on": on_state}))
+        
+        return results
 
     async def get_group_id_by_name(self, group_name: str) -> Optional[str]:
         """
@@ -253,7 +268,6 @@ class GroupControllerFactory:
         if not self._groups_cache:
             await self._refresh_groups_cache()
         return self._groups_cache.copy()
-
 
     async def _resolve_group_identifier(self, identifier: str) -> Optional[str]:
         """
@@ -321,75 +335,74 @@ class GroupControllerFactory:
                 output += f"  - {name}\n"
 
         return output
-    
+
     async def _find_closest_group_name(self, query: str) -> Optional[str]:
         """
         Find the closest matching group name using fuzzy matching.
-        
+
         Args:
             query: The group name to search for
-            
+
         Returns:
             The closest matching group name if similarity > 75, None otherwise
         """
         if not self._groups_cache:
             await self._refresh_groups_cache()
-                
+
         group_names = []
         for _, group_data in self._groups_cache.items():
             name = group_data.get("name", "")
             if name:
                 group_names.append(name)
-                    
+
         if not group_names:
             return None
-                
+
         result = process.extractOne(query, group_names)
-            
+
         if len(result) >= 2:
             best_match = result[0]
             score = result[1]
-                
+
             if score > 75:
                 return best_match
-                    
+
         return None
 
-        
     async def get_controller(self, group_identifier: str) -> GroupController:
         """
         Returns an existing controller or creates a new one for the specified group.
         Uses fuzzy matching if an exact match is not found.
-        
+
         Args:
             group_identifier: Name or ID of the group
-            
+
         Returns:
             A GroupController instance for the specified group
-            
+
         Raises:
             ValueError: If the group identifier cannot be resolved to a valid group
         """
         if group_identifier in self._controllers_cache:
             return self._controllers_cache[group_identifier]
-        
+
         group_id = await self._resolve_group_identifier(group_identifier)
-        
+
         if not group_id:
             fuzzy_match = await self._find_closest_group_name(group_identifier)
             if fuzzy_match:
                 return await self.get_controller(fuzzy_match)
-                
+
             available_groups = await self.get_available_groups_formatted()
             message = f"Group '{group_identifier}' not found.\n{available_groups}"
             raise ValueError(message)
-        
+
         controller = GroupController(self.bridge, group_id)
         await controller.initialize()
-        
+
         self._controllers_cache[group_id] = controller
         self._controllers_cache[controller.name] = controller
-        
+
         return controller
 
 
@@ -784,27 +797,47 @@ class GroupController:
             A dictionary mapping state IDs to their corresponding group states
         """
         return self.state_repository.saved_states
-
-    async def is_any_on(self) -> bool:
+    
+    # Hier mit reinpacken, ob der Zustand gespeichert werden soll: (will man doch lieber manuell machen oder nicht?) | Weiterhin jede Lampe hier muss einzelne betrachtet werden tats#chliche:
+    # TODO: Hier haben die jetzt alle die gleiche Farbe was nciht sehr ästehtisch ist.
+    async def subtle_light_change(self, 
+                                hue_shift: int = 1000,
+                                sat_adjustment: int = 0,
+                                transition_time: int = 10) -> str:
         """
-        Check if any lights in the group are on.
-
+        Creates a subtle change to the light color without affecting brightness.
+        
+        Args:
+            hue_shift: Amount to shift the hue value by (default: 1000)
+            sat_adjustment: Amount to adjust saturation by (default: 0)
+            transition_time: Transition time in 100ms units (default: 10)
+            
         Returns:
-            True if any light in the group is on, False otherwise
+            The ID of the saved state for this color change
         """
-        await self._refresh_group_info()
-        return self._group_info.get("state", {}).get("any_on", False)
-
-    async def is_all_on(self) -> bool:
-        """
-        Check if all lights in the group are on.
-
-        Returns:
-            True if all lights in the group are on, False otherwise
-        """
-        await self._refresh_group_info()
-        return self._group_info.get("state", {}).get("all_on", False)
-
+        current_state = self.state
+        
+        state_id = f"color_scheme_{self.group_id}_{int(asyncio.get_event_loop().time())}"
+        
+        self.state_repository.save_state(state_id, current_state)
+        
+        if not current_state.get("on", False):
+            return state_id
+        
+        new_state: GroupState = {"on": True}
+        
+        if "hue" in current_state:
+            new_state["hue"] = (current_state["hue"] + hue_shift) % 65536
+        
+        if "sat" in current_state and sat_adjustment != 0:
+            new_state["sat"] = max(0, min(254, current_state["sat"] + sat_adjustment))
+        
+        if "colormode" in current_state:
+            new_state["colormode"] = current_state["colormode"]
+        
+        await self.set_state(new_state, transition_time)
+        
+        return state_id
 
 class GroupsManager:
     """
