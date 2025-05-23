@@ -163,6 +163,7 @@ class GroupSceneController:
         self.scene_service = SceneService(bridge)
         self._scenes_cache: Dict[str, SceneInfo] = {}
 
+
     async def get_available_scenes(self) -> Dict[str, SceneInfo]:
         """
         Get all available scenes for this group.
@@ -174,10 +175,17 @@ class GroupSceneController:
         """
         scenes_data = await self.scene_service.get_scenes_for_group(self.group_id)
 
-        self._scenes_cache = {
-            scene_id: SceneInfo(scene_id, **scene_data)
-            for scene_id, scene_data in scenes_data.items()
-        }
+        self._scenes_cache = {}
+        for scene_id, scene_data in scenes_data.items():
+            # Create a copy of scene_data to avoid modifying the original
+            scene_data_copy = scene_data.copy()
+            
+            # Rename 'group' to 'group_id' to match SceneInfo field name
+            if 'group' in scene_data_copy:
+                scene_data_copy['group_id'] = scene_data_copy.pop('group')
+            
+            # Create SceneInfo instance
+            self._scenes_cache[scene_id] = SceneInfo(scene_id, **scene_data_copy)
 
         return self._scenes_cache.copy()
 

@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import AsyncMock, MagicMock
 import asyncio
 
-from hueify.controllers.group_controller import GroupController
+from hueify.controllers.group.group_controller import GroupController
 
 
 class TestGroupController(unittest.TestCase):
