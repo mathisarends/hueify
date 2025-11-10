@@ -4,21 +4,9 @@ from hueify.controllers.group.group_controller import GroupController
 from hueify.controllers.group.group_state_repository import GroupService
 from hueify.models.group_info import GroupInfo
 
-from rapidfuzz import process
-
 
 class GroupControllerFactory:
-    """
-    Factory for creating and managing GroupController instances.
-
-    This class provides methods to create and retrieve group controllers,
-    with caching to avoid creating duplicate controllers for the same group.
-    """
-
     def __init__(self, bridge: HueBridge) -> None:
-        """
-        Initialize the GroupControllerFactory with a Hue Bridge.
-        """
         self.bridge = bridge
         self.group_service = GroupService(bridge)
         self._controllers_cache: Dict[str, GroupController] = {}

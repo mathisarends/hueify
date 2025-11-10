@@ -1,13 +1,5 @@
-"""
-Example script to discover available Philips Hue Bridges on the local network.
-
-Uses the HueBridge class to query the official Hue discovery endpoint and
-prints the IP addresses of any bridges found.
-"""
-
 import asyncio
 from hueify import HueBridge
-
 
 async def main():
     print("🔍 Searching for Hue Bridges...")
@@ -19,7 +11,7 @@ async def main():
 
     print(f"✅ Found {len(bridges)} bridge(s):")
     for i, bridge in enumerate(bridges, start=1):
-        ip = bridge.get("internalipaddress", "<unknown>")
+        ip = bridge.internalipaddress
         print(f"  {i}. IP: {ip}")
 
 
