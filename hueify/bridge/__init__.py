@@ -1,16 +1,14 @@
 from .service import HueBridge
-from .models import BridgeDiscoveryResponse
+from .models import DisoveredBrigeResponse
 
 from .exceptions import (
     BridgeNotFoundException,
     BridgeConnectionException,
-    MissingCredentialsException,
 )
 
 __all__ = [
     "HueBridge",
-    "BridgeDiscoveryResponse",
+    "DisoveredBrigeResponse",
     "BridgeNotFoundException",
     "BridgeConnectionException",
-    "MissingCredentialsException",
 ]
