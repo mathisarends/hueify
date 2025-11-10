@@ -4,6 +4,7 @@ import httpx
 from dotenv import load_dotenv
 
 from hueify.bridge.models import DisoveredBrigeResponse, BridgeListAdapter
+from hueify.utils.decorators import singleton
 from hueify.utils.logging import LoggingMixin
 from hueify.bridge.utils import (
     is_valid_ip, 
@@ -18,13 +19,13 @@ from hueify.bridge.exceptions import (
 load_dotenv(override=True)
 
 
+@singleton
 class HueBridge(LoggingMixin):
     HUE_USER_ID = "HUE_USER_ID"
-    ENV_BRIDGE_IP = "HUE_BRIDGE_IP"
 
-    def __init__(self, ip: str, user: str) -> None:
-        self.ip = ip
-        self.user = user
+    def __init__(self, ip: str, hue_user_id: str) -> None:
+        self._ip = ip
+        self._hue_user_id = hue_user_id
 
     @staticmethod
     async def discover_bridges() -> list[DisoveredBrigeResponse]:
@@ -38,7 +39,15 @@ class HueBridge(LoggingMixin):
 
     @property
     def base_url(self) -> str:
-        return f"http://{self.ip}/api/{self.user}"
+        return f"http://{self._ip}/api/{self._hue_user_id}"
+
+    @property
+    def ip(self) -> str:
+        return self._ip
+
+    @property
+    def hue_user_id(self) -> str:
+        return self._hue_user_id
 
     @overload
     @classmethod
@@ -60,7 +69,7 @@ class HueBridge(LoggingMixin):
     @classmethod
     def _connect_with_credentials(cls, bridge_ip: str, bridge_user_id: str) -> Self:
         cls._validate_credentials(bridge_ip, bridge_user_id)
-        return cls(ip=bridge_ip, user=bridge_user_id)
+        return cls(ip=bridge_ip, hue_user_id=bridge_user_id)
 
     @classmethod
     async def _connect_with_discovery(cls) -> Self:
@@ -68,21 +77,21 @@ class HueBridge(LoggingMixin):
         if not bridges:
             raise BridgeNotFoundException()
 
-        user_id = os.getenv(cls.HUE_USER_ID)
-        if not user_id:
+        hue_user_id = os.getenv(cls.HUE_USER_ID)
+        if not hue_user_id:
             raise BridgeConnectionException(f"No {cls.HUE_USER_ID} found in environment")
             
-        return cls(ip=bridges[0].internalipaddress, user=user_id)
+        return cls(ip=bridges[0].internalipaddress, hue_user_id=hue_user_id)
 
     @classmethod
-    def _validate_credentials(cls, ip: str, user_id: str) -> None:
-        if not is_valid_ip(ip):
+    def _validate_credentials(cls, brige_ip: str, hue_user_id: str) -> None:
+        if not is_valid_ip(brige_ip):
             cls.logger.warning(
-                f"Provided IP address '{ip}' does not look like a valid IP address (format: xxx.xxx.xxx.xxx)"
+                f"Provided IP address '{brige_ip}' does not look like a valid IP address (format: xxx.xxx.xxx.xxx)"
             )
         
-        if not is_valid_user_id(user_id):
+        if not is_valid_user_id(hue_user_id):
             cls.logger.warning(
-                f"Provided user ID '{user_id}' does not look like a valid Hue API user ID "
+                f"Provided user ID '{hue_user_id}' does not look like a valid Hue API user ID "
                 f"(expected: alphanumeric, min 20 chars)"
             )
