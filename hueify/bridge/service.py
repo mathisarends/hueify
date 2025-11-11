@@ -4,7 +4,6 @@ import httpx
 from dotenv import load_dotenv
 
 from hueify.bridge.models import DisoveredBrigeResponse, BridgeListAdapter
-from hueify.utils.decorators import singleton
 from hueify.utils.logging import LoggingMixin
 from hueify.bridge.utils import (
     is_valid_ip, 
@@ -18,8 +17,6 @@ from hueify.bridge.exceptions import (
 
 load_dotenv(override=True)
 
-
-@singleton
 class HueBridge(LoggingMixin):
     HUE_USER_ID = "HUE_USER_ID"
 
