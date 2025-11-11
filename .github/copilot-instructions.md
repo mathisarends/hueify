@@ -18,6 +18,13 @@ Write clean, self-documenting code that follows Robert C. Martin's Clean Code pr
 - Prefer explicit types over `Any` where possible
 - Use `dict[str, Any]` only when truly necessary
 
+### Command-Query Separation (CQS)
+- **Commands** (operations that change state) should return `None`
+- **Queries** (operations that retrieve data) should return values
+- Never mix commands and queries in the same function
+- A function either changes state OR returns data, not both
+- This makes side effects explicit and testing easier
+
 ### Testable Design
 - Write code with testing in mind from the start
 - Use dependency injection for external dependencies
@@ -52,12 +59,18 @@ Write clean, self-documenting code that follows Robert C. Martin's Clean Code pr
 - Mutable default arguments
 - Global state
 - God classes/objects
+- Mixing commands and queries (violating CQS)
 
 ## Example Good Code
 ```python
+# Query - returns data
 async def fetch_light_state(self, light_id: str) -> LightState:
     response = await self._client.get(f"lights/{light_id}")
     return LightState.model_validate(response)
+
+# Command - changes state, returns None
+async def turn_on_light(self, light_id: str) -> None:
+    await self._client.post(f"lights/{light_id}/on")
 ```
 
 ## Example Bad Code
@@ -66,8 +79,13 @@ async def get_data(self, id: str) -> dict:
     # Get the light state from the API
     resp = await self._client.get(f"lights/{id}")  # Call API
     return resp  # Return response
+
+# Bad - mixing command and query
+async def update_and_get_light(self, light_id: str, state: bool) -> LightState:
+    await self._client.post(f"lights/{light_id}", {"on": state})
+    return await self.fetch_light_state(light_id)  # Don't do this!
 ```
 
 ---
 
-When in doubt: **Can someone understand what this code does without comments? Can it be easily tested?**
+When in doubt: **Can someone understand what this code does without comments? Can it be easily tested? Does this function either change state OR return data, but not both?**

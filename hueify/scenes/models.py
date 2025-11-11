@@ -63,8 +63,8 @@ class SceneInfo(BaseModel):
         return self.metadata.name
     
     @property
-    def group_id(self) -> str:
-        return str(self.group.rid)
+    def group_id(self) -> UUID:
+        return self.group.rid
 
     class Config:
         populate_by_name = True
