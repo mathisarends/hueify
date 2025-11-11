@@ -10,6 +10,7 @@ from hueify.scenes.models import (
 )
 from hueify.scenes.exceptions import SceneNotFoundError
 from hueify.utils.logging import LoggingMixin
+from hueify.utils.fuzzy import find_all_matches
 
 
 class SceneService(LoggingMixin):
@@ -21,10 +22,20 @@ class SceneService(LoggingMixin):
         scenes = await self.get_all_scenes()
 
         for scene in scenes:
-            if scene.name == scene_name:
+            if scene.name.lower() == scene_name.lower():
                 return scene
 
-        raise SceneNotFoundError(f"Scene '{scene_name}' not found")
+        suggestions = find_all_matches(
+            query=scene_name,
+            items=scenes,
+            text_extractor=lambda s: s.name,
+            min_similarity=0.6
+        )
+
+        raise SceneNotFoundError(
+            lookup_name=scene_name,
+            suggested_names=[s.name for s in suggestions]
+        )
 
     async def activate_scene_by_name(self, scene_name: str) -> SceneInfo:
         scene = await self.find_scene_by_name(scene_name)
