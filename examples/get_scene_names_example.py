@@ -4,9 +4,8 @@ from hueify import HueBridge, GroupsManager
 
 
 async def usage_example_1():
-    """Beispiel für die Verwendung des LightController als Facade."""
     try:
-        bridge = HueBridge.connect_by_ip()
+        bridge = HueBridge.connect()
 
         manager = GroupsManager(bridge=bridge)
 

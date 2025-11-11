@@ -1,4 +1,6 @@
 def is_valid_ip(ip: str) -> bool:
+    if not ip or ip != ip.strip():
+        return False
     parts = ip.split(".")
     if len(parts) != 4:
         return False
