@@ -1,3 +1,4 @@
+from uuid import UUID
 from hueify.http import HttpClient, ApiResponse
 from hueify.groups.lookup.models import GroupInfo, GroupInfoListAdapter, GroupType
 from hueify.groups.lookup.exceptions import GroupNotFoundError
