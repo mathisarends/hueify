@@ -1,10 +1,11 @@
 from hueify.http import HttpClient, ApiResponse
-from hueify.groups.lookup.models import GroupInfo, GroupInfoListAdapter
+from hueify.groups.lookup.models import GroupInfo, GroupInfoListAdapter, GroupType
 from hueify.groups.lookup.exceptions import GroupNotFoundError
+from hueify.utils.fuzzy import find_all_matches
+
 
 class GroupLookup:
     def __init__(self, client: HttpClient | None = None) -> None:
-        super().__init__()
         self._client = client or HttpClient()
 
     async def get_room_by_name(self, room_name: str) -> GroupInfo:
@@ -14,7 +15,18 @@ class GroupLookup:
             if room.name.lower() == room_name.lower():
                 return room
         
-        raise GroupNotFoundError(f"Room '{room_name}' not found")
+        suggestions = find_all_matches(
+            query=room_name,
+            items=rooms,
+            text_extractor=lambda r: r.name,
+            min_similarity=0.6
+        )
+        
+        raise GroupNotFoundError(
+            group_type=GroupType.ROOM,
+            lookup_name=room_name,
+            suggested_names=[s.name for s in suggestions]
+        )
 
     async def get_zone_by_name(self, zone_name: str) -> GroupInfo:
         zones = await self.get_zones()
@@ -23,7 +35,18 @@ class GroupLookup:
             if zone.name.lower() == zone_name.lower():
                 return zone
         
-        raise GroupNotFoundError(f"Zone '{zone_name}' not found")
+        suggestions = find_all_matches(
+            query=zone_name,
+            items=zones,
+            text_extractor=lambda z: z.name,
+            min_similarity=0.6
+        )
+        
+        raise GroupNotFoundError(
+            group_type=GroupType.ZONE,
+            lookup_name=zone_name,
+            suggested_names=[s.name for s in suggestions]
+        )
 
     async def get_rooms(self) -> list[GroupInfo]:
         response = await self._client.get("room")

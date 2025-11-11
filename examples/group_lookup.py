@@ -8,6 +8,7 @@ async def main():
     print(f"Room Info: {room}")
 
     # Get all rooms
+
     all_rooms = await lookup.get_rooms()
     for room in all_rooms:
         print(f"Room: {room.name} (ID: {room.id})")
