@@ -8,6 +8,7 @@ from httpx_sse import ServerSentEvent, aconnect_sse
 
 from hueify.credentials.service import HueBridgeCredentials
 from hueify.events.models import Event
+from hueify.http import HttpMethods
 from hueify.utils.logging import LoggingMixin
 
 
@@ -39,7 +40,7 @@ class EventStream(LoggingMixin):
             async with (
                 httpx.AsyncClient(verify=False, timeout=None) as client,
                 aconnect_sse(
-                    client=client, method="GET", url=self.url, headers=headers
+                    client=client, method=HttpMethods.GET, url=self.url, headers=headers
                 ) as event_source,
             ):
                 self.logger.info("Connected to event stream")

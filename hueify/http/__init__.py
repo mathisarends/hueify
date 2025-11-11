@@ -1,4 +1,8 @@
 from .client import HttpClient
-from .models import ApiResponse
+from .models import ApiResponse, HttpMethods
 
-__all__ = ["HttpClient", "ApiResponse"]
+__all__ = [
+    "ApiResponse",
+    "HttpClient",
+    "HttpMethods",
+]
