@@ -1,8 +1,8 @@
-from hueify.groups.lookup.models import GroupType
+from hueify.groups.models import GroupType
 from hueify.types.exceptions import HueifyException
 
 
-class RoomNotFoundExeption(HueifyException):
+class RoomNotFoundException(HueifyException):
     def __init__(
         self, 
         lookup_name: str, 

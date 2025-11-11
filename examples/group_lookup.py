@@ -1,23 +1,20 @@
-from hueify.groups.lookup.lookup import GroupLookup
-from hueify.groups.service import GroupService
 
-from hueify.groups.rooms import RoomController
+from hueify.groups import RoomController, GroupDiscovery
+from hueify.groups.models import GroupType
 
 
-lookup = GroupLookup()
-group_service = GroupService()
 
 async def main():
-    room = await lookup.get_room_by_name("Zimmer 1")
-    print(f"Room Info: {room}")
+    group_discovery = GroupDiscovery()
+    all_groups = await group_discovery.get_all_groups()
+    for group in all_groups:
+        if group.type == GroupType.ROOM:
+            room_controller = RoomController.from_group_info(group)
+            await room_controller.activate_scene("Entspannen")
+        print(f"Found group: {group.name} (ID: {group.id})")
 
-    all_rooms = await lookup.get_rooms()
-    for room in all_rooms:
-        print(f"Room: {room.name} (ID: {room.id})")
-
-
-    room_controller = await RoomController.from_name("Zimmer 1")
-    await room_controller.activate_scene("Entspannen")
+    # room_controller = await RoomController.from_name("Zimmer 1")
+    # await room_controller.activate_scene("Entspannen")
 
 
 

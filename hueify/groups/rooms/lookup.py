@@ -1,5 +1,5 @@
 from hueify.groups.base import GroupLookup
-from hueify.groups.rooms.exceptions import RoomNotFoundExeption
+from hueify.groups.rooms.exceptions import RoomNotFoundException
 
 
 class RoomLookup(GroupLookup):
@@ -11,7 +11,7 @@ class RoomLookup(GroupLookup):
         lookup_name: str, 
         suggested_names: list[str]
     ) -> Exception:
-        return RoomNotFoundExeption(
+        return RoomNotFoundException(
             lookup_name=lookup_name,
             suggested_names=suggested_names
         )

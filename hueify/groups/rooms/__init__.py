@@ -1,4 +1,4 @@
 from .controller import RoomController
-from .exceptions import RoomNotFoundExeption
+from .exceptions import RoomNotFoundException
 
-__all__ = ["RoomController", "RoomNotFoundExeption"]
+__all__ = ["RoomController", "RoomNotFoundException"]
