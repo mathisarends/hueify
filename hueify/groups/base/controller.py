@@ -62,7 +62,10 @@ class GroupController(ABC):
         scenes = await self.get_scenes()
         
         for scene in scenes:
-            if scene.status and scene.status.active == SceneStatusValue.ACTIVE:
+            if scene.status and scene.status.active == SceneStatusValue.STATIC:
                 return scene
-        
-        return None
+    
+    async def get_active_scene_name(self) -> str | None:
+        active_scene = await self.get_active_scene()
+        if active_scene:
+            return active_scene.name
