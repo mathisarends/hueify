@@ -1,39 +1,88 @@
 from enum import StrEnum
+from uuid import UUID
 from pydantic import BaseModel, Field, TypeAdapter
 
 
-class LightSceneType(StrEnum):
-    LIGHTSCENE = "LightScene"
-    GROUPSCENE = "GroupScene"
+class SceneStatusValue(StrEnum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    STATIC = "static"
+
+
+class SceneStatus(BaseModel):
+    active: SceneStatusValue
+
+
+class SceneAction(StrEnum):
+    ACTIVE = "active"
+    DYNAMIC_PALETTE = "dynamic_palette"
+    STATIC = "static"
+
+
+class ResourceReference(BaseModel):
+    rid: UUID
+    rtype: str
+
+
+class SceneMetadata(BaseModel):
+    name: str
+    image: ResourceReference | None = None
+
+
+class SceneGroup(BaseModel):
+    rid: UUID
+    rtype: str = "room"
+
+
+class SceneActionTarget(BaseModel):
+    target: ResourceReference
+    action: dict
+
+
+class ScenePalette(BaseModel):
+    color: list[dict] = Field(default_factory=list)
+    dimming: list[dict] = Field(default_factory=list)
+    color_temperature: list[dict] = Field(default_factory=list)
+    effects: list[dict] = Field(default_factory=list)
+    effects_v2: list[dict] = Field(default_factory=list)
 
 
 class SceneInfo(BaseModel):
-    id: str
-    name: str
-    group_id: str = Field(alias="group")
-    type: LightSceneType
-    lights: list[str]
+    id: UUID
+    metadata: SceneMetadata
+    group: SceneGroup
+    actions: list[SceneActionTarget] = Field(default_factory=list)
+    palette: ScenePalette = Field(default_factory=ScenePalette)
+    speed: float = 0.5
+    auto_dynamic: bool = False
+    status: SceneStatus | None = None
+    type: str = "scene"
+    
+    @property
+    def name(self) -> str:
+        return self.metadata.name
+    
+    @property
+    def group_id(self) -> str:
+        return str(self.group.rid)
 
     class Config:
         populate_by_name = True
 
+
 SceneInfoListAdapter = TypeAdapter(list[SceneInfo])
 
+
+class SceneRecall(BaseModel):
+    action: SceneAction = SceneAction.ACTIVE
+    duration: int | None = None
+    dimming: dict | None = None
+
+
 class SceneActivationRequest(BaseModel):
-    scene: str
+    recall: SceneRecall
 
 
 class SceneActivationResponse(BaseModel):
-    success: dict[str, str]
-
-
-class ScenesResponse(BaseModel):
-    scenes: dict[str, SceneInfo] = Field(default_factory=dict)
-
-    @classmethod
-    def from_dict(cls, data: dict[str, dict]) -> "ScenesResponse":
-        scenes = {}
-        for scene_id, scene_data in data.items():
-            scene_data["id"] = scene_id
-            scenes[scene_id] = SceneInfo.model_validate(scene_data)
-        return cls(scenes=scenes)
+    errors: list[dict] = Field(default_factory=list)
+    data: list[dict] = Field(default_factory=list)

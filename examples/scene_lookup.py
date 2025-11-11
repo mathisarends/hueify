@@ -1,9 +1,9 @@
-from hueify.scenes import SceneLookup
+from hueify.scenes.service import SceneService
 
 async def main():
-    scene_lookup = SceneLookup()
+    scene_lookup = SceneService()
 
-    scenes = await scene_lookup.find_scene_by_name("Nachts")
+    scenes = await scene_lookup.activate_scene_by_name("Morgendämmerung")
     print(scenes)
 
 if __name__ == "__main__":

@@ -1,0 +1,44 @@
+from uuid import UUID
+from hueify.http import HttpClient, ApiResponse
+from hueify.groups.lookup.models import GroupInfo, GroupInfoListAdapter, GroupType
+from hueify.groups.lookup.exceptions import GroupNotFoundError
+from hueify.utils.logging import LoggingMixin
+
+
+class GroupLookup(LoggingMixin):
+    def __init__(self, client: HttpClient | None = None) -> None:
+        super().__init__()
+        self._client = client or HttpClient()
+
+    async def get_room_by_name(self, room_name: str) -> GroupInfo:
+        rooms = await self.get_rooms()
+        
+        for room in rooms:
+            if room.name.lower() == room_name.lower():
+                return room
+        
+        raise GroupNotFoundError(f"Room '{room_name}' not found")
+
+    async def get_zone_by_name(self, zone_name: str) -> GroupInfo:
+        zones = await self.get_zones()
+        
+        for zone in zones:
+            if zone.name.lower() == zone_name.lower():
+                return zone
+        
+        raise GroupNotFoundError(f"Zone '{zone_name}' not found")
+
+    async def get_rooms(self) -> list[GroupInfo]:
+        response = await self._client.get("room")
+        return self._parse_groups_response(response)
+
+    async def get_zones(self) -> list[GroupInfo]:
+        response = await self._client.get("zone")
+        return self._parse_groups_response(response)
+    
+    def _parse_groups_response(self, response: ApiResponse) -> list[GroupInfo]:
+        data = response.get("data", [])
+        if not data:
+            return []
+        
+        return GroupInfoListAdapter.validate_python(data)
