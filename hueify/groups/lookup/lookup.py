@@ -1,11 +1,8 @@
-from uuid import UUID
 from hueify.http import HttpClient, ApiResponse
-from hueify.groups.lookup.models import GroupInfo, GroupInfoListAdapter, GroupType
+from hueify.groups.lookup.models import GroupInfo, GroupInfoListAdapter
 from hueify.groups.lookup.exceptions import GroupNotFoundError
-from hueify.utils.logging import LoggingMixin
 
-
-class GroupLookup(LoggingMixin):
+class GroupLookup:
     def __init__(self, client: HttpClient | None = None) -> None:
         super().__init__()
         self._client = client or HttpClient()
