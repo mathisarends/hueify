@@ -16,6 +16,7 @@ class SceneService(LoggingMixin):
         self._client = client or HttpClient()
         self._lookup = scene_lookup or SceneLookup(self._client)
 
+
     async def find_scene_by_name_in_group(self, scene_name: str, group_id: UUID) -> SceneInfo:
         return await self._lookup.find_scene_by_name_in_group(scene_name, group_id)
     
