@@ -2,9 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Self, TYPE_CHECKING
 from uuid import UUID
 
+from hueify.scenes import SceneService, SceneInfo, SceneStatusValue
 from hueify.groups.models import GroupInfo
-from hueify.scenes.models import SceneInfo, SceneStatusValue
-from hueify.scenes.service import SceneService
 from hueify.http import HttpClient
 
 if TYPE_CHECKING:
