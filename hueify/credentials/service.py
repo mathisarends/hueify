@@ -9,45 +9,53 @@ class HueBridgeCredentials(BaseSettings):
         extra="ignore",
         case_sensitive=False,
     )
-    
+
     hue_bridge_ip: str | None = Field(default=None, alias="HUE_BRIDGE_IP")
-    hue_user_id: str | None = Field(default=None, alias="HUE_USER_ID")
-    
+    hue_app_key: str | None = Field(default=None, alias="HUE_APP_KEY")
+
     @field_validator("hue_bridge_ip")
     @classmethod
     def validate_ip(cls, value: str | None) -> str | None:
         if value is None:
             return value
-            
+
         if not value or value != value.strip():
-            raise ValueError("IP address cannot be empty or contain leading/trailing whitespace")
-        
+            raise ValueError(
+                "IP address cannot be empty or contain leading/trailing whitespace"
+            )
+
         parts = value.split(".")
         if len(parts) != 4:
             raise ValueError(f"IP address must have 4 parts, got {len(parts)}")
-        
+
         try:
             for part in parts:
                 num = int(part)
                 if not 0 <= num <= 255:
-                    raise ValueError(f"IP address part must be between 0-255, got {num}")
+                    raise ValueError(
+                        f"IP address part must be between 0-255, got {num}"
+                    )
         except ValueError as e:
             if "invalid literal" in str(e):
-                raise ValueError(f"IP address parts must be numeric")
+                raise ValueError("IP address parts must be numeric") from e
             raise
-        
+
         return value
-    
-    @field_validator("hue_user_id")
+
+    @field_validator("hue_app_key")
     @classmethod
-    def validate_user_id(cls, value: str | None) -> str | None:
+    def validate_hue_app_key(cls, value: str | None) -> str | None:
         if value is None:
             return value
 
         if len(value) < 20:
-            raise ValueError(f"User ID must be at least 20 characters, got {len(value)}")
+            raise ValueError(
+                f"Hue App Key must be at least 20 characters, got {len(value)}"
+            )
 
         if not value.isalnum():
-            raise ValueError("User ID must be alphanumeric (letters and numbers only)")
+            raise ValueError(
+                "Hue App Key must be alphanumeric (letters and numbers only)"
+            )
 
         return value

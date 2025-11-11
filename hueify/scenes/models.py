@@ -1,5 +1,6 @@
 from enum import StrEnum
 from uuid import UUID
+
 from pydantic import BaseModel, Field, TypeAdapter
 
 
@@ -57,11 +58,11 @@ class SceneInfo(BaseModel):
     auto_dynamic: bool = False
     status: SceneStatus | None = None
     type: str = "scene"
-    
+
     @property
     def name(self) -> str:
         return self.metadata.name
-    
+
     @property
     def group_id(self) -> UUID:
         return self.group.rid
