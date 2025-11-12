@@ -2,7 +2,7 @@ from hueify.lights import LightController
 
 
 async def main():
-    light_controller = await LightController.from_name("Hue lightstrip plus 1")
+    light_controller = await LightController.from_name("Hue Lightstrip")
     await light_controller.increase_brightness(15)
     await asyncio.sleep(2)
     await light_controller.decrease_brightness(15)

@@ -128,3 +128,7 @@ class GroupController(ResourceController):
         return await self._client.get_resource(
             f"grouped_light/{self.grouped_light_id}", resource_type=GroupedLightState
         )
+
+    async def _get_current_on_state(self) -> bool:
+        state = await self._get_grouped_light_state()
+        return state.on.on if state.on else False

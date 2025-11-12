@@ -1,54 +1,50 @@
 import asyncio
-import httpx
-from hueify.bridge import HueBridge
+from pathlib import Path
 
+from agents import Agent, Runner
+from agents.mcp import MCPServerStdio
+from dotenv import load_dotenv
 
-async def create_hue_user(bridge_ip: str) -> str:
-    url = f"http://{bridge_ip}/api"
-    payload = {"devicetype": "hueify#user"}
+load_dotenv(override=True)
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, json=payload)
-        data = response.json()
-
-    if isinstance(data, list) and len(data) > 0:
-        if "success" in data[0]:
-            user_id = data[0]["success"]["username"]
-            print(f"✓ API user created!")
-            print(f"✓ Username (HUE_USER_ID): {user_id}")
-            return user_id
-        elif "error" in data[0]:
-            print(f"✗ Error: {data[0]['error']['description']}")
-            print("→ Press the link button on your Hue Bridge and try again!")
-    else:
-        print(f"✗ Unexpected response: {data}")
-
-    return None
+HUEIFY_DIR = Path("c:/code/hueify")
 
 
 async def main():
-    print("Hue Bridge API User Setup")
-    print("=" * 50)
+    async with MCPServerStdio(
+        params={
+            "command": "uv",
+            "args": [
+                "--directory",
+                str(HUEIFY_DIR),
+                "run",
+                "python",
+                "-m",
+                "hueify.mcp.server",
+            ],
+        },
+        name="My MCP Server",
+    ) as server:
+        agent = Agent(
+            name="Light toggler",
+            instructions=(
+                "You like to toggle lights using the turn_on_light and turn_off_light tools from the MCP server. "
+                "Not More not less. My name is Alex."
+            ),
+            mcp_servers=[server],
+            model="gpt-4.1-mini",
+        )
 
-    print("\nDiscovering Hue Bridges...")
-    bridges = await HueBridge.discover_bridges()
+        runner = Runner()
+        result = await runner.run(
+            starting_agent=agent,
+            input="Turn on Lighstripe 1. If the name is not correct, first discover the lights and use the correct name to turn off the light.",
+        )
 
-    if not bridges:
-        print("✗ No Hue Bridge found on your network!")
-        return
+        for step in result.new_items:
+            print(step)
 
-    bridge_ip = bridges[0]["internalipaddress"]
-    print(f"✓ Found bridge at: {bridge_ip}")
-
-    print(f"\n⚠ Press the link button on your Hue Bridge NOW!")
-    input("Press Enter when you've pressed the button...")
-
-    user_id = await create_hue_user(bridge_ip)
-
-    if user_id:
-        print("\nAdd these values to your .env file:")
-        print(f"HUE_BRIDGE_IP={bridge_ip}")
-        print(f"HUE_USER_ID={user_id}")
+        print("result", result.final_output)
 
 
 if __name__ == "__main__":

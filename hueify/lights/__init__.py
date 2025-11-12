@@ -1,5 +1,5 @@
 from hueify.lights.controller import LightController
-from hueify.lights.exceptions import LightNotFoundError
+from hueify.lights.exceptions import LightNotFoundException
 from hueify.lights.lookup import LightLookup
 from hueify.lights.models import (
     ColorGamut,
@@ -25,7 +25,7 @@ __all__ = [
     "LightDimmingState",
     "LightInfo",
     "LightLookup",
-    "LightNotFoundError",
+    "LightNotFoundException",
     "LightState",
     "MirekSchema",
 ]

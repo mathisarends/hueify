@@ -1,7 +1,7 @@
 from hueify.exceptions import ResourceNotFoundException
 
 
-class LightNotFoundError(ResourceNotFoundException):
+class LightNotFoundException(ResourceNotFoundException):
     def __init__(self, light_name: str, suggestions: list[str]) -> None:
         super().__init__(
             resource_type="light",

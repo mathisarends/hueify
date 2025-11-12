@@ -79,3 +79,7 @@ class LightController(ResourceController):
 
     async def _get_light_state(self) -> LightState:
         return await self._client.get_resource(f"light/{self.id}", LightState)
+
+    async def _get_current_on_state(self) -> bool:
+        state = await self._get_light_state()
+        return state.on.on if state.on else False
