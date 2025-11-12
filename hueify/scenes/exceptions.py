@@ -1,14 +1,11 @@
-from hueify.types.exceptions import HueifyException
+from hueify.exceptions import ResourceNotFoundException
 
 
-class SceneNotFoundError(HueifyException):
+class SceneNotFoundError(ResourceNotFoundException):
     def __init__(self, lookup_name: str, suggested_names: list[str]) -> None:
-        self.lookup_name = lookup_name
-        self.suggested_names = suggested_names
-        
-        error_msg = f"Scene '{lookup_name}' not found"
-        if suggested_names:
-            suggestions = ", ".join([f"'{name}'" for name in suggested_names[:3]])
-            error_msg += f". Did you mean: {suggestions}?"
-        
-        super().__init__(error_msg)
+        super().__init__(
+            resource_type="scene",
+            lookup_name=lookup_name,
+            suggested_names=suggested_names,
+            max_suggestions=3,
+        )

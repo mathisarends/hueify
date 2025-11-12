@@ -5,10 +5,10 @@ from hueify.http import HttpClient
 from hueify.lights.lookup import LightLookup
 from hueify.lights.models import (
     ColorTemperatureState,
-    DimmingState,
+    LightDimmingState,
     LightInfo,
+    LightOnState,
     LightState,
-    OnState,
 )
 from hueify.utils.decorators import time_execution_async
 from hueify.utils.logging import LoggingMixin
@@ -51,11 +51,11 @@ class LightController(LoggingMixin):
         return self._light_info.metadata.name
 
     async def turn_on(self) -> None:
-        update = LightState(on=OnState(on=True))
+        update = LightState(on=LightOnState(on=True))
         await self._client.put(f"light/{self.id}", data=update)
 
     async def turn_off(self) -> None:
-        update = LightState(on=OnState(on=False))
+        update = LightState(on=LightOnState(on=False))
         await self._client.put(f"light/{self.id}", data=update)
 
     async def set_brightness(self, brightness_percentage: float) -> None:
@@ -77,7 +77,7 @@ class LightController(LoggingMixin):
 
     async def _update_brightness(self, brightness: float) -> None:
         update = LightState(
-            on=OnState(on=True), dimming=DimmingState(brightness=brightness)
+            on=LightOnState(on=True), dimming=LightDimmingState(brightness=brightness)
         )
         await self._client.put(f"light/{self.id}", data=update)
 
@@ -120,13 +120,15 @@ class LightController(LoggingMixin):
 
     async def _update_color_temperature(self, mirek: int) -> None:
         update = LightState(
-            on=OnState(on=True), color_temperature=ColorTemperatureState(mirek=mirek)
+            on=LightOnState(on=True),
+            color_temperature=ColorTemperatureState(mirek=mirek),
         )
         await self._client.put(f"light/{self.id}", data=update)
 
     async def get_light_state(self) -> LightState:
         return await self._get_light_state()
 
+    # TODO: WTF is this
     async def _get_light_state(self) -> LightState:
         response = await self._client.get(f"light/{self.id}")
         data = response.get("data", [])
@@ -135,8 +137,8 @@ class LightController(LoggingMixin):
 
         light_data = data[0]
         return LightState(
-            on=OnState(**light_data["on"]) if "on" in light_data else None,
-            dimming=DimmingState(**light_data["dimming"])
+            on=LightOnState(**light_data["on"]) if "on" in light_data else None,
+            dimming=LightDimmingState(**light_data["dimming"])
             if "dimming" in light_data
             else None,
             color_temperature=ColorTemperatureState(**light_data["color_temperature"])

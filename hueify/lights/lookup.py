@@ -11,7 +11,7 @@ class LightLookup:
         self._client = client or HttpClient()
 
     async def get_light_by_name(self, light_name: str) -> LightInfo:
-        lights = await self._get_all_lights()
+        lights = await self.get_lights()
 
         for light in lights:
             if light.metadata.name.lower() == light_name.lower():
@@ -27,7 +27,7 @@ class LightLookup:
         raise LightNotFoundError(light_name=light_name, suggestions=suggestions)
 
     async def get_light_by_id(self, light_id: UUID) -> LightInfo:
-        lights = await self._get_all_lights()
+        lights = await self.get_lights()
 
         for light in lights:
             if light.id == light_id:
@@ -35,10 +35,7 @@ class LightLookup:
 
         raise LightNotFoundError(light_name=str(light_id), suggestions=[])
 
-    async def get_all_lights(self) -> list[LightInfo]:
-        return await self._get_all_lights()
-
-    async def _get_all_lights(self) -> list[LightInfo]:
+    async def get_lights(self) -> list[LightInfo]:
         response = await self._client.get("light")
         data = response.get("data", [])
         return LightInfoListAdapter.validate_python(data)

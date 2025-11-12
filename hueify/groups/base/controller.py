@@ -5,14 +5,13 @@ from uuid import UUID
 from hueify.groups.base.exceptions import NotInColorTemperatureModeError
 from hueify.groups.models import (
     ColorTemperatureState,
-    DimmingState,
+    GroupedLightDimmingState,
     GroupedLightState,
     GroupInfo,
-    OnState,
-    ResourceType,
 )
 from hueify.http import HttpClient
 from hueify.scenes import SceneInfo, SceneService, SceneStatusValue
+from hueify.shared.types import LightOnState, ResourceType
 from hueify.utils.decorators import time_execution_async
 from hueify.utils.logging import LoggingMixin
 
@@ -95,11 +94,11 @@ class GroupController(ABC, LoggingMixin):
             return active_scene.name
 
     async def turn_on(self) -> None:
-        update = GroupedLightState(on=OnState(on=True))
+        update = GroupedLightState(on=LightOnState(on=True))
         await self._client.put(f"grouped_light/{self.grouped_light_id}", data=update)
 
     async def turn_off(self) -> None:
-        update = GroupedLightState(on=OnState(on=False))
+        update = GroupedLightState(on=LightOnState(on=False))
         await self._client.put(f"grouped_light/{self.grouped_light_id}", data=update)
 
     async def set_brightness(self, brightness_percentage: int) -> None:
@@ -121,7 +120,8 @@ class GroupController(ABC, LoggingMixin):
 
     async def _update_brightness(self, brightness: int) -> None:
         update = GroupedLightState(
-            on=OnState(on=True), dimming=DimmingState(brightness=brightness)
+            on=LightOnState(on=True),
+            dimming=GroupedLightDimmingState(brightness=brightness),
         )
         await self._client.put(f"grouped_light/{self.grouped_light_id}", data=update)
 
@@ -173,7 +173,8 @@ class GroupController(ABC, LoggingMixin):
 
     async def _update_color_temperature(self, mirek: int) -> None:
         update = GroupedLightState(
-            on=OnState(on=True), color_temperature=ColorTemperatureState(mirek=mirek)
+            on=LightOnState(on=True),
+            color_temperature=ColorTemperatureState(mirek=mirek),
         )
         await self._client.put(f"grouped_light/{self.grouped_light_id}", data=update)
 

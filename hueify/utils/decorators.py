@@ -55,7 +55,7 @@ def time_execution_sync(
 
 def time_execution_async(
     additional_text: str = "",
-    min_duration_to_log: float = 0.25,
+    min_duration_to_log: float = 0.1,
 ) -> _AsyncDecorator:
     def decorator(func: _AsyncFunc) -> _AsyncFunc:
         @functools.wraps(func)
@@ -63,7 +63,6 @@ def time_execution_async(
             start_time = time.perf_counter()
             result = await func(*args, **kwargs)
             execution_time = time.perf_counter() - start_time
-            print(execution_time)
 
             if execution_time > min_duration_to_log:
                 logger = _get_logger_from_context(args, func)

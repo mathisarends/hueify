@@ -3,21 +3,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, TypeAdapter
 
+from hueify.shared.types import LightOnState, ResourceReference
+
 
 class GroupType(StrEnum):
     ROOM = "room"
     ZONE = "zone"
-
-
-class ResourceType(StrEnum):
-    LIGHT = "light"
-    SCENE = "scene"
-    ROOM = "room"
-    ZONE = "zone"
-    BRIDGE_HOME = "bridge_home"
-    GROUPED_LIGHT = "grouped_light"
-    DEVICE = "device"
-    BRIDGE = "bridge"
 
     DEVICE_SOFTWARE_UPDATE = "device_software_update"
     DEVICE_POWER = "device_power"
@@ -62,11 +53,6 @@ class ResourceType(StrEnum):
 
     SPEAKER = "speaker"
     CLIP = "clip"
-
-
-class ResourceReference(BaseModel):
-    rid: UUID
-    rtype: ResourceType
 
 
 class GroupArchetype(StrEnum):
@@ -136,11 +122,7 @@ class GroupInfo(BaseModel):
 GroupInfoListAdapter = TypeAdapter(list[GroupInfo])
 
 
-class OnState(BaseModel):
-    on: bool
-
-
-class DimmingState(BaseModel):
+class GroupedLightDimmingState(BaseModel):
     brightness: float = Field(ge=0, le=100)
 
 
@@ -152,6 +134,6 @@ class ColorTemperatureState(BaseModel):
 class GroupedLightState(BaseModel):
     id: UUID | None = None
     type: str | None = None
-    on: OnState | None = None
-    dimming: DimmingState | None = None
+    on: LightOnState | None = None
+    dimming: GroupedLightDimmingState | None = None
     color_temperature: ColorTemperatureState | None = None
