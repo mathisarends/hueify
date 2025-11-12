@@ -1,2 +1,0 @@
-class HueifyException(Exception):
-    pass
