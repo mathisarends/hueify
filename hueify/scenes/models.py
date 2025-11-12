@@ -1,7 +1,7 @@
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 
 class SceneStatusValue(StrEnum):
@@ -49,6 +49,8 @@ class ScenePalette(BaseModel):
 
 
 class SceneInfo(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: UUID
     metadata: SceneMetadata
     group: SceneGroup
@@ -66,9 +68,6 @@ class SceneInfo(BaseModel):
     @property
     def group_id(self) -> UUID:
         return self.group.rid
-
-    class Config:
-        populate_by_name = True
 
 
 SceneInfoListAdapter = TypeAdapter(list[SceneInfo])

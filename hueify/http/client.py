@@ -1,9 +1,13 @@
+from typing import TypeVar
+
 import httpx
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 
 from hueify.credentials import HueBridgeCredentials
-from hueify.http.models import ApiResponse
+from hueify.http.models import ApiResponse, HueApiResponse
 from hueify.utils.logging import LoggingMixin
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class HttpClient(LoggingMixin):
@@ -37,6 +41,16 @@ class HttpClient(LoggingMixin):
         )
         response.raise_for_status()
         return response.json()
+
+    async def get_resource(self, endpoint: str, resource_type: type[T]) -> T:
+        response = await self._client.get(
+            f"{self.base_url}/{endpoint}", headers=self._headers
+        )
+        response.raise_for_status()
+
+        adapter = TypeAdapter(HueApiResponse[resource_type])
+        api_response = adapter.validate_python(response.json())
+        return api_response.get_single_resource()
 
     async def put(self, endpoint: str, data: BaseModel) -> ApiResponse:
         response = await self._client.put(
