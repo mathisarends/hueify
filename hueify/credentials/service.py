@@ -1,6 +1,8 @@
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from hueify.credentials.utils import validate_hue_app_key, validate_hue_bridge_ip
+
 
 class HueBridgeCredentials(BaseSettings):
     model_config = SettingsConfigDict(
@@ -16,46 +18,9 @@ class HueBridgeCredentials(BaseSettings):
     @field_validator("hue_bridge_ip")
     @classmethod
     def validate_ip(cls, value: str | None) -> str | None:
-        if value is None:
-            return value
-
-        if not value or value != value.strip():
-            raise ValueError(
-                "IP address cannot be empty or contain leading/trailing whitespace"
-            )
-
-        parts = value.split(".")
-        if len(parts) != 4:
-            raise ValueError(f"IP address must have 4 parts, got {len(parts)}")
-
-        try:
-            for part in parts:
-                num = int(part)
-                if not 0 <= num <= 255:
-                    raise ValueError(
-                        f"IP address part must be between 0-255, got {num}"
-                    )
-        except ValueError as e:
-            if "invalid literal" in str(e):
-                raise ValueError("IP address parts must be numeric") from e
-            raise
-
-        return value
+        return validate_hue_bridge_ip(value)
 
     @field_validator("hue_app_key")
     @classmethod
-    def validate_hue_app_key(cls, value: str | None) -> str | None:
-        if value is None:
-            return value
-
-        if len(value) < 20:
-            raise ValueError(
-                f"Hue App Key must be at least 20 characters, got {len(value)}"
-            )
-
-        if not value.isalnum():
-            raise ValueError(
-                "Hue App Key must be alphanumeric (letters and numbers only)"
-            )
-
-        return value
+    def validate_app_key(cls, value: str | None) -> str | None:
+        return validate_hue_app_key(value)

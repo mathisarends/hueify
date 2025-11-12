@@ -1,3 +1,4 @@
+from functools import cached_property
 from typing import TypeVar
 
 import httpx
@@ -5,12 +6,11 @@ from pydantic import BaseModel, TypeAdapter
 
 from hueify.credentials import HueBridgeCredentials
 from hueify.http.models import ApiResponse, HueApiResponse
-from hueify.utils.logging import LoggingMixin
 
 T = TypeVar("T", bound=BaseModel)
 
 
-class HttpClient(LoggingMixin):
+class HttpClient:
     def __init__(
         self,
         credentials: HueBridgeCredentials | None = None,
@@ -20,13 +20,13 @@ class HttpClient(LoggingMixin):
         self._credentials = credentials or HueBridgeCredentials()
         self._client = httpx.AsyncClient(timeout=timeout, verify=verify_ssl)
 
-    @property
+    @cached_property
     def base_url(self) -> str:
         if not self._credentials.hue_bridge_ip:
             raise ValueError("Credentials not properly configured (missing IP)")
         return f"https://{self._credentials.hue_bridge_ip}/clip/v2/resource"
 
-    @property
+    @cached_property
     def _headers(self) -> dict[str, str]:
         if not self._credentials.hue_app_key:
             raise ValueError("Credentials not properly configured (missing App Key)")
