@@ -6,6 +6,7 @@ from hueify.lights import LightLookup
 from hueify.scenes import SceneLookup
 
 
+# Make this more dynamic and content placeholders do not work here
 class SystemPromptTemplate:
     PROMPT_FILE = Path(__file__).parent / "system_prompt.md"
 
@@ -25,7 +26,12 @@ class SystemPromptTemplate:
         self._dynamic_context: str | None = None
 
     def _load_base_prompt(self) -> str:
-        return self.PROMPT_FILE.read_text(encoding="utf-8")
+        content = self.PROMPT_FILE.read_text(encoding="utf-8")
+
+        if "## Available Entities" in content:
+            content = content.split("## Available Entities")[0].rstrip()
+
+        return content
 
     async def get_system_prompt(self) -> str:
         if self._dynamic_context is None:
@@ -35,6 +41,7 @@ class SystemPromptTemplate:
             f"{self._base_prompt}\n\n## Available Entities\n\n{self._dynamic_context}"
         )
 
+    # Das mit der Injection funktioniert hier noch nicht so 100% (die platzhalter sind immwmer ncoh im prompt)
     async def refresh_dynamic_content(self) -> None:
         lights_task = self._light_lookup.get_light_names()
         rooms_task = self._room_lookup.get_all_entities()

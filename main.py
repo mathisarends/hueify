@@ -5,12 +5,17 @@ from agents import Agent, Runner, SQLiteSession
 from agents.mcp import MCPServerStdio
 from dotenv import load_dotenv
 
+from hueify.prompts.service import SystemPromptTemplate
+
 load_dotenv(override=True)
 
 HUEIFY_DIR = Path("c:/code/hueify")
 
 
 async def main():
+    system_prompt_service = SystemPromptTemplate()
+    system_prompt = await system_prompt_service.get_system_prompt()
+
     async with MCPServerStdio(
         params={
             "command": "uv",
@@ -27,9 +32,7 @@ async def main():
     ) as server:
         agent = Agent(
             name="Hue Controller",
-            instructions=(
-                "You are an intelligent assistant that helps users control their Hue lights. "
-            ),
+            instructions=system_prompt,
             mcp_servers=[server],
             model="gpt-4.1",
         )
