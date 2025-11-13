@@ -1,39 +1,49 @@
 from abc import ABC, abstractmethod
+from typing import Generic, TypeVar
 
-from hueify.groups.models import GroupInfo, GroupInfoListAdapter
 from hueify.http import ApiResponse, HttpClient
 from hueify.utils.fuzzy import find_all_matches_sorted
 
+T = TypeVar("T")
 
-class GroupLookup(ABC):
+
+class ResourceLookup(ABC, Generic[T]):
     def __init__(self, client: HttpClient | None = None) -> None:
         self._client = client or HttpClient()
 
-    async def get_entity_by_name(self, group_name: str) -> GroupInfo:
-        groups = await self.get_all_entities()
+    async def get_entity_by_name(self, entity_name: str) -> T:
+        entities = await self.get_all_entities()
 
-        for group in groups:
-            if group.name.lower() == group_name.lower():
-                return group
+        for entity in entities:
+            if self._extract_name(entity).lower() == entity_name.lower():
+                return entity
 
-        matching_groups = find_all_matches_sorted(
-            query=group_name,
-            items=groups,
-            text_extractor=lambda g: g.name,
+        matching_entities = find_all_matches_sorted(
+            query=entity_name,
+            items=entities,
+            text_extractor=self._extract_name,
         )
 
-        suggestions = [group.name for group in matching_groups]
+        suggestions = [self._extract_name(entity) for entity in matching_entities]
 
         raise self._create_not_found_exception(
-            lookup_name=group_name, suggested_names=suggestions
+            lookup_name=entity_name, suggested_names=suggestions
         )
 
-    async def get_all_entities(self) -> list[GroupInfo]:
+    async def get_all_entities(self) -> list[T]:
         response = await self._client.get(self._get_endpoint())
-        return self._parse_groups_response(response)
+        return self._parse_response(response)
 
     @abstractmethod
     def _get_endpoint(self) -> str:
+        pass
+
+    @abstractmethod
+    def _extract_name(self, entity: T) -> str:
+        pass
+
+    @abstractmethod
+    def _parse_response(self, response: ApiResponse) -> list[T]:
         pass
 
     @abstractmethod
@@ -41,11 +51,3 @@ class GroupLookup(ABC):
         self, lookup_name: str, suggested_names: list[str]
     ) -> Exception:
         pass
-
-    # TODO: This could be used with resource fetch
-    def _parse_groups_response(self, response: ApiResponse) -> list[GroupInfo]:
-        data = response.get("data", [])
-        if not data:
-            return []
-
-        return GroupInfoListAdapter.validate_python(data)

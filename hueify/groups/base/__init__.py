@@ -1,9 +1,9 @@
 from .controller import GroupController
 from .exceptions import NotInColorTemperatureModeError
-from .lookup import GroupLookup
+from .lookup import ResourceLookup
 
 __all__ = [
     "GroupController",
-    "GroupLookup",
     "NotInColorTemperatureModeError",
+    "ResourceLookup",
 ]

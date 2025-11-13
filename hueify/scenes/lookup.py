@@ -1,14 +1,35 @@
 from uuid import UUID
 
-from hueify.http.client import HttpClient
+from hueify.groups.base.lookup import ResourceLookup
+from hueify.http import ApiResponse
 from hueify.scenes.exceptions import SceneNotFoundException
 from hueify.scenes.models import SceneInfo, SceneStatusValue
 from hueify.utils.fuzzy import find_all_matches_sorted
 
 
-class SceneLookup:
-    def __init__(self, client: HttpClient | None = None) -> None:
-        self._client = client or HttpClient()
+class SceneLookup(ResourceLookup[SceneInfo]):
+    def _get_endpoint(self) -> str:
+        return "scene"
+
+    def _extract_name(self, entity: SceneInfo) -> str:
+        return entity.name
+
+    def _parse_response(self, response: ApiResponse) -> list[SceneInfo]:
+        data = response.get("data", [])
+        if not data:
+            return []
+
+        from pydantic import TypeAdapter
+
+        adapter = TypeAdapter(list[SceneInfo])
+        return adapter.validate_python(data)
+
+    def _create_not_found_exception(
+        self, lookup_name: str, suggested_names: list[str]
+    ) -> Exception:
+        return SceneNotFoundException(
+            lookup_name=lookup_name, suggested_names=suggested_names
+        )
 
     async def get_active_scene(self) -> SceneInfo | None:
         scenes = await self.get_scenes()
@@ -18,26 +39,10 @@ class SceneLookup:
         return None
 
     async def get_scenes(self) -> list[SceneInfo]:
-        return await self._client.get_resources("scene", SceneInfo)
+        return await self.get_all_entities()
 
     async def find_scene_by_name(self, scene_name: str) -> SceneInfo:
-        all_scenes = await self.get_scenes()
-
-        for scene in all_scenes:
-            if scene.name.lower() == scene_name.lower():
-                return scene
-
-        matching_scenes = find_all_matches_sorted(
-            query=scene_name,
-            items=all_scenes,
-            text_extractor=lambda s: s.name,
-        )
-
-        suggestions = [scene.name for scene in matching_scenes]
-
-        raise SceneNotFoundException(
-            lookup_name=scene_name, suggested_names=suggestions
-        )
+        return await self.get_entity_by_name(scene_name)
 
     async def find_scene_by_name_in_group(
         self, scene_name: str, group_id: UUID

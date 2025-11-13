@@ -21,7 +21,7 @@ from hueify.shared.types import LightOnState, ResourceType
 from hueify.utils.decorators import time_execution_async
 
 if TYPE_CHECKING:
-    from hueify.groups.base import GroupLookup
+    from hueify.groups.base import ResourceLookup
 
 
 class GroupController(ResourceController):
@@ -58,7 +58,7 @@ class GroupController(ResourceController):
 
     @classmethod
     @abstractmethod
-    def _create_lookup(cls, client: HttpClient) -> "GroupLookup":
+    def _create_lookup(cls, client: HttpClient) -> "ResourceLookup":
         pass
 
     @property

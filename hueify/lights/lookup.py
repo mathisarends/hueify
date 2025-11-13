@@ -1,34 +1,36 @@
 from uuid import UUID
 
-from hueify.http import HttpClient
+from hueify.groups.base.lookup import ResourceLookup
+from hueify.http import ApiResponse
 from hueify.lights.exceptions import LightNotFoundException
 from hueify.lights.models import LightInfo, LightInfoListAdapter
-from hueify.utils.fuzzy import find_all_matches_sorted
 
 
-class LightLookup:
-    def __init__(self, client: HttpClient | None = None) -> None:
-        self._client = client or HttpClient()
+class LightLookup(ResourceLookup[LightInfo]):
+    def _get_endpoint(self) -> str:
+        return "light"
 
-    async def get_light_by_name(self, light_name: str) -> LightInfo:
-        lights = await self.get_lights()
+    def _extract_name(self, entity: LightInfo) -> str:
+        return entity.metadata.name
 
-        for light in lights:
-            if light.metadata.name.lower() == light_name.lower():
-                return light
+    def _parse_response(self, response: ApiResponse) -> list[LightInfo]:
+        data = response.get("data", [])
+        if not data:
+            return []
+        return LightInfoListAdapter.validate_python(data)
 
-        matching_lights = find_all_matches_sorted(
-            query=light_name,
-            items=lights,
-            text_extractor=lambda light: light.metadata.name,
+    def _create_not_found_exception(
+        self, lookup_name: str, suggested_names: list[str]
+    ) -> Exception:
+        return LightNotFoundException(
+            light_name=lookup_name, suggestions=suggested_names
         )
 
-        suggestions = [light.metadata.name for light in matching_lights]
-
-        raise LightNotFoundException(light_name=light_name, suggestions=suggestions)
+    async def get_light_by_name(self, light_name: str) -> LightInfo:
+        return await self.get_entity_by_name(light_name)
 
     async def get_light_by_id(self, light_id: UUID) -> LightInfo:
-        lights = await self.get_lights()
+        lights = await self.get_all_entities()
 
         for light in lights:
             if light.id == light_id:
@@ -37,9 +39,7 @@ class LightLookup:
         raise LightNotFoundException(light_name=str(light_id), suggestions=[])
 
     async def get_lights(self) -> list[LightInfo]:
-        response = await self._client.get("light")
-        data = response.get("data", [])
-        return LightInfoListAdapter.validate_python(data)
+        return await self.get_all_entities()
 
     async def get_light_names(self) -> list[str]:
         lights = await self.get_lights()

@@ -64,17 +64,16 @@ class SystemPromptTemplate:
         scenes: list[str],
     ) -> str:
         """Build the dynamic section with available entities"""
-        return f"""**Rooms:**
-{self._format_list(rooms)}
-
-**Zones:**
-{self._format_list(zones)}
-
-**Lights:**
-{self._format_list(lights)}
-
-**Scenes:**
-{self._format_list(scenes)}"""
+        return (
+            "**Rooms:**\n"
+            f"{self._format_list(rooms)}\n\n"
+            "**Zones:**\n"
+            f"{self._format_list(zones)}\n\n"
+            "**Lights:**\n"
+            f"{self._format_list(lights)}\n\n"
+            "**Scenes:**\n"
+            f"{self._format_list(scenes)}"
+        )
 
     def _format_list(self, items: list[str]) -> str:
         if not items:
