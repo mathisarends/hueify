@@ -5,6 +5,16 @@ MIN_TEMPERATURE_PERCENTAGE = 0
 MAX_TEMPERATURE_PERCENTAGE = 100
 
 
+def normalize_percentage_input(value: float | int) -> int:
+    if isinstance(value, int):
+        return value
+
+    if 0 <= value <= 1:
+        return int(value * 100)
+
+    return int(value)
+
+
 def clamp_brightness(brightness: int) -> int:
     if brightness < MIN_BRIGHTNESS:
         return MIN_BRIGHTNESS

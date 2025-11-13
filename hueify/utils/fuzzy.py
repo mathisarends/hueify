@@ -12,6 +12,17 @@ class _MatchResult(Generic[T]):
     similarity: float
 
 
+def find_all_matches_sorted(
+    query: str,
+    items: list[T],
+    text_extractor: Callable[[T], str],
+) -> list[T]:
+    matches = _find_best_matches(
+        query, items, text_extractor, min_similarity=0.0, limit=None
+    )
+    return [match.item for match in matches]
+
+
 def find_all_matches(
     query: str,
     items: list[T],
@@ -46,6 +57,7 @@ def _find_best_matches(
         return results[:limit]
 
     return results
+
 
 def _sort_by_highest_similarity_first(
     results: list[_MatchResult],

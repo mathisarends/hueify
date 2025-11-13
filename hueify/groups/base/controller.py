@@ -12,8 +12,11 @@ from hueify.groups.models import (
     GroupInfo,
 )
 from hueify.http import HttpClient
-from hueify.scenes import SceneInfo, SceneService, SceneStatusValue
-from hueify.shared.controllers.base import ResourceController
+from hueify.scenes import SceneInfo
+from hueify.scenes.controller import SceneController
+from hueify.scenes.lookup import SceneLookup
+from hueify.shared.controller.base import ResourceController
+from hueify.shared.controller.models import ActionResult
 from hueify.shared.types import LightOnState, ResourceType
 from hueify.utils.decorators import time_execution_async
 
@@ -26,11 +29,11 @@ class GroupController(ResourceController):
         self,
         group_info: GroupInfo,
         client: HttpClient | None = None,
-        scene_service: SceneService | None = None,
+        scene_lookup: SceneLookup | None = None,
     ) -> None:
         super().__init__(client)
         self._group_info = group_info
-        self._scene_service = scene_service or SceneService(client=self._client)
+        self._scene_lookup = scene_lookup or SceneLookup(client=self._client)
         self._grouped_light_id = self._extract_grouped_light_id()
 
     def _extract_grouped_light_id(self) -> UUID:
@@ -44,10 +47,10 @@ class GroupController(ResourceController):
     @time_execution_async()
     async def from_name(cls, group_name: str, client: HttpClient | None = None) -> Self:
         client = client or HttpClient()
-        lookup = cls._create_lookup(client)
-        group_info = await lookup.get_group_by_name(group_name)
+        group_lookup = cls._create_lookup(client)
+        group_info = await group_lookup.get_entity_by_name(group_name)
 
-        return cls(group_info=group_info, scene_service=SceneService(client=client))
+        return cls(group_info=group_info, client=client)
 
     @classmethod
     def from_dto(cls, group_info: GroupInfo, client: HttpClient | None = None) -> Self:
@@ -96,27 +99,16 @@ class GroupController(ResourceController):
         )
 
     @time_execution_async()
-    async def activate_scene(self, scene_name: str) -> None:
-        scene = await self._scene_service.find_scene_by_name_in_group(
-            scene_name, group_id=self.id
+    async def activate_scene(self, scene_name: str) -> ActionResult:
+        scene_controller = await SceneController.from_name_in_group(
+            scene_name=scene_name, group_id=self.id, client=self._client
         )
-        await self._scene_service.activate_scene_by_id(scene.id)
+        return await scene_controller.activate()
 
+    @time_execution_async()
     async def get_scenes(self) -> list[SceneInfo]:
-        return await self._scene_service.get_scenes_by_group_id(self.id)
-
-    async def get_active_scene(self) -> SceneInfo | None:
-        scenes = await self.get_scenes()
-
-        for scene in scenes:
-            print(scene.status)
-            if scene.status and scene.status.active == SceneStatusValue.STATIC:
-                return scene
-
-    async def get_active_scene_name(self) -> str | None:
-        active_scene = await self.get_active_scene()
-        if active_scene:
-            return active_scene.name
+        all_scenes = await self._scene_lookup.get_scenes()
+        return [scene for scene in all_scenes if scene.group_id == self.id]
 
     def _get_current_mirek(self, state: GroupedLightState) -> int:
         if not state.color_temperature or state.color_temperature.mirek is None:

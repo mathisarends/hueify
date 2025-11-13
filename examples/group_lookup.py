@@ -1,11 +1,36 @@
-from hueify.groups import RoomController
+from hueify.groups.rooms.lookup import RoomLookup
+from hueify.groups.zones.lookup import ZoneLookup
+from hueify.lights.lookup import LightLookup
 
 
 async def main():
-    room_controller = await RoomController.from_name("Zimmer 1")
-    await room_controller.increase_brightness(15)
-    activate_scene = await room_controller.get_active_scene_name()
-    print("Active scene:", activate_scene)
+    light_lookup = LightLookup()
+    room_lookup = RoomLookup()
+    zone_lookup = ZoneLookup()
+
+    lights_task = light_lookup.get_light_names()
+    rooms_task = room_lookup.get_all_entities()
+    zones_task = zone_lookup.get_all_entities()
+
+    lights, rooms, zones = await asyncio.gather(lights_task, rooms_task, zones_task)
+
+    light_names = lights
+    room_names = [room.name for room in rooms]
+    zone_names = [zone.name for zone in zones]
+
+    result = (
+        "Lights:\n"
+        + "\n".join(light_names)
+        + "\n\n"
+        + "Rooms:\n"
+        + "\n".join(room_names)
+        + "\n\n"
+        + "Zones:\n"
+        + "\n".join(zone_names)
+        + "\n\n"
+    )
+    print("result", result)
+    return result
 
 
 if __name__ == "__main__":

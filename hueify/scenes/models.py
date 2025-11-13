@@ -1,13 +1,17 @@
 from enum import StrEnum
+from typing import Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, Field, TypeAdapter
+
+from hueify.shared.types import ResourceReference, ResourceType
 
 
 class SceneStatusValue(StrEnum):
     ACTIVE = "active"
     INACTIVE = "inactive"
     STATIC = "static"
+    DYNAMIC_PALETTE = "dynamic_palette"
 
 
 class SceneStatus(BaseModel):
@@ -20,19 +24,14 @@ class SceneAction(StrEnum):
     STATIC = "static"
 
 
-class ResourceReference(BaseModel):
+class ImageResourceReference(BaseModel):
     rid: UUID
-    rtype: str
+    rtype: Literal[ResourceType.PUBLIC_IMAGE] = ResourceType.PUBLIC_IMAGE
 
 
 class SceneMetadata(BaseModel):
     name: str
-    image: ResourceReference | None = None
-
-
-class SceneGroup(BaseModel):
-    rid: UUID
-    rtype: str = "room"
+    image: ImageResourceReference | None = None
 
 
 class SceneActionTarget(BaseModel):
@@ -40,6 +39,7 @@ class SceneActionTarget(BaseModel):
     action: dict
 
 
+# Diese Modelle hier müssen viel besser getyped werden
 class ScenePalette(BaseModel):
     color: list[dict] = Field(default_factory=list)
     dimming: list[dict] = Field(default_factory=list)
@@ -49,17 +49,15 @@ class ScenePalette(BaseModel):
 
 
 class SceneInfo(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
     id: UUID
     metadata: SceneMetadata
-    group: SceneGroup
+    group: ResourceReference
     actions: list[SceneActionTarget] = Field(default_factory=list)
     palette: ScenePalette = Field(default_factory=ScenePalette)
     speed: float = 0.5
     auto_dynamic: bool = False
     status: SceneStatus | None = None
-    type: str = "scene"
+    type: Literal[ResourceType.SCENE] = ResourceType.SCENE
 
     @property
     def name(self) -> str:
@@ -68,6 +66,20 @@ class SceneInfo(BaseModel):
     @property
     def group_id(self) -> UUID:
         return self.group.rid
+
+
+class ShortSceneInfo(BaseModel):
+    id: UUID
+    name: str
+    group_id: UUID
+
+    @classmethod
+    def from_scene_info(cls, scene_info: SceneInfo) -> Self:
+        return cls(
+            id=scene_info.id,
+            name=scene_info.metadata.name,
+            group_id=scene_info.group.rid,
+        )
 
 
 SceneInfoListAdapter = TypeAdapter(list[SceneInfo])

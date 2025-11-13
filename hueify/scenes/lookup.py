@@ -1,65 +1,66 @@
 from uuid import UUID
+
 from hueify.http.client import HttpClient
-from hueify.http.models import ApiResponse
-from hueify.scenes.models import SceneInfo, SceneInfoListAdapter
-from hueify.scenes.exceptions import SceneNotFoundError
-from hueify.utils.fuzzy import find_all_matches
+from hueify.scenes.exceptions import SceneNotFoundException
+from hueify.scenes.models import SceneInfo, SceneStatusValue
+from hueify.utils.fuzzy import find_all_matches_sorted
 
 
 class SceneLookup:
-    def __init__(self, client: HttpClient) -> None:
-        self._client = client
+    def __init__(self, client: HttpClient | None = None) -> None:
+        self._client = client or HttpClient()
 
-    async def get_all_scenes(self) -> list[SceneInfo]:
-        response = await self._client.get("scene")
-        return self._parse_scenes_response(response)
+    async def get_active_scene(self) -> SceneInfo | None:
+        scenes = await self.get_scenes()
+        for scene in scenes:
+            if scene.status.active != SceneStatusValue.INACTIVE:
+                return scene
+        return None
+
+    async def get_scenes(self) -> list[SceneInfo]:
+        return await self._client.get_resources("scene", SceneInfo)
 
     async def find_scene_by_name(self, scene_name: str) -> SceneInfo:
-        all_scenes = await self.get_all_scenes()
-        
+        all_scenes = await self.get_scenes()
+
         for scene in all_scenes:
             if scene.name.lower() == scene_name.lower():
                 return scene
 
-        suggestions = find_all_matches(
+        matching_scenes = find_all_matches_sorted(
             query=scene_name,
             items=all_scenes,
             text_extractor=lambda s: s.name,
-            min_similarity=0.6
         )
 
-        raise SceneNotFoundError(
-            lookup_name=scene_name,
-            suggested_names=[s.name for s in suggestions]
+        suggestions = [scene.name for scene in matching_scenes]
+
+        raise SceneNotFoundException(
+            lookup_name=scene_name, suggested_names=suggestions
         )
 
-    async def find_scene_by_name_in_group(self, scene_name: str, group_id: UUID) -> SceneInfo:
-        all_scenes = await self.get_all_scenes()
+    async def find_scene_by_name_in_group(
+        self, scene_name: str, group_id: UUID
+    ) -> SceneInfo:
+        all_scenes = await self.get_scenes()
         group_scenes = [scene for scene in all_scenes if scene.group_id == group_id]
-        
+
         for scene in group_scenes:
             if scene.name.lower() == scene_name.lower():
                 return scene
 
-        suggestions = find_all_matches(
+        matching_scenes = find_all_matches_sorted(
             query=scene_name,
             items=group_scenes,
             text_extractor=lambda s: s.name,
-            min_similarity=0.6
         )
 
-        raise SceneNotFoundError(
-            lookup_name=scene_name,
-            suggested_names=[s.name for s in suggestions]
+        suggestions = [scene.name for scene in matching_scenes]
+
+        raise SceneNotFoundException(
+            lookup_name=scene_name, suggested_names=suggestions
         )
 
     async def get_scenes_by_group_id(self, group_id: UUID) -> list[SceneInfo]:
-        all_scenes = await self.get_all_scenes()
+        all_scenes = await self.get_scenes()
         return [scene for scene in all_scenes if scene.group_id == group_id]
-
-    def _parse_scenes_response(self, response: ApiResponse) -> list[SceneInfo]:
-        data = response.get("data", [])
-        if not data:
-            return []
-        
-        return SceneInfoListAdapter.validate_python(data)

@@ -1,7 +1,7 @@
 import asyncio
 from pathlib import Path
 
-from agents import Agent, Runner
+from agents import Agent, Runner, SQLiteSession
 from agents.mcp import MCPServerStdio
 from dotenv import load_dotenv
 
@@ -26,25 +26,42 @@ async def main():
         name="My MCP Server",
     ) as server:
         agent = Agent(
-            name="Light toggler",
+            name="Hue Controller",
             instructions=(
-                "You like to toggle lights using the turn_on_light and turn_off_light tools from the MCP server. "
-                "Not More not less. My name is Alex."
+                "You are an intelligent assistant that helps users control their Hue lights. "
             ),
             mcp_servers=[server],
-            model="gpt-4.1-mini",
+            model="gpt-4.1",
         )
 
         runner = Runner()
-        result = await runner.run(
-            starting_agent=agent,
-            input="Turn on Lighstripe 1. If the name is not correct, first discover the lights and use the correct name to turn off the light.",
-        )
+        session = SQLiteSession("hue_light_session")  # ← SQLiteSession erstellen!
 
-        for step in result.new_items:
-            print(step)
+        print("🔦 Light Control Chat (type 'quit' to exit)")
+        print("-" * 50)
 
-        print("result", result.final_output)
+        while True:
+            user_input = input("\nYou: ").strip()
+
+            if user_input.lower() in ["quit", "exit"]:
+                print("\n👋 Goodbye!")
+                break
+
+            if not user_input:
+                continue
+
+            print("\n⏳ Processing...")
+            result = await runner.run(
+                starting_agent=agent,
+                input=user_input,
+                session=session,  # ← Session übergeben!
+            )
+
+            print("\n📋 Steps:")
+            for step in result.new_items:
+                print(f"  {step}")
+
+            print(f"\n🤖 Agent: {result.final_output}")
 
 
 if __name__ == "__main__":

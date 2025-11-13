@@ -42,6 +42,16 @@ class HttpClient:
         response.raise_for_status()
         return response.json()
 
+    async def get_resources(self, endpoint: str, resource_type: type[T]) -> list[T]:
+        response = await self._client.get(
+            f"{self.base_url}/{endpoint}", headers=self._headers
+        )
+        response.raise_for_status()
+
+        adapter = TypeAdapter(HueApiResponse[resource_type])
+        api_response = adapter.validate_python(response.json())
+        return api_response.data
+
     async def get_resource(self, endpoint: str, resource_type: type[T]) -> T:
         response = await self._client.get(
             f"{self.base_url}/{endpoint}", headers=self._headers

@@ -6,10 +6,11 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from hueify.http import HttpClient
-from hueify.shared.controllers.models import ActionResult
+from hueify.shared.controller.models import ActionResult
 from hueify.shared.validation import (
     clamp_brightness,
     clamp_temperature_percentage,
+    normalize_percentage_input,
     percentage_to_mirek,
 )
 from hueify.utils.decorators import time_execution_async
@@ -88,88 +89,101 @@ class ResourceController(ABC, LoggingMixin):
 
         return ActionResult(message=message)
 
-    async def set_brightness(self, brightness_percentage: int) -> ActionResult:
-        clamped_brightness = clamp_brightness(brightness_percentage)
-        was_clamped = clamped_brightness != brightness_percentage
+    async def set_brightness_percentage(self, percentage: float | int) -> ActionResult:
+        percentage_int = normalize_percentage_input(percentage)
+        clamped_percentage = clamp_brightness(percentage_int)
+        was_clamped = clamped_percentage != percentage_int
 
         if was_clamped:
             self.logger.warning(
-                f"Brightness {brightness_percentage} is out of range. Clamping to {clamped_brightness}."
+                f"Brightness {percentage_int}% is out of range. Clamping to {clamped_percentage}%."
             )
             message = self._build_clamped_message(
                 property_name="Brightness",
-                clamped_value=clamped_brightness,
-                requested_value=brightness_percentage,
-            )
-        else:
-            message = f"Brightness set to {clamped_brightness}"
-
-        await self._update_brightness(clamped_brightness)
-        return ActionResult(
-            message=message, clamped=was_clamped, final_value=clamped_brightness
-        )
-
-    async def increase_brightness(self, increment: int) -> ActionResult:
-        current_brightness = await self._get_current_brightness()
-        target_brightness = int(current_brightness + increment)
-        new_brightness = clamp_brightness(target_brightness)
-        was_clamped = new_brightness != target_brightness
-
-        if was_clamped:
-            message = self._build_clamped_message(
-                property_name="Brightness",
-                clamped_value=new_brightness,
-                requested_value=target_brightness,
-            )
-        else:
-            message = f"Brightness increased to {new_brightness}"
-
-        await self._update_brightness(new_brightness)
-        return ActionResult(
-            message=message, clamped=was_clamped, final_value=new_brightness
-        )
-
-    async def decrease_brightness(self, decrement: int) -> ActionResult:
-        current_brightness = await self._get_current_brightness()
-        target_brightness = int(current_brightness - decrement)
-        new_brightness = clamp_brightness(target_brightness)
-        was_clamped = new_brightness != target_brightness
-
-        if was_clamped:
-            message = self._build_clamped_message(
-                property_name="Brightness",
-                clamped_value=new_brightness,
-                requested_value=target_brightness,
-            )
-        else:
-            message = f"Brightness decreased to {new_brightness}"
-
-        await self._update_brightness(new_brightness)
-        return ActionResult(
-            message=message, clamped=was_clamped, final_value=new_brightness
-        )
-
-    async def set_color_temperature(self, temperature_percentage: int) -> ActionResult:
-        clamped_temperature = clamp_temperature_percentage(temperature_percentage)
-        was_clamped = clamped_temperature != temperature_percentage
-
-        if was_clamped:
-            self.logger.warning(
-                f"Temperature {temperature_percentage}% is out of range. Clamping to {clamped_temperature}%."
-            )
-            message = self._build_clamped_message(
-                property_name="Temperature",
-                clamped_value=clamped_temperature,
-                requested_value=temperature_percentage,
+                clamped_value=clamped_percentage,
+                requested_value=percentage_int,
                 unit="%",
             )
         else:
-            message = f"Temperature set to {clamped_temperature}%"
+            message = f"Brightness set to {clamped_percentage}%"
 
-        mirek = percentage_to_mirek(clamped_temperature)
+        await self._update_brightness(clamped_percentage)
+        return ActionResult(
+            message=message, clamped=was_clamped, final_value=clamped_percentage
+        )
+
+    async def increase_brightness_percentage(
+        self, percentage: float | int
+    ) -> ActionResult:
+        percentage_int = normalize_percentage_input(percentage)
+        current_brightness = await self._get_current_brightness()
+        target_brightness = int(current_brightness + percentage_int)
+        new_brightness = clamp_brightness(target_brightness)
+        was_clamped = new_brightness != target_brightness
+
+        if was_clamped:
+            message = self._build_clamped_message(
+                property_name="Brightness",
+                clamped_value=new_brightness,
+                requested_value=target_brightness,
+                unit="%",
+            )
+        else:
+            message = f"Brightness increased to {new_brightness}%"
+
+        await self._update_brightness(new_brightness)
+        return ActionResult(
+            message=message, clamped=was_clamped, final_value=new_brightness
+        )
+
+    async def decrease_brightness_percentage(
+        self, percentage: float | int
+    ) -> ActionResult:
+        percentage_int = normalize_percentage_input(percentage)
+        current_brightness = await self._get_current_brightness()
+        target_brightness = int(current_brightness - percentage_int)
+        new_brightness = clamp_brightness(target_brightness)
+        was_clamped = new_brightness != target_brightness
+
+        if was_clamped:
+            message = self._build_clamped_message(
+                property_name="Brightness",
+                clamped_value=new_brightness,
+                requested_value=target_brightness,
+                unit="%",
+            )
+        else:
+            message = f"Brightness decreased to {new_brightness}%"
+
+        await self._update_brightness(new_brightness)
+        return ActionResult(
+            message=message, clamped=was_clamped, final_value=new_brightness
+        )
+
+    async def set_color_temperature_percentage(
+        self, percentage: float | int
+    ) -> ActionResult:
+        percentage_int = normalize_percentage_input(percentage)
+        clamped_percentage = clamp_temperature_percentage(percentage_int)
+        was_clamped = clamped_percentage != percentage_int
+
+        if was_clamped:
+            self.logger.warning(
+                f"Temperature {percentage_int}% is out of range. Clamping to {clamped_percentage}%."
+            )
+            message = self._build_clamped_message(
+                property_name="Temperature",
+                clamped_value=clamped_percentage,
+                requested_value=percentage_int,
+                unit="%",
+            )
+        else:
+            message = f"Temperature set to {clamped_percentage}%"
+
+        mirek = percentage_to_mirek(clamped_percentage)
         await self._update_color_temperature(mirek)
         return ActionResult(
-            message=message, clamped=was_clamped, final_value=clamped_temperature
+            message=message, clamped=was_clamped, final_value=clamped_percentage
         )
 
     def _build_clamped_message(

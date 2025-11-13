@@ -8,7 +8,7 @@ class ResourceNotFoundException(HueifyException):
         resource_type: str,
         lookup_name: str,
         suggested_names: list[str],
-        max_suggestions: int = 3,
+        max_suggestions: int | None = None,
     ) -> None:
         self.resource_type = resource_type
         self.lookup_name = lookup_name
@@ -16,9 +16,12 @@ class ResourceNotFoundException(HueifyException):
 
         error_msg = f"{resource_type.capitalize()} '{lookup_name}' not found"
         if suggested_names:
-            suggestions = ", ".join(
-                [f"'{name}'" for name in suggested_names[:max_suggestions]]
+            limited_suggestions = (
+                suggested_names[:max_suggestions]
+                if max_suggestions
+                else suggested_names
             )
+            suggestions = ", ".join([f"'{name}'" for name in limited_suggestions])
             error_msg += f". Did you mean: {suggestions}?"
 
         super().__init__(error_msg)

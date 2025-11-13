@@ -3,7 +3,7 @@ from uuid import UUID
 from hueify.http import HttpClient
 from hueify.lights.exceptions import LightNotFoundException
 from hueify.lights.models import LightInfo, LightInfoListAdapter
-from hueify.utils.fuzzy import find_all_matches
+from hueify.utils.fuzzy import find_all_matches_sorted
 
 
 class LightLookup:
@@ -17,11 +17,10 @@ class LightLookup:
             if light.metadata.name.lower() == light_name.lower():
                 return light
 
-        matching_lights = find_all_matches(
+        matching_lights = find_all_matches_sorted(
             query=light_name,
             items=lights,
             text_extractor=lambda light: light.metadata.name,
-            min_similarity=0.6,
         )
 
         suggestions = [light.metadata.name for light in matching_lights]

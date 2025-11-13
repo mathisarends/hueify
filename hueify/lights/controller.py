@@ -12,7 +12,7 @@ from hueify.lights.models import (
     LightOnState,
     LightState,
 )
-from hueify.shared.controllers.base import ResourceController
+from hueify.shared.controller.base import ResourceController
 from hueify.utils.decorators import time_execution_async
 
 

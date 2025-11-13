@@ -1,0 +1,82 @@
+import asyncio
+from pathlib import Path
+
+from hueify.groups import RoomLookup, ZoneLookup
+from hueify.lights import LightLookup
+from hueify.scenes import SceneLookup
+
+
+class SystemPromptTemplate:
+    PROMPT_FILE = Path(__file__).parent / "system_prompt.md"
+
+    def __init__(
+        self,
+        light_lookup: LightLookup | None = None,
+        room_lookup: RoomLookup | None = None,
+        zone_lookup: ZoneLookup | None = None,
+        scene_lookup: SceneLookup | None = None,
+    ) -> None:
+        self._light_lookup = light_lookup or LightLookup()
+        self._room_lookup = room_lookup or RoomLookup()
+        self._zone_lookup = zone_lookup or ZoneLookup()
+        self._scene_lookup = scene_lookup or SceneLookup()
+
+        self._base_prompt = self._load_base_prompt()
+        self._dynamic_context: str | None = None
+
+    def _load_base_prompt(self) -> str:
+        return self.PROMPT_FILE.read_text(encoding="utf-8")
+
+    async def get_system_prompt(self) -> str:
+        if self._dynamic_context is None:
+            await self.refresh_dynamic_content()
+
+        return (
+            f"{self._base_prompt}\n\n## Available Entities\n\n{self._dynamic_context}"
+        )
+
+    async def refresh_dynamic_content(self) -> None:
+        lights_task = self._light_lookup.get_light_names()
+        rooms_task = self._room_lookup.get_all_entities()
+        zones_task = self._zone_lookup.get_all_entities()
+        scenes_task = self._scene_lookup.get_scenes()
+
+        lights, rooms, zones, scenes = await asyncio.gather(
+            lights_task, rooms_task, zones_task, scenes_task
+        )
+
+        room_names = [room.name for room in rooms]
+        zone_names = [zone.name for zone in zones]
+        scene_names = [scene.name for scene in scenes]
+
+        self._dynamic_context = self._build_dynamic_context(
+            lights=lights,
+            rooms=room_names,
+            zones=zone_names,
+            scenes=scene_names,
+        )
+
+    def _build_dynamic_context(
+        self,
+        lights: list[str],
+        rooms: list[str],
+        zones: list[str],
+        scenes: list[str],
+    ) -> str:
+        """Build the dynamic section with available entities"""
+        return f"""**Rooms:**
+{self._format_list(rooms)}
+
+**Zones:**
+{self._format_list(zones)}
+
+**Lights:**
+{self._format_list(lights)}
+
+**Scenes:**
+{self._format_list(scenes)}"""
+
+    def _format_list(self, items: list[str]) -> str:
+        if not items:
+            return "- None available"
+        return "\n".join(f"- {item}" for item in items)

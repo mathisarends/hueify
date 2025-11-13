@@ -14,6 +14,15 @@ class ResourceType(StrEnum):
     DEVICE = "device"
     BRIDGE = "bridge"
 
+    PUBLIC_IMAGE = "public_image"
+
+    ENTERTAINMENT = "entertainment"
+    ENTERTAINMENT_CONFIGURATION = "entertainment_configuration"
+    BUTTON = "button"
+    TEMPERATURE = "temperature"
+    LIGHT_LEVEL = "light_level"
+    MOTION = "motion"
+
 
 class ResourceReference(BaseModel):
     rid: UUID
