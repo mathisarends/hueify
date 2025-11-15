@@ -15,8 +15,8 @@ from hueify.http import HttpClient
 from hueify.scenes import SceneInfo
 from hueify.scenes.controller import SceneController
 from hueify.scenes.lookup import SceneLookup
-from hueify.shared.controller.base import Resource
-from hueify.shared.controller.models import ActionResult
+from hueify.shared.resource.base import Resource
+from hueify.shared.resource.models import ActionResult
 from hueify.shared.types import LightOnState, ResourceType
 from hueify.utils.decorators import time_execution_async
 

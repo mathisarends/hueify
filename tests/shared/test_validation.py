@@ -1,5 +1,5 @@
 from hueify.shared.validation import (
-    clamp_brightness,
+    clamp_brightness_percentage,
     clamp_temperature_percentage,
     mirek_to_percentage,
     percentage_to_mirek,
@@ -8,19 +8,19 @@ from hueify.shared.validation import (
 
 class TestClampBrightness:
     def test_clamps_negative_brightness_to_zero(self) -> None:
-        assert clamp_brightness(-10) == 0
+        assert clamp_brightness_percentage(-10) == 0
 
     def test_clamps_brightness_above_hundred(self) -> None:
-        assert clamp_brightness(150) == 100
+        assert clamp_brightness_percentage(150) == 100
 
     def test_returns_brightness_within_range(self) -> None:
-        assert clamp_brightness(50) == 50
+        assert clamp_brightness_percentage(50) == 50
 
     def test_clamps_zero(self) -> None:
-        assert clamp_brightness(0) == 0
+        assert clamp_brightness_percentage(0) == 0
 
     def test_clamps_hundred(self) -> None:
-        assert clamp_brightness(100) == 100
+        assert clamp_brightness_percentage(100) == 100
 
 
 class TestClampTemperaturePercentage:

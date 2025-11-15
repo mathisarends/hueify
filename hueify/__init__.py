@@ -14,7 +14,7 @@ from .mcp import mcp
 from .prompts import SystemPromptTemplate
 from .scenes import SceneController, SceneInfo, SceneLookup, SceneNotFoundException
 from .shared.cache import LookupCache, get_cache
-from .shared.controller import ActionResult
+from .shared.resource import ActionResult
 
 __all__ = [
     "ActionResult",

@@ -1,5 +1,5 @@
-MIN_BRIGHTNESS = 0
-MAX_BRIGHTNESS = 100
+MIN_BRIGHTNESS_PERCENTAGE = 0
+MAX_BRIGHTNESS_PERCENTAGE = 100
 
 MIN_TEMPERATURE_PERCENTAGE = 0
 MAX_TEMPERATURE_PERCENTAGE = 100
@@ -15,11 +15,11 @@ def normalize_percentage_input(value: float | int) -> int:
     return int(value)
 
 
-def clamp_brightness(brightness: int) -> int:
-    if brightness < MIN_BRIGHTNESS:
-        return MIN_BRIGHTNESS
-    elif brightness > MAX_BRIGHTNESS:
-        return MAX_BRIGHTNESS
+def clamp_brightness_percentage(brightness: int) -> int:
+    if brightness < MIN_BRIGHTNESS_PERCENTAGE:
+        return MIN_BRIGHTNESS_PERCENTAGE
+    elif brightness > MAX_BRIGHTNESS_PERCENTAGE:
+        return MAX_BRIGHTNESS_PERCENTAGE
     return brightness
 
 

@@ -10,7 +10,7 @@ from hueify.scenes.models import (
     SceneRecall,
     SceneStatusValue,
 )
-from hueify.shared.controller.models import ActionResult
+from hueify.shared.resource.models import ActionResult
 from hueify.utils.decorators import time_execution_async
 from hueify.utils.logging import LoggingMixin
 

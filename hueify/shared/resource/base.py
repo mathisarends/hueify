@@ -6,10 +6,10 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from hueify.http import HttpClient
-from hueify.shared.controller.models import ActionResult
+from hueify.shared.resource.models import ActionResult
 from hueify.shared.validation import (
     build_clamped_message,
-    clamp_brightness,
+    clamp_brightness_percentage,
     clamp_temperature_percentage,
     normalize_percentage_input,
     percentage_to_mirek,
@@ -101,7 +101,7 @@ class Resource(ABC, LoggingMixin):
     @time_execution_async()
     async def set_brightness_percentage(self, percentage: float | int) -> ActionResult:
         percentage_int = normalize_percentage_input(percentage)
-        clamped_percentage = clamp_brightness(percentage_int)
+        clamped_percentage = clamp_brightness_percentage(percentage_int)
         was_clamped = clamped_percentage != percentage_int
 
         if was_clamped:
@@ -129,7 +129,7 @@ class Resource(ABC, LoggingMixin):
     ) -> ActionResult:
         percentage_int = normalize_percentage_input(percentage)
         target_brightness = int(self.current_brightness + percentage_int)
-        new_brightness = clamp_brightness(target_brightness)
+        new_brightness = clamp_brightness_percentage(target_brightness)
         was_clamped = new_brightness != target_brightness
 
         if was_clamped:
@@ -154,7 +154,7 @@ class Resource(ABC, LoggingMixin):
     ) -> ActionResult:
         percentage_int = normalize_percentage_input(percentage)
         target_brightness = int(self.current_brightness - percentage_int)
-        new_brightness = clamp_brightness(target_brightness)
+        new_brightness = clamp_brightness_percentage(target_brightness)
         was_clamped = new_brightness != target_brightness
 
         if was_clamped:

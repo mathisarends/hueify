@@ -11,7 +11,7 @@ from hueify.lights import Light, LightLookup
 from hueify.prompts.service import SystemPromptTemplate
 from hueify.scenes import SceneLookup
 from hueify.shared.cache import get_cache
-from hueify.shared.controller import ActionResult
+from hueify.shared.resource import ActionResult
 
 to_client_logger = get_logger(name="fastmcp.server.context.to_client")
 to_client_logger.setLevel(logging.DEBUG)
