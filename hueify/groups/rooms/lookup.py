@@ -2,9 +2,13 @@ from hueify.groups.base.lookup import ResourceLookup
 from hueify.groups.models import GroupInfo, GroupInfoListAdapter
 from hueify.groups.rooms.exceptions import RoomNotFoundException
 from hueify.http import ApiResponse
+from hueify.shared.types import ResourceType
 
 
 class RoomLookup(ResourceLookup[GroupInfo]):
+    def get_resource_type(self) -> ResourceType:
+        return ResourceType.ROOM
+
     def _get_endpoint(self) -> str:
         return "room"
 

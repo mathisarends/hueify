@@ -4,10 +4,14 @@ from hueify.groups.base.lookup import ResourceLookup
 from hueify.http import ApiResponse
 from hueify.scenes.exceptions import SceneNotFoundException
 from hueify.scenes.models import SceneInfo, SceneStatusValue
+from hueify.shared.types import ResourceType
 from hueify.utils.fuzzy import find_all_matches_sorted
 
 
 class SceneLookup(ResourceLookup[SceneInfo]):
+    def get_resource_type(self) -> ResourceType:
+        return ResourceType.SCENE
+
     def _get_endpoint(self) -> str:
         return "scene"
 

@@ -4,9 +4,13 @@ from hueify.groups.base.lookup import ResourceLookup
 from hueify.http import ApiResponse
 from hueify.lights.exceptions import LightNotFoundException
 from hueify.lights.models import LightInfo, LightInfoListAdapter
+from hueify.shared.types import ResourceType
 
 
 class LightLookup(ResourceLookup[LightInfo]):
+    def get_resource_type(self) -> ResourceType:
+        return ResourceType.LIGHT
+
     def _get_endpoint(self) -> str:
         return "light"
 
