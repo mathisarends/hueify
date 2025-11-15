@@ -1,8 +1,8 @@
-from hueify.lights import LightController
+from hueify.lights import Light
 
 
 async def main():
-    light_controller = await LightController.from_name("Hue Lightstrip plus 1")
+    light_controller = await Light.from_name("Hue Lightstrip plus 1")
 
     await light_controller.turn_off()
 

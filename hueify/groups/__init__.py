@@ -1,15 +1,15 @@
 from .discovery import GroupDiscovery
 from .models import GroupInfo
-from .rooms import RoomController, RoomLookup, RoomNotFoundException
-from .zones import ZoneController, ZoneLookup, ZoneNotFoundException
+from .rooms import Room, RoomLookup, RoomNotFoundException
+from .zones import Zone, ZoneLookup, ZoneNotFoundException
 
 __all__ = [
     "GroupDiscovery",
     "GroupInfo",
-    "RoomController",
+    "Room",
     "RoomLookup",
     "RoomNotFoundException",
-    "ZoneController",
+    "Zone",
     "ZoneLookup",
     "ZoneNotFoundException",
 ]

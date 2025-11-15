@@ -1,8 +1,8 @@
-from hueify import RoomController
+from hueify import Room
 
 
 async def main():
-    room = await RoomController.from_name("Zimmer 1")
+    room = await Room.from_name("Zimmer 1")
     await room.turn_on()
 
 

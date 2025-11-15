@@ -1,9 +1,9 @@
-from .controller import RoomController
 from .exceptions import RoomNotFoundException
 from .lookup import RoomLookup
+from .service import Room
 
 __all__ = [
-    "RoomController",
+    "Room",
     "RoomLookup",
     "RoomNotFoundException",
     "RoomNotFoundExceptionRoomLookup",

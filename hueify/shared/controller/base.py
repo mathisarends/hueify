@@ -18,7 +18,7 @@ from hueify.utils.decorators import time_execution_async
 from hueify.utils.logging import LoggingMixin
 
 
-class ResourceController(ABC, LoggingMixin):
+class Resource(ABC, LoggingMixin):
     def __init__(self, client: HttpClient | None = None) -> None:
         self._client = client or HttpClient()
 

@@ -1,7 +1,7 @@
-from .base import ResourceController
+from .base import Resource
 from .models import ActionResult
 
 __all__ = [
     "ActionResult",
-    "ResourceController",
+    "Resource",
 ]

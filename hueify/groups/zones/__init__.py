@@ -1,5 +1,5 @@
-from .controller import ZoneController
 from .exceptions import ZoneNotFoundException
 from .lookup import ZoneLookup
+from .service import Zone
 
-__all__ = ["ZoneController", "ZoneLookup", "ZoneNotFoundException"]
+__all__ = ["Zone", "ZoneLookup", "ZoneNotFoundException"]

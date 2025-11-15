@@ -1,10 +1,10 @@
-from .controller import LightController
 from .exceptions import LightNotFoundException
 from .lookup import LightLookup
 from .models import LightInfo
+from .service import Light
 
 __all__ = [
-    "LightController",
+    "Light",
     "LightInfo",
     "LightLookup",
     "LightNotFoundException",

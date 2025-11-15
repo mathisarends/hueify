@@ -1,8 +1,8 @@
-from hueify import RoomController, ZoneLookup
+from hueify import Room, ZoneLookup
 
 
 async def main():
-    room = await RoomController.from_name("Zimmer 1")
+    room = await Room.from_name("Zimmer 1")
     result = await room.activate_scene("Entspannen")
     print("result", result)
     await asyncio.sleep(2)

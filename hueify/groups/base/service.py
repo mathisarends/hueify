@@ -15,7 +15,7 @@ from hueify.http import HttpClient
 from hueify.scenes import SceneInfo
 from hueify.scenes.controller import SceneController
 from hueify.scenes.lookup import SceneLookup
-from hueify.shared.controller.base import ResourceController
+from hueify.shared.controller.base import Resource
 from hueify.shared.controller.models import ActionResult
 from hueify.shared.types import LightOnState, ResourceType
 from hueify.utils.decorators import time_execution_async
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from hueify.groups.base import ResourceLookup
 
 
-class GroupController(ResourceController):
+class Group(Resource):
     def __init__(
         self,
         group_info: GroupInfo,

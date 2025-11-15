@@ -15,5 +15,5 @@
 2025-11-15 10:06:28,025 - hueify.LookupCache - DEBUG - Cache MISS for scene. Fetching...
 2025-11-15 10:06:28,179 - hueify.LookupCache - INFO - Cached scene
 2025-11-15 10:06:43,595 - hueify.LookupCache - DEBUG - Cache HIT for light
-2025-11-15 10:06:43,781 - hueify.LightController - DEBUG - ⏳ turn_on() took 0.18s
+2025-11-15 10:06:43,781 - hueify.Light - DEBUG - ⏳ turn_on() took 0.18s
 2025-11-15 10:09:34,232 - hueify.LookupCache - INFO - Cache cleared

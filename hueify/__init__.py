@@ -2,14 +2,14 @@ from .bridge import HueBridge
 from .groups import (
     GroupDiscovery,
     GroupInfo,
-    RoomController,
+    Room,
     RoomLookup,
     RoomNotFoundException,
-    ZoneController,
+    Zone,
     ZoneLookup,
     ZoneNotFoundException,
 )
-from .lights import LightController, LightInfo, LightLookup, LightNotFoundException
+from .lights import Light, LightInfo, LightLookup, LightNotFoundException
 from .mcp import mcp
 from .prompts import SystemPromptTemplate
 from .scenes import SceneController, SceneInfo, SceneLookup, SceneNotFoundException
@@ -21,12 +21,12 @@ __all__ = [
     "GroupDiscovery",
     "GroupInfo",
     "HueBridge",
-    "LightController",
+    "Light",
     "LightInfo",
     "LightLookup",
     "LightNotFoundException",
     "LookupCache",
-    "RoomController",
+    "Room",
     "RoomLookup",
     "RoomNotFoundException",
     "SceneController",
@@ -34,7 +34,7 @@ __all__ = [
     "SceneLookup",
     "SceneNotFoundException",
     "SystemPromptTemplate",
-    "ZoneController",
+    "Zone",
     "ZoneLookup",
     "ZoneNotFoundException",
     "get_cache",

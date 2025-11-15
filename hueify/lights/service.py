@@ -12,11 +12,11 @@ from hueify.lights.models import (
     LightOnState,
     LightState,
 )
-from hueify.shared.controller.base import ResourceController
+from hueify.shared.controller.base import Resource
 from hueify.utils.decorators import time_execution_async
 
 
-class LightController(ResourceController):
+class Light(Resource):
     def __init__(
         self,
         light_info: LightInfo,
