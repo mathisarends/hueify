@@ -34,7 +34,7 @@ async def main():
             name="Hue Controller",
             instructions=system_prompt,
             mcp_servers=[server],
-            model="gpt-4.1",
+            model="gpt-4.1-mini",
         )
 
         runner = Runner()
@@ -60,9 +60,9 @@ async def main():
                 session=session,  # ← Session übergeben!
             )
 
-            print("\n📋 Steps:")
-            for step in result.new_items:
-                print(f"  {step}")
+            # print("\n📋 Steps:")
+            # for step in result.new_items:
+            #     print(f"  {step}")
 
             print(f"\n🤖 Agent: {result.final_output}")
 

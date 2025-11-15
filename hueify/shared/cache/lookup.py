@@ -19,7 +19,7 @@ class LookupCache(LoggingMixin):
     async def get_or_fetch(
         self,
         entity_type: ResourceType,
-        fetcher: Fetcher[T],
+        all_entities_fetcher: Fetcher[T],
     ) -> list[T]:
         cached = self._cache.get(entity_type)
         if cached is not None:
@@ -33,7 +33,7 @@ class LookupCache(LoggingMixin):
                 return cached
 
             self.logger.debug(f"Cache MISS for {entity_type}. Fetching...")
-            fresh = await fetcher()
+            fresh = await all_entities_fetcher()
             self._cache[entity_type] = fresh
             self.logger.info(f"Cached {entity_type}")
             return fresh

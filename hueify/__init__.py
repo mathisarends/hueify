@@ -13,6 +13,7 @@ from .lights import LightController, LightInfo, LightLookup, LightNotFoundExcept
 from .mcp import mcp
 from .prompts import SystemPromptTemplate
 from .scenes import SceneController, SceneInfo, SceneLookup, SceneNotFoundException
+from .shared.cache import LookupCache, get_cache
 from .shared.controller import ActionResult
 
 __all__ = [
@@ -24,6 +25,7 @@ __all__ = [
     "LightInfo",
     "LightLookup",
     "LightNotFoundException",
+    "LookupCache",
     "RoomController",
     "RoomLookup",
     "RoomNotFoundException",
@@ -35,5 +37,6 @@ __all__ = [
     "ZoneController",
     "ZoneLookup",
     "ZoneNotFoundException",
+    "get_cache",
     "mcp",
 ]

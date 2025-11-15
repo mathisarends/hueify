@@ -64,6 +64,10 @@ def time_execution_async(
             result = await func(*args, **kwargs)
             execution_time = time.perf_counter() - start_time
 
+            # TODO: Remove this
+            with open("C:/code/hueify/timing.log", "a") as f:
+                f.write(f"execution_time {func.__name__}: {execution_time}\n")
+
             if execution_time > min_duration_to_log:
                 logger = _get_logger_from_context(args, func)
                 function_name = additional_text.strip("-") or func.__name__

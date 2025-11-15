@@ -58,13 +58,20 @@ class ResourceController(ABC, LoggingMixin):
         pass
 
     @abstractmethod
+    @time_execution_async()
     def _create_color_temperature_state(self, mirek: int) -> BaseModel:
         pass
 
     @abstractmethod
+    @time_execution_async()
     async def _get_current_on_state(self) -> bool:
         pass
 
+    @abstractmethod
+    async def _update_state(self, state: BaseModel) -> None:
+        pass
+
+    @time_execution_async()
     async def turn_on(self) -> ActionResult:
         was_already_on = await self._get_current_on_state()
 
@@ -77,6 +84,7 @@ class ResourceController(ABC, LoggingMixin):
 
         return ActionResult(message=message)
 
+    @time_execution_async()
     async def turn_off(self) -> ActionResult:
         was_already_off = not await self._get_current_on_state()
 
@@ -89,6 +97,7 @@ class ResourceController(ABC, LoggingMixin):
 
         return ActionResult(message=message)
 
+    @time_execution_async()
     async def set_brightness_percentage(self, percentage: float | int) -> ActionResult:
         percentage_int = normalize_percentage_input(percentage)
         clamped_percentage = clamp_brightness(percentage_int)
@@ -112,6 +121,7 @@ class ResourceController(ABC, LoggingMixin):
             message=message, clamped=was_clamped, final_value=clamped_percentage
         )
 
+    @time_execution_async()
     async def increase_brightness_percentage(
         self, percentage: float | int
     ) -> ActionResult:
@@ -136,6 +146,7 @@ class ResourceController(ABC, LoggingMixin):
             message=message, clamped=was_clamped, final_value=new_brightness
         )
 
+    @time_execution_async()
     async def decrease_brightness_percentage(
         self, percentage: float | int
     ) -> ActionResult:
@@ -160,6 +171,7 @@ class ResourceController(ABC, LoggingMixin):
             message=message, clamped=was_clamped, final_value=new_brightness
         )
 
+    @time_execution_async()
     async def set_color_temperature_percentage(
         self, percentage: float | int
     ) -> ActionResult:
@@ -205,7 +217,3 @@ class ResourceController(ABC, LoggingMixin):
     async def _update_color_temperature(self, mirek: int) -> None:
         state = self._create_color_temperature_state(mirek)
         await self._update_state(state)
-
-    async def _update_state(self, state: BaseModel) -> None:
-        endpoint = self._get_resource_endpoint()
-        await self._client.put(f"{endpoint}/{self.id}", data=state)

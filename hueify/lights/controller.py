@@ -21,20 +21,16 @@ class LightController(ResourceController):
         super().__init__(client)
         self._light_info = light_info
 
+    @property
+    def is_on(self) -> bool:
+        return self._light_info.on.on if self._light_info.on else False
+
     @classmethod
     @time_execution_async()
     async def from_name(cls, light_name: str, client: HttpClient | None = None) -> Self:
         client = client or HttpClient()
         lookup = LightLookup(client)
         light_info = await lookup.get_light_by_name(light_name)
-        return cls(light_info=light_info, client=client)
-
-    @classmethod
-    @time_execution_async()
-    async def from_id(cls, light_id: UUID, client: HttpClient | None = None) -> Self:
-        client = client or HttpClient()
-        lookup = LightLookup(client)
-        light_info = await lookup.get_light_by_id(light_id)
         return cls(light_info=light_info, client=client)
 
     @classmethod
@@ -81,5 +77,8 @@ class LightController(ResourceController):
         return await self._client.get_resource(f"light/{self.id}", LightState)
 
     async def _get_current_on_state(self) -> bool:
-        state = await self._get_light_state()
-        return state.on.on if state.on else False
+        return self.is_on
+
+    async def _update_state(self, state: BaseModel) -> None:
+        endpoint = self._get_resource_endpoint()
+        await self._client.put(f"{endpoint}/{self.id}", data=state)

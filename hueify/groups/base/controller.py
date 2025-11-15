@@ -124,3 +124,7 @@ class GroupController(ResourceController):
     async def _get_current_on_state(self) -> bool:
         state = await self._get_grouped_light_state()
         return state.on.on if state.on else False
+
+    async def _update_state(self, state: BaseModel) -> None:
+        endpoint = self._get_resource_endpoint()
+        await self._client.put(f"{endpoint}/{self.grouped_light_id}", data=state)

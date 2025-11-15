@@ -41,10 +41,10 @@ class ResourceLookup(ABC, Generic[T]):
         resource_type = self.get_resource_type()
         return await self._cache.get_or_fetch(
             entity_type=resource_type,
-            fetcher=self._fetch_fresh_entities,
+            all_entities_fetcher=self._fetch_all_entities,
         )
 
-    async def _fetch_fresh_entities(self) -> list[T]:
+    async def _fetch_all_entities(self) -> list[T]:
         response = await self._client.get(self._get_endpoint())
         return self._parse_response(response)
 

@@ -1,13 +1,44 @@
-from fastmcp import FastMCP
+import asyncio
+import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
-from hueify.groups import RoomController, ZoneController
-from hueify.lights import LightController
+from fastmcp import Context, FastMCP
+from fastmcp.utilities.logging import get_logger
+
+from hueify.groups import RoomController, RoomLookup, ZoneController, ZoneLookup
+from hueify.lights import LightController, LightLookup
 from hueify.prompts.service import SystemPromptTemplate
+from hueify.scenes import SceneLookup
+from hueify.shared.cache import get_cache
 from hueify.shared.controller import ActionResult
 
-mcp = FastMCP("Hueify MCP Server")
+to_client_logger = get_logger(name="fastmcp.server.context.to_client")
+to_client_logger.setLevel(logging.DEBUG)
 
-_system_prompt_service = SystemPromptTemplate()
+
+@asynccontextmanager
+async def lifespan(server: FastMCP) -> AsyncIterator[None]:
+    cache = get_cache()
+
+    light_lookup = LightLookup()
+    room_lookup = RoomLookup()
+    zone_lookup = ZoneLookup()
+    scene_lookup = SceneLookup()
+
+    await asyncio.gather(
+        light_lookup.get_lights(),
+        room_lookup.get_all_entities(),
+        zone_lookup.get_all_entities(),
+        scene_lookup.get_scenes(),
+    )
+
+    yield
+
+    await cache.clear_all()
+
+
+mcp = FastMCP("Hueify MCP Server", lifespan=lifespan)
 
 
 @mcp.tool(
@@ -18,7 +49,8 @@ _system_prompt_service = SystemPromptTemplate()
     )
 )
 async def refresh_system_prompt() -> str:
-    await _system_prompt_service.refresh_dynamic_content()
+    system_prompt_service = SystemPromptTemplate()
+    await system_prompt_service.refresh_dynamic_content()
     return "System prompt refreshed successfully. All entity lists are now up to date."
 
 
@@ -29,7 +61,8 @@ async def turn_on_light(light_name: str) -> ActionResult:
 
 
 @mcp.tool()
-async def turn_off_light(light_name: str) -> ActionResult:
+async def turn_off_light(light_name: str, ctx: Context) -> ActionResult:
+    ctx.info("Turning off light: %s", light_name)
     controller = await LightController.from_name(light_name)
     return await controller.turn_off()
 
