@@ -1,9 +1,10 @@
 from enum import StrEnum
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, TypeAdapter
 
-from hueify.shared.types import LightOnState, ResourceReference
+from hueify.shared.types import LightOnState, ResourceReference, ResourceType
 
 
 class LightArchetype(StrEnum):
@@ -124,7 +125,7 @@ class LightState(BaseModel):
 
 class LightInfo(BaseModel):
     id: UUID
-    type: str
+    type: Literal[ResourceType.LIGHT] = ResourceType.LIGHT
     owner: ResourceReference
     metadata: LightMetadata
     on: LightOnState | None = None
