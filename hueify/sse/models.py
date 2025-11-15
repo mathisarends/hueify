@@ -1,8 +1,8 @@
 from enum import StrEnum
-from typing import Annotated, Literal, Self
+from typing import Annotated, Any, Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from hueify.shared.types import ResourceType
 
@@ -17,6 +17,7 @@ class ButtonEvent(StrEnum):
     INITIAL_PRESS = "initial_press"
     REPEAT = "repeat"
     SHORT_RELEASE = "short_release"
+    LONG_PRESS = "long_press"
     LONG_RELEASE = "long_release"
     DOUBLE_SHORT_RELEASE = "double_short_release"
 
@@ -94,7 +95,7 @@ class SceneStatus(BaseModel):
     last_recall: str | None = None
 
 
-class ButtonResource(BaseModel):
+class ButtonEvent(BaseModel):
     type: Literal[ResourceType.BUTTON] = ResourceType.BUTTON
     id: UUID
     id_v1: str | None = None
@@ -102,7 +103,7 @@ class ButtonResource(BaseModel):
     button: ButtonData
 
 
-class RelativeRotaryResource(BaseModel):
+class RelativeRotaryEvent(BaseModel):
     type: Literal[ResourceType.RELATIVE_ROTARY] = ResourceType.RELATIVE_ROTARY
     id: UUID
     id_v1: str | None = None
@@ -110,7 +111,7 @@ class RelativeRotaryResource(BaseModel):
     relative_rotary: RelativeRotaryData
 
 
-class LightResource(BaseModel):
+class LightEvent(BaseModel):
     type: Literal[ResourceType.LIGHT] = ResourceType.LIGHT
     id: UUID
     id_v1: str | None = None
@@ -122,7 +123,7 @@ class LightResource(BaseModel):
     color_temperature: ColorTemperature | None = None
 
 
-class MotionResource(BaseModel):
+class MotionEvent(BaseModel):
     type: Literal[ResourceType.MOTION] = ResourceType.MOTION
     id: UUID
     id_v1: str | None = None
@@ -130,7 +131,7 @@ class MotionResource(BaseModel):
     motion: MotionData
 
 
-class GroupedLightResource(BaseModel):
+class GroupedLightEvent(BaseModel):
     type: Literal[ResourceType.GROUPED_LIGHT] = ResourceType.GROUPED_LIGHT
     id: UUID
     id_v1: str | None = None
@@ -139,27 +140,45 @@ class GroupedLightResource(BaseModel):
     dimming: DimmingState | None = None
 
 
-class SceneResource(BaseModel):
+class SceneEvent(BaseModel):
     type: Literal[ResourceType.SCENE] = ResourceType.SCENE
     id: UUID
     id_v1: str | None = None
     status: SceneStatus
 
 
-ResourceData = Annotated[
-    ButtonResource
-    | RelativeRotaryResource
-    | LightResource
-    | MotionResource
-    | GroupedLightResource
-    | SceneResource,
+HueEvent = Annotated[
+    ButtonEvent
+    | RelativeRotaryEvent
+    | LightEvent
+    | MotionEvent
+    | GroupedLightEvent
+    | SceneEvent,
     Field(discriminator="type"),
 ]
 
 
+class UnknownEvent(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: UUID
+    type: str
+    id_v1: str | None = None
+    owner: OwnerReference | None = None
+    service_id: int | None = None
+
+    @property
+    def extra_fields(self) -> dict[str, Any]:
+        return {
+            k: v
+            for k, v in self.__dict__.items()
+            if k not in self.__class__.model_fields
+        }
+
+
 class EventData(BaseModel):
     creationtime: str
-    data: list[ResourceData]
+    data: list[HueEvent | UnknownEvent]
     id: UUID
     type: EventType
 

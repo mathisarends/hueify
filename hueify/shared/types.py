@@ -32,3 +32,12 @@ class ResourceReference(BaseModel):
 
 class LightOnState(BaseModel):
     on: bool
+
+
+class ResourceMetadata(BaseModel):
+    name: str
+
+
+class ResourceInfo(BaseModel):
+    id: UUID
+    metadata: ResourceMetadata

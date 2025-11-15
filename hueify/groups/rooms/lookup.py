@@ -12,9 +12,6 @@ class RoomLookup(ResourceLookup[GroupInfo]):
     def _get_endpoint(self) -> str:
         return "room"
 
-    def _extract_name(self, entity: GroupInfo) -> str:
-        return entity.name
-
     def _parse_response(self, response: ApiResponse) -> list[GroupInfo]:
         data = response.get("data", [])
         if not data:

@@ -14,9 +14,6 @@ class LightLookup(ResourceLookup[LightInfo]):
     def _get_endpoint(self) -> str:
         return "light"
 
-    def _extract_name(self, entity: LightInfo) -> str:
-        return entity.metadata.name
-
     def _parse_response(self, response: ApiResponse) -> list[LightInfo]:
         data = response.get("data", [])
         if not data:

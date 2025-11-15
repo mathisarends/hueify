@@ -15,9 +15,6 @@ class SceneLookup(ResourceLookup[SceneInfo]):
     def _get_endpoint(self) -> str:
         return "scene"
 
-    def _extract_name(self, entity: SceneInfo) -> str:
-        return entity.name
-
     def _parse_response(self, response: ApiResponse) -> list[SceneInfo]:
         data = response.get("data", [])
         if not data:

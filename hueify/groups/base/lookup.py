@@ -3,10 +3,10 @@ from typing import Generic, TypeVar
 
 from hueify.http import ApiResponse, HttpClient
 from hueify.shared.cache import LookupCache, get_cache
-from hueify.shared.types import ResourceType
+from hueify.shared.types import ResourceInfo, ResourceType
 from hueify.utils.fuzzy import find_all_matches_sorted
 
-T = TypeVar("T")
+T = TypeVar("T", bound=ResourceInfo)
 
 
 class ResourceLookup(ABC, Generic[T]):
@@ -22,16 +22,16 @@ class ResourceLookup(ABC, Generic[T]):
         entities = await self.get_all_entities()
 
         for entity in entities:
-            if self._extract_name(entity).lower() == entity_name.lower():
+            if entity.metadata.name.lower() == entity_name.lower():
                 return entity
 
         matching_entities = find_all_matches_sorted(
             query=entity_name,
             items=entities,
-            text_extractor=self._extract_name,
+            text_extractor=lambda e: e.metadata.name,
         )
 
-        suggestions = [self._extract_name(entity) for entity in matching_entities]
+        suggestions = [entity.metadata.name for entity in matching_entities]
 
         raise self._create_not_found_exception(
             lookup_name=entity_name, suggested_names=suggestions
@@ -42,6 +42,8 @@ class ResourceLookup(ABC, Generic[T]):
         return await self._cache.get_or_fetch(
             entity_type=resource_type,
             all_entities_fetcher=self._fetch_all_entities,
+            name_extractor=lambda e: e.metadata.name,
+            id_extractor=lambda e: e.id,
         )
 
     async def _fetch_all_entities(self) -> list[T]:
@@ -54,10 +56,6 @@ class ResourceLookup(ABC, Generic[T]):
 
     @abstractmethod
     def _get_endpoint(self) -> str:
-        pass
-
-    @abstractmethod
-    def _extract_name(self, entity: T) -> str:
         pass
 
     @abstractmethod

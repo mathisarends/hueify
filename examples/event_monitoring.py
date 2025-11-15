@@ -1,60 +1,52 @@
-# examples/event_monitoring.py
 import asyncio
 
-from hueify.sse.models import ResourceData
+from hueify.sse.models import (
+    ButtonEvent,
+    GroupedLightEvent,
+    LightEvent,
+    MotionEvent,
+)
 from hueify.sse.monitor import EventMonitor
 
 
 async def main():
     monitor = EventMonitor()
 
-    # Handler für Fernbedienungs-Events
-    def on_button_pressed(resource: ResourceData):
-        if not resource.button:
-            return
-
+    def on_button_pressed(event: ButtonEvent):
         print("🎮 Button pressed!")
-        print(f"   Button ID: {resource.id}")
-        print(f"   Event: {resource.button.last_event.value}")
-        print(f"   Updated: {resource.button.button_report.updated}")
+        print(f"   Button ID: {event.id}")
+        print(f"   Event: {event.button.last_event.value}")
+        print(f"   Updated: {event.button.button_report.updated}")
 
-    # Handler für Bewegungssensor
-    def on_motion(resource: ResourceData):
-        if not resource.motion:
-            return
-
-        if resource.motion.motion_valid:
+    def on_motion(event: MotionEvent):
+        if event.motion.motion_valid:
             print("🚶 Motion detected!")
-            print(f"   Sensor ID: {resource.id}")
-            print(f"   Motion: {resource.motion.motion}")
+            print(f"   Sensor ID: {event.id}")
+            print(f"   Motion: {event.motion.motion}")
 
-    # Handler für Licht-Updates
-    def on_light_changed(resource: ResourceData):
+    def on_light_changed(event: LightEvent):
         print("💡 Light changed:")
-        print(f"   ID: {resource.id}")
+        print(f"   ID: {event.id}")
 
-        if resource.on:
-            print(f"   On: {resource.on.on}")
-        if resource.dimming:
-            print(f"   Brightness: {resource.dimming.brightness:.2f}%")
-        if resource.color:
-            print(
-                f"   Color XY: ({resource.color.xy.x:.4f}, {resource.color.xy.y:.4f})"
-            )
+        if event.on:
+            print(f"   On: {event.on.on}")
+        if event.dimming:
+            print(f"   Brightness: {event.dimming.brightness:.2f}%")
+        if event.color:
+            print(f"   Color XY: ({event.color.xy.x:.4f}, {event.color.xy.y:.4f})")
 
-    # Handler für Raum-Licht-Updates
-    def on_room_changed(resource: ResourceData):
+    def on_room_changed(event: GroupedLightEvent):
         print("🏠 Room light state changed:")
-        print(f"   ID: {resource.id}")
-        print(f"   Type: {resource.type}")
+        print(f"   ID: {event.id}")
+        print(f"   Type: {event.type}")
 
-        if resource.on:
-            print(f"   On: {resource.on.on}")
-        if resource.dimming:
-            print(f"   Brightness: {resource.dimming.brightness:.2f}%")
+        if event.on:
+            print(f"   On: {event.on.on}")
+        if event.dimming:
+            print(f"   Brightness: {event.dimming.brightness:.2f}%")
 
     # Register handlers
-    monitor.on_button_event(on_button_pressed)
+    monitor.on_button_press(on_button_pressed)
     monitor.on_motion_detected(on_motion)
     monitor.on_light_update(on_light_changed)
     monitor.on_grouped_light_update(on_room_changed)
