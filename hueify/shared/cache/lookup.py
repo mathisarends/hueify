@@ -3,27 +3,23 @@ from collections.abc import Awaitable, Callable
 from typing import TypeVar
 from uuid import UUID
 
-from pydantic import BaseModel
-
-from hueify.shared.types import ResourceType
+from hueify.shared.types import ResourceInfo, ResourceType
 from hueify.utils.logging import LoggingMixin
 
-T = TypeVar("T", bound=BaseModel)
+T = TypeVar("T", bound=ResourceInfo)
 Fetcher = Callable[[], Awaitable[list[T]]]
 
 
 class LookupCache(LoggingMixin):
     def __init__(self) -> None:
-        self._name_to_model: dict[str, BaseModel] = {}
-        self._id_to_model: dict[str, BaseModel] = {}
+        self._name_to_model: dict[str, ResourceInfo] = {}
+        self._id_to_model: dict[str, ResourceInfo] = {}
         self._lock = asyncio.Lock()
 
     async def get_or_fetch(
         self,
         entity_type: ResourceType,
         all_entities_fetcher: Fetcher[T],
-        name_extractor: Callable[[T], str],
-        id_extractor: Callable[[T], UUID],
     ) -> list[T]:
         type_prefix = self._get_type_prefix(entity_type)
 
@@ -50,7 +46,7 @@ class LookupCache(LoggingMixin):
 
             self.logger.debug(f"Cache MISS for {entity_type}. Fetching...")
             fresh = await all_entities_fetcher()
-            self._store_entities(fresh, entity_type, name_extractor, id_extractor)
+            self._store_entities(fresh, entity_type)
             self.logger.info(f"Cached {len(fresh)} entities for {entity_type}")
             return fresh
 
@@ -58,21 +54,19 @@ class LookupCache(LoggingMixin):
         self,
         entities: list[T],
         entity_type: ResourceType,
-        name_extractor: Callable[[T], str],
-        id_extractor: Callable[[T], UUID],
     ) -> None:
         type_prefix = self._get_type_prefix(entity_type)
 
         for entity in entities:
-            entity_id = id_extractor(entity)
-            entity_name = name_extractor(entity)
+            entity_id = entity.id
+            entity_name = entity.metadata.name
 
             id_key = f"{type_prefix}:{entity_id}"
             name_key = f"{type_prefix}:{entity_name.lower()}"
 
             self._id_to_model[id_key] = entity
             self._check_and_store_by_name(
-                name_key, entity, entity_id, entity_name, entity_type, id_extractor
+                name_key, entity, entity_id, entity_name, entity_type
             )
 
     def _check_and_store_by_name(
@@ -82,7 +76,6 @@ class LookupCache(LoggingMixin):
         entity_id: UUID,
         entity_name: str,
         entity_type: ResourceType,
-        id_extractor: Callable[[T], UUID],
     ) -> None:
         existing = self._name_to_model.get(name_key)
 
@@ -90,7 +83,7 @@ class LookupCache(LoggingMixin):
             self._name_to_model[name_key] = entity
             return
 
-        existing_id = id_extractor(existing)
+        existing_id = existing.id
 
         if existing_id == entity_id:
             self._name_to_model[name_key] = entity
@@ -102,12 +95,14 @@ class LookupCache(LoggingMixin):
         )
         self._name_to_model[name_key] = entity
 
-    def get_by_name(self, entity_type: ResourceType, name: str) -> BaseModel | None:
+    def get_by_name(self, entity_type: ResourceType, name: str) -> ResourceInfo | None:
         type_prefix = self._get_type_prefix(entity_type)
         name_key = f"{type_prefix}:{name.lower()}"
         return self._name_to_model.get(name_key)
 
-    def get_by_id(self, entity_type: ResourceType, entity_id: UUID) -> BaseModel | None:
+    def get_by_id(
+        self, entity_type: ResourceType, entity_id: UUID
+    ) -> ResourceInfo | None:
         type_prefix = self._get_type_prefix(entity_type)
         id_key = f"{type_prefix}:{entity_id}"
         return self._id_to_model.get(id_key)

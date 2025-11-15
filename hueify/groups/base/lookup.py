@@ -42,8 +42,6 @@ class ResourceLookup(ABC, Generic[T]):
         return await self._cache.get_or_fetch(
             entity_type=resource_type,
             all_entities_fetcher=self._fetch_all_entities,
-            name_extractor=lambda e: e.metadata.name,
-            id_extractor=lambda e: e.id,
         )
 
     async def _fetch_all_entities(self) -> list[T]:
