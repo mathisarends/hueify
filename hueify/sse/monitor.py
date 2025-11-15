@@ -1,9 +1,9 @@
 import asyncio
 from collections.abc import Callable
 
-# hueify/events/monitor.py
-from hueify.events.models import EventData, ResourceData, ResourceType
-from hueify.events.stream import EventStream
+from hueify.shared.types import ResourceType
+from hueify.sse.models import EventData, ResourceData
+from hueify.sse.stream import EventStream
 from hueify.utils.logging import LoggingMixin
 
 

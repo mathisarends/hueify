@@ -1,4 +1,4 @@
-from .models import Event, EventData, EventType, ResourceType
+from .models import Event, EventData, EventType
 from .monitor import EventMonitor
 from .stream import EventStream
 
@@ -8,5 +8,4 @@ __all__ = [
     "EventMonitor",
     "EventStream",
     "EventType",
-    "ResourceType",
 ]

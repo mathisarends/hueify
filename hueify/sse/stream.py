@@ -7,8 +7,8 @@ import httpx
 from httpx_sse import ServerSentEvent, aconnect_sse
 
 from hueify.credentials.service import HueBridgeCredentials
-from hueify.events.models import Event
 from hueify.http import HttpMethods
+from hueify.sse.models import Event
 from hueify.utils.logging import LoggingMixin
 
 
@@ -56,11 +56,9 @@ class EventStream(LoggingMixin):
         finally:
             self.logger.info("Disconnected from event stream")
 
-    # TODO: Work on processing this here
     async def _process_server_sent_event(self, sse: ServerSentEvent) -> None:
         try:
             raw_data = json.loads(sse.data)
-            print("raw_data:", raw_data)
 
             event = Event.from_sse_data(raw_data)
 

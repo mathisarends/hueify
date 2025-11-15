@@ -49,6 +49,9 @@ mcp = FastMCP("Hueify MCP Server", lifespan=lifespan)
     )
 )
 async def refresh_system_prompt() -> str:
+    cache = get_cache()
+    await cache.clear_all()
+
     system_prompt_service = SystemPromptTemplate()
     await system_prompt_service.refresh_dynamic_content()
     return "System prompt refreshed successfully. All entity lists are now up to date."
