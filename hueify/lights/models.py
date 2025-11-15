@@ -128,7 +128,7 @@ class LightInfo(BaseModel):
     type: Literal[ResourceType.LIGHT] = ResourceType.LIGHT
     owner: ResourceReference
     metadata: LightMetadata
-    on: LightOnState | None = None
+    on: LightOnState
     dimming: LightDimmingState | None = None
     color_temperature: ColorTemperatureState | None = None
     color: ColorState | None = None

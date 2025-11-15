@@ -28,11 +28,13 @@ class GroupController(ResourceController):
     def __init__(
         self,
         group_info: GroupInfo,
+        state: GroupedLightState,
         client: HttpClient | None = None,
         scene_lookup: SceneLookup | None = None,
     ) -> None:
         super().__init__(client)
         self._group_info = group_info
+        self._state = state
         self._scene_lookup = scene_lookup or SceneLookup(client=self._client)
         self._grouped_light_id = self._extract_grouped_light_id()
 
@@ -50,11 +52,15 @@ class GroupController(ResourceController):
         group_lookup = cls._create_lookup(client)
         group_info = await group_lookup.get_entity_by_name(group_name)
 
-        return cls(group_info=group_info, client=client)
+        temp_controller = cls.__new__(cls)
+        temp_controller._group_info = group_info
+        grouped_light_id = temp_controller._extract_grouped_light_id()
 
-    @classmethod
-    def from_dto(cls, group_info: GroupInfo, client: HttpClient | None = None) -> Self:
-        return cls(group_info=group_info, client=client)
+        state = await client.get_resource(
+            f"grouped_light/{grouped_light_id}", resource_type=GroupedLightState
+        )
+
+        return cls(group_info=group_info, state=state, client=client)
 
     @classmethod
     @abstractmethod
@@ -73,12 +79,22 @@ class GroupController(ResourceController):
     def grouped_light_id(self) -> UUID:
         return self._grouped_light_id
 
+    @property
+    def is_on(self) -> bool:
+        return self._state.on.on
+
+    @property
+    def current_brightness(self) -> float:
+        return self._state.dimming.brightness if self._state.dimming else 0.0
+
+    @property
+    def current_color_temperature(self) -> int | None:
+        if self._state.color_temperature:
+            return self._state.color_temperature.mirek
+        return None
+
     def _get_resource_endpoint(self) -> str:
         return "grouped_light"
-
-    async def _get_current_brightness(self) -> float:
-        state = await self._get_grouped_light_state()
-        return state.dimming.brightness if state.dimming else 0.0
 
     def _create_on_state(self) -> BaseModel:
         return GroupedLightState(on=LightOnState(on=True))
@@ -121,10 +137,7 @@ class GroupController(ResourceController):
             f"grouped_light/{self.grouped_light_id}", resource_type=GroupedLightState
         )
 
-    async def _get_current_on_state(self) -> bool:
-        state = await self._get_grouped_light_state()
-        return state.on.on if state.on else False
-
     async def _update_state(self, state: BaseModel) -> None:
         endpoint = self._get_resource_endpoint()
         await self._client.put(f"{endpoint}/{self.grouped_light_id}", data=state)
+        self._state = await self._get_grouped_light_state()

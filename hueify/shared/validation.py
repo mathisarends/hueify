@@ -37,3 +37,15 @@ def percentage_to_mirek(percentage: int) -> int:
 
 def mirek_to_percentage(mirek: int) -> int:
     return int(((mirek - 153) / (500 - 153)) * 100)
+
+
+def build_clamped_message(
+    property_name: str,
+    clamped_value: int,
+    requested_value: int,
+    unit: str = "",
+) -> str:
+    return (
+        f"{property_name} clamped to {clamped_value}{unit}. "
+        f"Requested value {requested_value}{unit} was out of range."
+    )

@@ -17,13 +17,29 @@ from hueify.utils.decorators import time_execution_async
 
 
 class LightController(ResourceController):
-    def __init__(self, light_info: LightInfo, client: HttpClient | None = None) -> None:
+    def __init__(
+        self,
+        light_info: LightInfo,
+        state: LightState,
+        client: HttpClient | None = None,
+    ) -> None:
         super().__init__(client)
         self._light_info = light_info
+        self._state = state
 
     @property
     def is_on(self) -> bool:
-        return self._light_info.on.on if self._light_info.on else False
+        return self._state.on.on if self._state.on else False
+
+    @property
+    def current_brightness(self) -> float:
+        return self._state.dimming.brightness if self._state.dimming else 0.0
+
+    @property
+    def current_color_temperature(self) -> int | None:
+        if self._state.color_temperature:
+            return self._state.color_temperature.mirek
+        return None
 
     @classmethod
     @time_execution_async()
@@ -31,12 +47,9 @@ class LightController(ResourceController):
         client = client or HttpClient()
         lookup = LightLookup(client)
         light_info = await lookup.get_light_by_name(light_name)
-        return cls(light_info=light_info, client=client)
 
-    @classmethod
-    def from_dto(cls, light_info: LightInfo, client: HttpClient | None = None) -> Self:
-        client = client or HttpClient()
-        return cls(light_info=light_info, client=client)
+        state = await client.get_resource(f"light/{light_info.id}", LightState)
+        return cls(light_info=light_info, state=state, client=client)
 
     @property
     def id(self) -> UUID:
@@ -48,10 +61,6 @@ class LightController(ResourceController):
 
     def _get_resource_endpoint(self) -> str:
         return "light"
-
-    async def _get_current_brightness(self) -> float:
-        state = await self._get_light_state()
-        return state.dimming.brightness if state.dimming else 0.0
 
     def _create_on_state(self) -> BaseModel:
         return LightState(on=LightOnState(on=True))
@@ -76,9 +85,7 @@ class LightController(ResourceController):
     async def _get_light_state(self) -> LightState:
         return await self._client.get_resource(f"light/{self.id}", LightState)
 
-    async def _get_current_on_state(self) -> bool:
-        return self.is_on
-
     async def _update_state(self, state: BaseModel) -> None:
         endpoint = self._get_resource_endpoint()
         await self._client.put(f"{endpoint}/{self.id}", data=state)
+        self._state = await self._get_light_state()

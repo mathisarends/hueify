@@ -134,6 +134,6 @@ class ColorTemperatureState(BaseModel):
 class GroupedLightState(BaseModel):
     id: UUID | None = None
     type: str | None = None
-    on: LightOnState | None = None
+    on: LightOnState
     dimming: GroupedLightDimmingState | None = None
     color_temperature: ColorTemperatureState | None = None
