@@ -22,6 +22,7 @@ class ResourceType(StrEnum):
     TEMPERATURE = "temperature"
     LIGHT_LEVEL = "light_level"
     MOTION = "motion"
+    RELATIVE_ROTARY = "relative_rotary"
 
 
 class ResourceReference(BaseModel):

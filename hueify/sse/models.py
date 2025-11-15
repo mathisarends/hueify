@@ -1,8 +1,10 @@
 from enum import StrEnum
-from typing import Self
+from typing import Annotated, Literal, Self
 from uuid import UUID
 
 from pydantic import BaseModel, Field
+
+from hueify.shared.types import ResourceType
 
 
 class EventType(StrEnum):
@@ -92,21 +94,67 @@ class SceneStatus(BaseModel):
     last_recall: str | None = None
 
 
-class ResourceData(BaseModel):
+class ButtonResource(BaseModel):
+    type: Literal[ResourceType.BUTTON] = ResourceType.BUTTON
     id: UUID
-    type: str
     id_v1: str | None = None
-    owner: OwnerReference | None = None
-    service_id: int | None = None
+    owner: OwnerReference
+    button: ButtonData
 
-    button: ButtonData | None = None
+
+class RelativeRotaryResource(BaseModel):
+    type: Literal[ResourceType.RELATIVE_ROTARY] = ResourceType.RELATIVE_ROTARY
+    id: UUID
+    id_v1: str | None = None
+    owner: OwnerReference
+    relative_rotary: RelativeRotaryData
+
+
+class LightResource(BaseModel):
+    type: Literal[ResourceType.LIGHT] = ResourceType.LIGHT
+    id: UUID
+    id_v1: str | None = None
+    owner: OwnerReference
+    service_id: int | None = None
     on: OnState | None = None
     dimming: DimmingState | None = None
     color: ColorState | None = None
     color_temperature: ColorTemperature | None = None
-    relative_rotary: RelativeRotaryData | None = None
-    motion: MotionData | None = None
-    status: SceneStatus | None = None
+
+
+class MotionResource(BaseModel):
+    type: Literal[ResourceType.MOTION] = ResourceType.MOTION
+    id: UUID
+    id_v1: str | None = None
+    owner: OwnerReference
+    motion: MotionData
+
+
+class GroupedLightResource(BaseModel):
+    type: Literal[ResourceType.GROUPED_LIGHT] = ResourceType.GROUPED_LIGHT
+    id: UUID
+    id_v1: str | None = None
+    owner: OwnerReference | None = None
+    on: OnState | None = None
+    dimming: DimmingState | None = None
+
+
+class SceneResource(BaseModel):
+    type: Literal[ResourceType.SCENE] = ResourceType.SCENE
+    id: UUID
+    id_v1: str | None = None
+    status: SceneStatus
+
+
+ResourceData = Annotated[
+    ButtonResource
+    | RelativeRotaryResource
+    | LightResource
+    | MotionResource
+    | GroupedLightResource
+    | SceneResource,
+    Field(discriminator="type"),
+]
 
 
 class EventData(BaseModel):

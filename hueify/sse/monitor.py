@@ -1,8 +1,14 @@
 import asyncio
 from collections.abc import Callable
 
-from hueify.shared.types import ResourceType
-from hueify.sse.models import EventData, ResourceData
+from hueify.sse.models import (
+    ButtonResource,
+    EventData,
+    GroupedLightResource,
+    LightResource,
+    MotionResource,
+    ResourceData,
+)
 from hueify.sse.stream import EventStream
 from hueify.utils.logging import LoggingMixin
 
@@ -12,10 +18,10 @@ class EventMonitor(LoggingMixin):
         self._stream = EventStream()
         self._stream.register_event_handler(self._route_event_to_handlers)
 
-        self._light_handlers: list[Callable[[ResourceData], None]] = []
-        self._button_handlers: list[Callable[[ResourceData], None]] = []
-        self._motion_handlers: list[Callable[[ResourceData], None]] = []
-        self._grouped_light_handlers: list[Callable[[ResourceData], None]] = []
+        self._light_handlers: list[Callable[[LightResource], None]] = []
+        self._button_handlers: list[Callable[[ButtonResource], None]] = []
+        self._motion_handlers: list[Callable[[MotionResource], None]] = []
+        self._grouped_light_handlers: list[Callable[[GroupedLightResource], None]] = []
 
     async def start(self) -> None:
         self.logger.info("Starting event monitor")
@@ -25,33 +31,36 @@ class EventMonitor(LoggingMixin):
         self.logger.info("Stopping event monitor")
         self._stream.disconnect()
 
-    def on_light_update(self, handler: Callable[[ResourceData], None]) -> None:
+    def on_light_update(self, handler: Callable[[LightResource], None]) -> None:
         self._light_handlers.append(handler)
 
-    def on_button_event(self, handler: Callable[[ResourceData], None]) -> None:
+    def on_button_event(self, handler: Callable[[ButtonResource], None]) -> None:
         self._button_handlers.append(handler)
 
-    def on_motion_detected(self, handler: Callable[[ResourceData], None]) -> None:
+    def on_motion_detected(self, handler: Callable[[MotionResource], None]) -> None:
         self._motion_handlers.append(handler)
 
-    def on_grouped_light_update(self, handler: Callable[[ResourceData], None]) -> None:
+    def on_grouped_light_update(
+        self, handler: Callable[[GroupedLightResource], None]
+    ) -> None:
         self._grouped_light_handlers.append(handler)
 
     async def _route_event_to_handlers(self, event_data: EventData) -> None:
         for resource_data in event_data.data:
-            handlers = self._get_handlers_for_resource_type(resource_data.type)
+            if isinstance(resource_data, LightResource):
+                await self._invoke_handlers(self._light_handlers, resource_data)
+            elif isinstance(resource_data, ButtonResource):
+                await self._invoke_handlers(self._button_handlers, resource_data)
+            elif isinstance(resource_data, MotionResource):
+                await self._invoke_handlers(self._motion_handlers, resource_data)
+            elif isinstance(resource_data, GroupedLightResource):
+                await self._invoke_handlers(self._grouped_light_handlers, resource_data)
 
-            for handler in handlers:
-                await self._invoke_handler(handler, resource_data)
-
-    def _get_handlers_for_resource_type(self, resource_type: str) -> list[Callable]:
-        handler_map = {
-            ResourceType.LIGHT: self._light_handlers,
-            ResourceType.BUTTON: self._button_handlers,
-            ResourceType.MOTION: self._motion_handlers,
-            ResourceType.GROUPED_LIGHT: self._grouped_light_handlers,
-        }
-        return handler_map.get(resource_type, [])
+    async def _invoke_handlers(
+        self, handlers: list[Callable], resource_data: ResourceData
+    ) -> None:
+        for handler in handlers:
+            await self._invoke_handler(handler, resource_data)
 
     async def _invoke_handler(
         self, handler: Callable[[ResourceData], None], resource_data: ResourceData
