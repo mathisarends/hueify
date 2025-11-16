@@ -1,4 +1,4 @@
-from .events import EventBus
+from .events import EventBus, get_event_bus
 from .models import Event, EventData, EventType
 from .monitor import EventMonitor
 from .stream import EventStream
@@ -10,4 +10,5 @@ __all__ = [
     "EventMonitor",
     "EventStream",
     "EventType",
+    "get_event_bus",
 ]

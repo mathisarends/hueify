@@ -4,6 +4,8 @@ from typing import TypeVar
 from uuid import UUID
 
 from hueify.shared.types import ResourceInfo, ResourceType
+from hueify.sse import get_event_bus
+from hueify.sse.models import GroupedLightEvent, LightEvent, SceneEvent
 from hueify.utils.logging import LoggingMixin
 
 T = TypeVar("T", bound=ResourceInfo)
@@ -15,12 +17,15 @@ class LookupCache(LoggingMixin):
         self._name_to_model: dict[str, ResourceInfo] = {}
         self._id_to_model: dict[str, ResourceInfo] = {}
         self._lock = asyncio.Lock()
+        self._event_subscription_initialized = False
 
     async def get_or_fetch(
         self,
         entity_type: ResourceType,
         all_entities_fetcher: Fetcher[T],
     ) -> list[T]:
+        await self._ensure_event_subscription()
+
         type_prefix = self._get_type_prefix(entity_type)
 
         cached_models = [
@@ -133,6 +138,67 @@ class LookupCache(LoggingMixin):
 
     def _get_type_prefix(self, resource_type: ResourceType) -> str:
         return resource_type.value
+
+    async def _ensure_event_subscription(self) -> None:
+        if self._event_subscription_initialized:
+            return
+
+        try:
+            event_bus = await get_event_bus()
+
+            event_bus.subscribe_to_light(self._handle_light_event)
+            event_bus.subscribe_to_grouped_light(self._handle_grouped_light_event)
+            event_bus.subscribe_to_scene(self._handle_scene_event)
+
+            self._event_subscription_initialized = True
+            self.logger.info("Event subscriptions initialized for cache updates")
+        except Exception as e:
+            self.logger.warning(
+                f"Failed to initialize event subscriptions: {e}", exc_info=True
+            )
+
+    def _handle_light_event(self, event: LightEvent) -> None:
+        self._update_cached_resource(ResourceType.LIGHT, event.id, event)
+
+    def _handle_grouped_light_event(self, event: GroupedLightEvent) -> None:
+        self._update_cached_resource(ResourceType.GROUPED_LIGHT, event.id, event)
+
+    def _handle_scene_event(self, event: SceneEvent) -> None:
+        self._update_cached_resource(ResourceType.SCENE, event.id, event)
+
+    def _update_cached_resource(
+        self,
+        resource_type: ResourceType,
+        resource_id: UUID,
+        event: LightEvent | GroupedLightEvent | SceneEvent,
+    ) -> None:
+        type_prefix = self._get_type_prefix(resource_type)
+        id_key = f"{type_prefix}:{resource_id}"
+
+        cached_resource = self._id_to_model.get(id_key)
+
+        if cached_resource is None:
+            return
+
+        try:
+            updated_data = event.model_dump(exclude_unset=True, exclude_none=True)
+            updated_resource = cached_resource.model_copy(
+                update=updated_data, deep=True
+            )
+
+            self._id_to_model[id_key] = updated_resource
+
+            name_key = f"{type_prefix}:{cached_resource.metadata.name.lower()}"
+            self._name_to_model[name_key] = updated_resource
+
+            self.logger.debug(
+                f"Updated cached {resource_type} with ID {resource_id} from event"
+            )
+        except Exception as e:
+            self.logger.error(
+                f"Failed to update cached {resource_type} {resource_id}: {e}",
+                exc_info=True,
+            )
 
 
 _cache_instance: LookupCache | None = None

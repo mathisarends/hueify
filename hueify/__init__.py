@@ -15,9 +15,11 @@ from .prompts import SystemPromptTemplate
 from .scenes import SceneController, SceneInfo, SceneLookup, SceneNotFoundException
 from .shared.cache import LookupCache, get_cache
 from .shared.resource import ActionResult
+from .sse import EventBus, get_event_bus
 
 __all__ = [
     "ActionResult",
+    "EventBus",
     "GroupDiscovery",
     "GroupInfo",
     "HueBridge",
@@ -38,5 +40,6 @@ __all__ = [
     "ZoneLookup",
     "ZoneNotFoundException",
     "get_cache",
+    "get_event_bus",
     "mcp",
 ]
