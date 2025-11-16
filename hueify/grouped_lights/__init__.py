@@ -1,7 +1,7 @@
-from .exceptions import NotInColorTemperatureModeError
-from .service import Group
+from .models import GroupedLightState
+from .service import GroupedLights
 
 __all__ = [
-    "Group",
-    "NotInColorTemperatureModeError",
+    "GroupedLightState",
+    "GroupedLights",
 ]

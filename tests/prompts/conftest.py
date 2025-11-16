@@ -5,7 +5,6 @@ import pytest
 
 from hueify.groups.models import GroupArchetype, GroupInfo, GroupMetadata, GroupType
 from hueify.lights.models import (
-    LightDimmingState,
     LightInfo,
     LightMetadata,
 )
@@ -15,7 +14,12 @@ from hueify.scenes.models import (
     SceneStatus,
     SceneStatusValue,
 )
-from hueify.shared.types import LightOnState, ResourceReference, ResourceType
+from hueify.shared.types.resource import (
+    DimmingState,
+    LightOnState,
+    ResourceReference,
+    ResourceType,
+)
 
 
 class EntityWithName(Protocol):
@@ -29,7 +33,7 @@ def create_mock_light(name: str) -> LightInfo:
         owner=ResourceReference(rid=uuid4(), rtype=ResourceType.DEVICE),
         metadata=LightMetadata(name=name, archetype=None),
         on=LightOnState(on=False),
-        dimming=LightDimmingState(brightness=50.0, min_dim_level=0.0),
+        dimming=DimmingState(brightness=50.0),
     )
 
 

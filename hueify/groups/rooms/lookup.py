@@ -1,7 +1,7 @@
+from hueify.groups.models import GroupInfo, GroupInfoListAdapter
+from hueify.groups.rooms.exceptions import RoomNotFoundException
 from hueify.http import ApiResponse
-from hueify.rooms.exceptions import RoomNotFoundException
 from hueify.shared.resource.lookup import ResourceLookup
-from hueify.shared.types.groups import GroupInfo, GroupInfoListAdapter
 from hueify.shared.types.resource import ResourceType
 
 

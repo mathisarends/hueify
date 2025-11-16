@@ -1,8 +1,8 @@
+from hueify.groups.models import GroupInfo, GroupInfoListAdapter
+from hueify.groups.zones.exceptions import ZoneNotFoundException
 from hueify.http import ApiResponse
 from hueify.shared.resource.lookup import ResourceLookup
-from hueify.shared.types.groups import GroupInfo, GroupInfoListAdapter
 from hueify.shared.types.resource import ResourceType
-from hueify.zones.exceptions import ZoneNotFoundException
 
 
 class ZoneLookup(ResourceLookup[GroupInfo]):

@@ -3,8 +3,9 @@ from uuid import UUID
 
 import pytest
 
-from hueify.shared.cache.lookup import LookupCache, get_cache
-from hueify.shared.types import ResourceInfo, ResourceMetadata, ResourceType
+from hueify import LookupCache, get_cache
+from hueify.groups.models import ResourceType
+from hueify.shared.types.resource import ResourceInfo, ResourceMetadata
 
 
 class TestResource(ResourceInfo):
@@ -353,4 +354,4 @@ async def test_name_collision_warning_logged(
     )
 
     assert any("Name collision for" in record.message for record in caplog.records)
-    assert any("Duplicate" in record.message for record in caplog.records)
+    assert any("duplicate" in record.message for record in caplog.records)

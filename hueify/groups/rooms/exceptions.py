@@ -1,5 +1,5 @@
+from hueify.groups.models import GroupType
 from hueify.shared.exceptions import ResourceNotFoundException
-from hueify.shared.types.groups import GroupType
 
 
 class RoomNotFoundException(ResourceNotFoundException):

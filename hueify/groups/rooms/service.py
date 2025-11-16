@@ -1,6 +1,6 @@
-from hueify.grouped_lights import Group
+from hueify.groups.rooms.lookup import RoomLookup
+from hueify.groups.service import Group
 from hueify.http import HttpClient
-from hueify.rooms.lookup import RoomLookup
 from hueify.shared.resource.lookup import ResourceLookup
 
 

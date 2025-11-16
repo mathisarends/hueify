@@ -1,11 +1,10 @@
 import asyncio
 from pathlib import Path
 
+from hueify.groups import RoomLookup, ZoneLookup
 from hueify.lights import LightLookup
 from hueify.prompts.files import FileSystemPromptReader, PromptFileReader
-from hueify.rooms import RoomLookup
 from hueify.scenes import SceneLookup
-from hueify.zones import ZoneLookup
 
 
 class SystemPromptTemplate:
