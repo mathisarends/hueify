@@ -7,7 +7,6 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from hueify.grouped_lights import GroupedLights, GroupedLightState
-from hueify.groups.exceptions import NotInColorTemperatureModeError
 from hueify.groups.models import GroupInfo
 from hueify.http import HttpClient
 from hueify.scenes import SceneInfo
@@ -19,7 +18,6 @@ from hueify.shared.resource.models import (
     ResourceType,
 )
 from hueify.sse import get_event_bus
-from hueify.sse.models import GroupedLightEvent
 from hueify.utils.decorators import time_execution_async
 
 if TYPE_CHECKING:
@@ -38,7 +36,6 @@ class Group(Resource[GroupedLightState]):
         self._group_info = group_info
         self._scene_lookup = scene_lookup or SceneLookup(client=self._client)
         self._grouped_light_id = self._extract_grouped_light_id()
-        self._event_subscription_initialized = False
 
     def _extract_grouped_light_id(self) -> UUID:
         for service in self._group_info.services:
@@ -60,7 +57,7 @@ class Group(Resource[GroupedLightState]):
 
         grouped_lights = await GroupedLights.from_id(grouped_light_id, client=client)
         instance = cls(group_info=group_info, state=grouped_lights.state, client=client)
-        await instance._ensure_event_subscription()
+        await instance.ensure_event_subscription()
         return instance
 
     @classmethod
@@ -95,45 +92,13 @@ class Group(Resource[GroupedLightState]):
         all_scenes = await self._scene_lookup.get_scenes()
         return [scene for scene in all_scenes if scene.group_id == self.id]
 
-    def _get_current_mirek(self, state: GroupedLightState) -> int:
-        if (
-            not self._light_info.color_temperature
-            or self._light_info.color_temperature.mirek is None
-        ):
-            raise NotInColorTemperatureModeError(self.name)
-
-        return self._light_info.color_temperature.mirek
-
-    async def _get_grouped_light_state(self) -> GroupedLightState:
-        return await self._client.get_resource(
-            f"grouped_light/{self.grouped_light_id}", resource_type=GroupedLightState
-        )
-
     async def _update_remote_state(self, state: BaseModel) -> None:
         endpoint = self._get_resource_endpoint()
         await self._client.put(f"{endpoint}/{self.grouped_light_id}", data=state)
 
-    async def _ensure_event_subscription(self) -> None:
-        if self._event_subscription_initialized:
-            return
-
+    async def _subscribe_to_events(self) -> None:
         event_bus = await get_event_bus()
         event_bus.subscribe_to_grouped_light(
-            self._handle_grouped_light_event, group_id=self.grouped_light_id
-        )
-
-        self._event_subscription_initialized = True
-        self.logger.info(
-            f"Event subscription initialized for grouped light {self.grouped_light_id}"
-        )
-
-    def _handle_grouped_light_event(self, event: GroupedLightEvent) -> None:
-        current_state_data = self._light_info.model_dump()
-        event_data = event.model_dump(exclude_unset=True, exclude_none=True)
-
-        current_state_data.update(event_data)
-        self._light_info = GroupedLightState.model_validate(current_state_data)
-
-        self.logger.debug(
-            f"Updated state for grouped light {self.grouped_light_id} from event"
+            handler=self._handle_event,
+            group_id=self.grouped_light_id,
         )

@@ -30,11 +30,37 @@ class Resource(ABC, Generic[TLightInfo], LoggingMixin):
     ) -> None:
         self._light_info = light_info
         self._client = client or HttpClient()
+        self._event_subscription_initialized = False
 
     @classmethod
     @abstractmethod
     async def from_name(cls, name: str, client: HttpClient | None = None) -> Self:
         pass
+
+    @abstractmethod
+    async def _subscribe_to_events(self) -> None:
+        pass
+
+    @time_execution_async()
+    async def ensure_event_subscription(self) -> None:
+        if self._event_subscription_initialized:
+            return
+
+        await self._subscribe_to_events()
+        self._event_subscription_initialized = True
+        self.logger.info(f"Event subscription initialized for {self.name}")
+
+    def _handle_event(self, event: TLightInfo) -> None:
+        try:
+            current_info_data = self._light_info.model_dump()
+            event_data = event.model_dump(exclude_unset=True, exclude_none=True)
+
+            current_info_data.update(event_data)
+            self._light_info = type(self._light_info).model_validate(current_info_data)
+
+            self.logger.debug(f"Updated state for {self.id} from event")
+        except Exception as e:
+            self.logger.error(f"Failed to update state from event: {e}", exc_info=True)
 
     @property
     def is_on(self) -> bool:

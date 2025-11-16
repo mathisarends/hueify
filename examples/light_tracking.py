@@ -8,7 +8,7 @@ async def main():
 
     await asyncio.sleep(10)
 
-    print("current brightness:", light.current_brightness)
+    print("current brightness:", light.current_brightness_percentage)
 
     print("current on state:", light.is_on)
 

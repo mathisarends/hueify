@@ -9,19 +9,10 @@ from hueify.lights.models import (
 )
 from hueify.shared.resource.base import Resource
 from hueify.sse.events.bus import get_event_bus
-from hueify.sse.models import LightEvent
 from hueify.utils.decorators import time_execution_async
 
 
 class Light(Resource[LightInfo]):
-    def __init__(
-        self,
-        light_info: LightInfo,
-        client: HttpClient | None = None,
-    ) -> None:
-        super().__init__(light_info, client)
-        self._is_syncing_events = False
-
     @classmethod
     @time_execution_async()
     async def from_name(cls, light_name: str, client: HttpClient | None = None) -> Self:
@@ -30,33 +21,15 @@ class Light(Resource[LightInfo]):
         light_info = await lookup.get_light_by_name(light_name)
 
         instance = cls(light_info=light_info, client=client)
-        await instance.enable_event_sync()
+        await instance.ensure_event_subscription()
         return instance
 
-    async def enable_event_sync(self) -> None:
-        if self._is_syncing_events:
-            return
-
+    async def _subscribe_to_events(self) -> None:
         event_bus = await get_event_bus()
         event_bus.subscribe_to_light(
-            handler=self._sync_state_from_event,
+            handler=self._handle_event,
             light_id=self.id,
         )
-        self._is_syncing_events = True
-
-    def _sync_state_from_event(self, event: LightEvent) -> None:
-        try:
-            current_info_data = self._light_info.model_dump()
-            event_data = event.model_dump(exclude_unset=True, exclude_none=True)
-
-            current_info_data.update(event_data)
-            self._light_info = LightInfo.model_validate(current_info_data)
-
-            self.logger.debug(f"Synced light state for {self.id} from event")
-        except Exception as e:
-            self.logger.error(
-                f"Failed to sync light state from event: {e}", exc_info=True
-            )
 
     @property
     def name(self) -> str:

@@ -6,11 +6,11 @@ async def main():
 
     await room.turn_on()
 
-    print("room current brightness:", room.current_brightness)
+    print("room current brightness:", room.current_brightness_percentage)
 
     await asyncio.sleep(5)
 
-    print("room current brightness aufter time:", room.current_brightness)
+    print("room current brightness aufter time:", room.current_brightness_percentage)
 
     print("room current on state:", room.is_on)
 
