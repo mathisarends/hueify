@@ -6,36 +6,36 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from hueify.grouped_lights import GroupedLights, GroupedLightState
+from hueify.grouped_lights import GroupedLights
 from hueify.groups.models import GroupInfo
 from hueify.http import HttpClient
 from hueify.scenes import SceneInfo
 from hueify.scenes.controller import SceneController
 from hueify.scenes.lookup import SceneLookup
-from hueify.shared.resource.base import Resource
 from hueify.shared.resource.models import (
     ActionResult,
     ResourceType,
 )
-from hueify.sse import get_event_bus
+from hueify.sse.events.bus import get_event_bus
 from hueify.utils.decorators import time_execution_async
+from hueify.utils.logging import LoggingMixin
 
 if TYPE_CHECKING:
     from hueify.shared.resource import ResourceLookup
 
 
-class Group(Resource[GroupedLightState]):
+class Group(LoggingMixin):
     def __init__(
         self,
         group_info: GroupInfo,
-        state: GroupedLightState,
+        grouped_lights: GroupedLights,
         client: HttpClient | None = None,
         scene_lookup: SceneLookup | None = None,
     ) -> None:
-        super().__init__(state, client)
         self._group_info = group_info
+        self._grouped_lights = grouped_lights
+        self._client = client or HttpClient()
         self._scene_lookup = scene_lookup or SceneLookup(client=self._client)
-        self._grouped_light_id = self._extract_grouped_light_id(group_info)
 
     @classmethod
     @time_execution_async()
@@ -46,10 +46,9 @@ class Group(Resource[GroupedLightState]):
 
         grouped_light_id = cls._extract_grouped_light_id(group_info)
         grouped_lights = await GroupedLights.from_id(grouped_light_id, client=client)
+        await grouped_lights.ensure_event_subscription()
 
-        instance = cls(group_info=group_info, state=grouped_lights.state, client=client)
-        await instance.ensure_event_subscription()
-        return instance
+        return cls(group_info=group_info, grouped_lights=grouped_lights, client=client)
 
     @staticmethod
     def _extract_grouped_light_id(group_info: GroupInfo) -> UUID:
@@ -74,10 +73,43 @@ class Group(Resource[GroupedLightState]):
 
     @property
     def grouped_light_id(self) -> UUID:
-        return self._grouped_light_id
+        return self._grouped_lights.id
 
-    def _get_resource_endpoint(self) -> str:
-        return "grouped_light"
+    @property
+    def is_on(self) -> bool:
+        return self._grouped_lights.is_on
+
+    @property
+    def brightness_percentage(self) -> float:
+        return self._grouped_lights.brightness_percentage
+
+    @property
+    def color_temperature_percentage(self) -> int | None:
+        return self._grouped_lights.color_temperature_percentage
+
+    async def turn_on(self) -> ActionResult:
+        return await self._grouped_lights.turn_on()
+
+    async def turn_off(self) -> ActionResult:
+        return await self._grouped_lights.turn_off()
+
+    async def set_brightness_percentage(self, percentage: float | int) -> ActionResult:
+        return await self._grouped_lights.set_brightness_percentage(percentage)
+
+    async def increase_brightness_percentage(
+        self, percentage: float | int
+    ) -> ActionResult:
+        return await self._grouped_lights.increase_brightness_percentage(percentage)
+
+    async def decrease_brightness_percentage(
+        self, percentage: float | int
+    ) -> ActionResult:
+        return await self._grouped_lights.decrease_brightness_percentage(percentage)
+
+    async def set_color_temperature_percentage(
+        self, percentage: float | int
+    ) -> ActionResult:
+        return await self._grouped_lights.set_color_temperature_percentage(percentage)
 
     @time_execution_async()
     async def activate_scene(self, scene_name: str) -> ActionResult:

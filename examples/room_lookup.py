@@ -1,23 +1,28 @@
-from hueify import LightLookup, Room, RoomLookup, SceneLookup, ZoneLookup, get_cache
+import asyncio
+
+from hueify import Room, get_cache
 
 
 async def main():
-    _ = get_cache()
-
-    light_lookup = LightLookup()
-    room_lookup = RoomLookup()
-    zone_lookup = ZoneLookup()
-    scene_lookup = SceneLookup()
-
-    await asyncio.gather(
-        light_lookup.get_lights(),
-        room_lookup.get_all_entities(),
-        zone_lookup.get_all_entities(),
-        scene_lookup.get_scenes(),
-    )
+    cache = get_cache()
+    await cache.populate()
 
     room = await Room.from_name("Zimmer 1")
     await room.turn_on()
+
+    await room.turn_off()
+
+    await asyncio.sleep(5)
+
+    await room.turn_on()
+
+    await asyncio.sleep(5)
+
+    await room.increase_brightness_percentage(30)
+
+    await asyncio.sleep(5)
+
+    await room.decrease_brightness_percentage(20)
 
     print(f"Turned on room: {room.brightness_percentage}")
 

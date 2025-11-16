@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from hueify.shared.cache.lookup.base import EntityLookupCache
-from hueify.shared.resource.models import ResourceInfo
+
+if TYPE_CHECKING:
+    pass
 
 
-class GroupedLightsLookupCache(EntityLookupCache[ResourceInfo]):
+class GroupedLightsLookupCache(EntityLookupCache["GroupedLightInfo"]):
     pass

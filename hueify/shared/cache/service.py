@@ -38,19 +38,26 @@ class LookupCache(LoggingMixin):
         self._event_subscription_initialized = False
 
     async def populate(self) -> None:
-        # cirular import issue workaround
-        from hueify import LightLookup, RoomLookup, SceneLookup, ZoneLookup
+        from hueify import (
+            GroupedLightLookup,
+            LightLookup,
+            RoomLookup,
+            SceneLookup,
+            ZoneLookup,
+        )
 
         light_lookup = LightLookup()
         room_lookup = RoomLookup()
         zone_lookup = ZoneLookup()
         scene_lookup = SceneLookup()
+        _ = GroupedLightLookup()
 
         await asyncio.gather(
             light_lookup.get_lights(),
             room_lookup.get_all_entities(),
             zone_lookup.get_all_entities(),
             scene_lookup.get_scenes(),
+            # grouped_light_lookup.get_all_entities()
         )
         self.logger.info("Cache warmed up successfully")
 
