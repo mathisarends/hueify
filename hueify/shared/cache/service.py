@@ -5,7 +5,7 @@ from uuid import UUID
 from hueify.shared.cache.lookup.groups import GroupCache
 from hueify.shared.cache.lookup.lights import LightCache
 from hueify.shared.cache.lookup.scenes import SceneCache
-from hueify.shared.types import ResourceInfo, ResourceType
+from hueify.shared.types.resource import ResourceInfo, ResourceType
 from hueify.sse import get_event_bus
 from hueify.sse.models import GroupedLightEvent, LightEvent, SceneEvent
 from hueify.utils.logging import LoggingMixin

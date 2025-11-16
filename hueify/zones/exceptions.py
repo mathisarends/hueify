@@ -1,5 +1,5 @@
-from hueify.groups.models import GroupType
 from hueify.shared.exceptions import ResourceNotFoundException
+from hueify.shared.types.groups import GroupType
 
 
 class ZoneNotFoundException(ResourceNotFoundException):
@@ -10,7 +10,7 @@ class ZoneNotFoundException(ResourceNotFoundException):
         max_suggestions: int | None = None,
     ) -> None:
         super().__init__(
-            resource_type=GroupType.ZONE.value,
+            resource_type=GroupType.ZONE,
             lookup_name=lookup_name,
             suggested_names=suggested_names,
             max_suggestions=max_suggestions,

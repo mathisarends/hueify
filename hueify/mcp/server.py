@@ -6,12 +6,13 @@ from contextlib import asynccontextmanager
 from fastmcp import Context, FastMCP
 from fastmcp.utilities.logging import get_logger
 
-from hueify.groups import Room, RoomLookup, Zone, ZoneLookup
 from hueify.lights import Light, LightLookup
 from hueify.prompts.service import SystemPromptTemplate
+from hueify.rooms import Room, RoomLookup
 from hueify.scenes import SceneLookup
 from hueify.shared.cache import get_cache
 from hueify.shared.resource import ActionResult
+from hueify.zones import Zone, ZoneLookup
 
 to_client_logger = get_logger(name="fastmcp.server.context.to_client")
 to_client_logger.setLevel(logging.DEBUG)

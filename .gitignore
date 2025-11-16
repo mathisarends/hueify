@@ -82,3 +82,5 @@ desktop.ini
 
 # dotenv files
 .env
+
+.ruff_cache/

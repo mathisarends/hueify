@@ -4,23 +4,25 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from hueify.groups.base.exceptions import NotInColorTemperatureModeError
-from hueify.groups.models import (
-    ColorTemperatureState,
-    GroupedLightState,
-    GroupInfo,
-)
+from hueify.grouped_lights.exceptions import NotInColorTemperatureModeError
 from hueify.http import HttpClient
 from hueify.scenes import SceneInfo
 from hueify.scenes.controller import SceneController
 from hueify.scenes.lookup import SceneLookup
 from hueify.shared.resource.base import Resource
 from hueify.shared.resource.models import ActionResult
-from hueify.shared.types import DimmingState, LightOnState, ResourceType
+from hueify.shared.types.groups import (
+    DimmingState,
+    GroupedLightState,
+    GroupInfo,
+    LightOnState,
+    ResourceType,
+)
+from hueify.shared.types.resource import ColorTemperatureState
 from hueify.utils.decorators import time_execution_async
 
 if TYPE_CHECKING:
-    from hueify.groups.base import ResourceLookup
+    from hueify.shared.resource import ResourceLookup
 
 
 class Group(Resource):

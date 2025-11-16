@@ -1,10 +1,10 @@
 from uuid import UUID
 
-from hueify.groups.base.lookup import ResourceLookup
 from hueify.http import ApiResponse
 from hueify.scenes.exceptions import SceneNotFoundException
 from hueify.scenes.models import SceneInfo, SceneStatusValue
-from hueify.shared.types import ResourceType
+from hueify.shared.resource.lookup import ResourceLookup
+from hueify.shared.types.resource import ResourceType
 from hueify.utils.fuzzy import find_all_matches_sorted
 
 

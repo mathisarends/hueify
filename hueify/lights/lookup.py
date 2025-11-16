@@ -1,10 +1,10 @@
 from uuid import UUID
 
-from hueify.groups.base.lookup import ResourceLookup
 from hueify.http import ApiResponse
 from hueify.lights.exceptions import LightNotFoundException
 from hueify.lights.models import LightInfo, LightInfoListAdapter
-from hueify.shared.types import ResourceType
+from hueify.shared.resource.lookup import ResourceLookup
+from hueify.shared.types.resource import ResourceType
 
 
 class LightLookup(ResourceLookup[LightInfo]):

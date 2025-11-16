@@ -4,7 +4,7 @@ import asyncio
 from typing import Generic, TypeVar
 from uuid import UUID
 
-from hueify.shared.types import ResourceInfo
+from hueify.shared.types.resource import ResourceInfo
 from hueify.utils.logging import LoggingMixin
 
 T = TypeVar("T", bound=ResourceInfo)
