@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from hueify.shared.types.resource import ResourceType
+from hueify.shared.resource.models import ResourceType
 
 
 class EventType(StrEnum):

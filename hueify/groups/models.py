@@ -3,9 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, TypeAdapter
 
-from hueify.shared.types.resource import (
-    ResourceReference,
-)
+from hueify.shared.resource.models import ResourceReference
 
 
 class GroupType(StrEnum):

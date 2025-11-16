@@ -3,12 +3,12 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from hueify.shared.types.resource import (
+from hueify.shared.resource.models import (
     ColorTemperatureState,
-    DimmingState,
     LightOnState,
     ResourceType,
 )
+from hueify.sse.models import DimmingState
 
 
 class GroupedLightState(BaseModel):

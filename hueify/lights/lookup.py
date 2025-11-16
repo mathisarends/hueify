@@ -4,7 +4,7 @@ from hueify.http import ApiResponse
 from hueify.lights.exceptions import LightNotFoundException
 from hueify.lights.models import LightInfo, LightInfoListAdapter
 from hueify.shared.resource.lookup import ResourceLookup
-from hueify.shared.types.resource import ResourceType
+from hueify.shared.resource.models import ResourceType
 
 
 class LightLookup(ResourceLookup[LightInfo]):

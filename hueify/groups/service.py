@@ -14,8 +14,8 @@ from hueify.scenes import SceneInfo
 from hueify.scenes.controller import SceneController
 from hueify.scenes.lookup import SceneLookup
 from hueify.shared.resource.base import Resource
-from hueify.shared.resource.models import ActionResult
-from hueify.shared.types.resource import (
+from hueify.shared.resource.models import (
+    ActionResult,
     ColorTemperatureState,
     DimmingState,
     LightOnState,

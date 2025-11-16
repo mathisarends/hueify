@@ -2,10 +2,10 @@ from collections.abc import Awaitable, Callable
 from typing import TypeVar
 from uuid import UUID
 
-from hueify.shared.cache.lookup.groups import GroupCache
+from hueify.shared.cache.lookup.groups import GroupedLightsCache
 from hueify.shared.cache.lookup.lights import LightCache
 from hueify.shared.cache.lookup.scenes import SceneCache
-from hueify.shared.types.resource import ResourceInfo, ResourceType
+from hueify.shared.resource.models import ResourceInfo, ResourceType
 from hueify.sse import get_event_bus
 from hueify.sse.models import GroupedLightEvent, LightEvent, SceneEvent
 from hueify.utils.logging import LoggingMixin
@@ -18,7 +18,7 @@ class LookupCache(LoggingMixin):
     def __init__(self) -> None:
         self._light_cache = LightCache()
         self._scene_cache = SceneCache()
-        self._group_cache = GroupCache()
+        self._grouped_lights_cache = GroupedLightsCache()
         self._event_subscription_initialized = False
 
     async def get_or_fetch(
@@ -51,7 +51,7 @@ class LookupCache(LoggingMixin):
             ResourceType.ROOM,
             ResourceType.ZONE,
         ):
-            return self._group_cache
+            return self._grouped_lights_cache
         else:
             raise ValueError(f"Unsupported resource type: {resource_type}")
 
@@ -68,7 +68,7 @@ class LookupCache(LoggingMixin):
     async def clear_all(self) -> None:
         await self._light_cache.clear()
         await self._scene_cache.clear()
-        await self._group_cache.clear()
+        await self._grouped_lights_cache.clear()
         self.logger.info("All caches cleared")
 
     async def clear_by_type(self, resource_type: ResourceType) -> None:
@@ -100,7 +100,7 @@ class LookupCache(LoggingMixin):
 
     def _handle_grouped_light_event(self, event: GroupedLightEvent) -> None:
         event_data = event.model_dump(exclude_unset=True, exclude_none=True)
-        self._group_cache.update_from_event(event.id, event_data)
+        self._grouped_lights_cache.update_from_event(event.id, event_data)
 
     def _handle_scene_event(self, event: SceneEvent) -> None:
         event_data = event.model_dump(exclude_unset=True, exclude_none=True)

@@ -12,7 +12,7 @@ from hueify.lights.models import (
     LightState,
 )
 from hueify.shared.resource.base import Resource
-from hueify.shared.types.resource import DimmingState
+from hueify.shared.resource.models import DimmingState
 from hueify.sse.events.bus import get_event_bus
 from hueify.sse.models import LightEvent
 from hueify.utils.decorators import time_execution_async
