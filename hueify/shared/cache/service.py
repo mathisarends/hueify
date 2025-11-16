@@ -1,7 +1,12 @@
+import asyncio
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
 from uuid import UUID
 
+from hueify.groups.rooms.lookup import RoomLookup
+from hueify.groups.zones.lookup import ZoneLookup
+from hueify.lights.lookup import LightLookup
+from hueify.scenes.lookup import SceneLookup
 from hueify.shared.cache.lookup import (
     BaseCache,
     GroupedLightsCache,
@@ -35,6 +40,20 @@ class LookupCache(LoggingMixin):
             ResourceType.GROUPED_LIGHT: self._grouped_lights_cache,
         }
         self._event_subscription_initialized = False
+
+    async def warm_up(self) -> None:
+        light_lookup = LightLookup()
+        room_lookup = RoomLookup()
+        zone_lookup = ZoneLookup()
+        scene_lookup = SceneLookup()
+
+        await asyncio.gather(
+            light_lookup.get_lights(),
+            room_lookup.get_all_entities(),
+            zone_lookup.get_all_entities(),
+            scene_lookup.get_scenes(),
+        )
+        self.logger.info("Cache warmed up successfully")
 
     async def get_or_fetch(
         self,
@@ -73,11 +92,13 @@ class LookupCache(LoggingMixin):
         return cache.get_by_id(entity_id)
 
     async def clear_all(self) -> None:
-        await self._light_cache.clear()
-        await self._scene_cache.clear()
-        await self._room_cache.clear()
-        await self._zone_cache.clear()
-        await self._grouped_lights_cache.clear()
+        await asyncio.gather(
+            self._light_cache.clear(),
+            self._scene_cache.clear(),
+            self._room_cache.clear(),
+            self._zone_cache.clear(),
+            self._grouped_lights_cache.clear(),
+        )
         self.logger.info("All caches cleared")
 
     async def clear_by_type(self, resource_type: ResourceType) -> None:

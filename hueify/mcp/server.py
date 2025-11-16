@@ -1,13 +1,11 @@
-import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
 
-from hueify.groups import Room, RoomLookup, Zone, ZoneLookup
-from hueify.lights import Light, LightLookup
+from hueify.groups import Room, Zone
+from hueify.lights import Light
 from hueify.prompts import SystemPromptTemplate
-from hueify.scenes import SceneLookup
 from hueify.shared.cache import get_cache
 from hueify.shared.resource import ActionResult
 
@@ -15,18 +13,7 @@ from hueify.shared.resource import ActionResult
 @asynccontextmanager
 async def lifespan(server: FastMCP) -> AsyncIterator[None]:
     cache = get_cache()
-
-    light_lookup = LightLookup()
-    room_lookup = RoomLookup()
-    zone_lookup = ZoneLookup()
-    scene_lookup = SceneLookup()
-
-    await asyncio.gather(
-        light_lookup.get_lights(),
-        room_lookup.get_all_entities(),
-        zone_lookup.get_all_entities(),
-        scene_lookup.get_scenes(),
-    )
+    await cache.populate()
 
     yield
 
