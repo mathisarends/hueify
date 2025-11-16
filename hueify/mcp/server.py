@@ -1,10 +1,8 @@
 import asyncio
-import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastmcp import Context, FastMCP
-from fastmcp.utilities.logging import get_logger
+from fastmcp import FastMCP
 
 from hueify.groups import Room, RoomLookup, Zone, ZoneLookup
 from hueify.lights import Light, LightLookup
@@ -12,9 +10,6 @@ from hueify.prompts import SystemPromptTemplate
 from hueify.scenes import SceneLookup
 from hueify.shared.cache import get_cache
 from hueify.shared.resource import ActionResult
-
-to_client_logger = get_logger(name="fastmcp.server.context.to_client")
-to_client_logger.setLevel(logging.DEBUG)
 
 
 @asynccontextmanager
@@ -38,10 +33,10 @@ async def lifespan(server: FastMCP) -> AsyncIterator[None]:
     await cache.clear_all()
 
 
-mcp = FastMCP("Hueify MCP Server", lifespan=lifespan)
+mcp_server = FastMCP("Hueify MCP Server", lifespan=lifespan)
 
 
-@mcp.tool(
+@mcp_server.tool(
     description=(
         "Refresh the system prompt to update available entities (lights, rooms, zones, scenes). "
         "Use this when you encounter errors suggesting that entity names in the system prompt are outdated, "
@@ -57,152 +52,169 @@ async def refresh_system_prompt() -> str:
     return "System prompt refreshed successfully. All entity lists are now up to date."
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def turn_on_light(light_name: str) -> ActionResult:
-    controller = await Light.from_name(light_name)
-    return await controller.turn_on()
+    light = await Light.from_name(light_name)
+    return await light.turn_on()
 
 
-@mcp.tool()
-async def turn_off_light(light_name: str, ctx: Context) -> ActionResult:
-    ctx.info("Turning off light: %s", light_name)
-    controller = await Light.from_name(light_name)
-    return await controller.turn_off()
+@mcp_server.tool()
+async def turn_off_light(light_name: str) -> ActionResult:
+    light = await Light.from_name(light_name)
+    return await light.turn_off()
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def set_light_brightness(
     light_name: str, percentage: float | int
 ) -> ActionResult:
-    controller = await Light.from_name(light_name)
-    return await controller.set_brightness_percentage(percentage)
+    light = await Light.from_name(light_name)
+    return await light.set_brightness_percentage(percentage)
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def increase_light_brightness(
     light_name: str, percentage: float | int
 ) -> ActionResult:
-    controller = await Light.from_name(light_name)
-    return await controller.increase_brightness_percentage(percentage)
+    light = await Light.from_name(light_name)
+    return await light.increase_brightness_percentage(percentage)
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def decrease_light_brightness(
     light_name: str, percentage: float | int
 ) -> ActionResult:
-    controller = await Light.from_name(light_name)
-    return await controller.decrease_brightness_percentage(percentage)
+    light = await Light.from_name(light_name)
+    return await light.decrease_brightness_percentage(percentage)
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def set_light_color_temperature(
     light_name: str, percentage: float | int
 ) -> ActionResult:
-    controller = await Light.from_name(light_name)
-    return await controller.set_color_temperature_percentage(percentage)
+    light = await Light.from_name(light_name)
+    return await light.set_color_temperature_percentage(percentage)
+
+
+@mcp_server.tool()
+async def get_light_brightness_percentage(light_name: str) -> float:
+    light = await Light.from_name(light_name)
+    return light.brightness_percentage
+
+
+@mcp_server.tool()
+async def get_room_brightness_percentage(room_name: str) -> float:
+    room = await Room.from_name(room_name)
+    return room.brightness_percentage
+
+
+@mcp_server.tool()
+async def get_zone_brightness_percentage(zone_name: str) -> float:
+    zone = await Zone.from_name(zone_name)
+    return zone.brightness_percentage
 
 
 # ===== Rooms =====
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def turn_on_room(room_name: str) -> ActionResult:
-    controller = await Room.from_name(room_name)
-    return await controller.turn_on()
+    room = await Room.from_name(room_name)
+    return await room.turn_on()
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def turn_off_room(room_name: str) -> ActionResult:
-    controller = await Room.from_name(room_name)
-    return await controller.turn_off()
+    room = await Room.from_name(room_name)
+    return await room.turn_off()
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def set_room_brightness(room_name: str, percentage: float | int) -> ActionResult:
-    controller = await Room.from_name(room_name)
-    return await controller.set_brightness_percentage(percentage)
+    room = await Room.from_name(room_name)
+    return await room.set_brightness_percentage(percentage)
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def increase_room_brightness(
     room_name: str, percentage: float | int
 ) -> ActionResult:
-    controller = await Room.from_name(room_name)
-    return await controller.increase_brightness_percentage(percentage)
+    room = await Room.from_name(room_name)
+    return await room.increase_brightness_percentage(percentage)
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def decrease_room_brightness(
     room_name: str, percentage: float | int
 ) -> ActionResult:
-    controller = await Room.from_name(room_name)
-    return await controller.decrease_brightness_percentage(percentage)
+    room = await Room.from_name(room_name)
+    return await room.decrease_brightness_percentage(percentage)
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def set_room_color_temperature(
     room_name: str, percentage: float | int
 ) -> ActionResult:
-    controller = await Room.from_name(room_name)
-    return await controller.set_color_temperature_percentage(percentage)
+    room = await Room.from_name(room_name)
+    return await room.set_color_temperature_percentage(percentage)
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def activate_room_scene(room_name: str, scene_name: str) -> ActionResult:
-    controller = await Room.from_name(room_name)
-    return await controller.activate_scene(scene_name)
+    room = await Room.from_name(room_name)
+    return await room.activate_scene(scene_name)
 
 
 # ===== Zones =====
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def turn_on_zone(zone_name: str) -> ActionResult:
-    controller = await Zone.from_name(zone_name)
-    return await controller.turn_on()
+    zone = await Zone.from_name(zone_name)
+    return await zone.turn_on()
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def turn_off_zone(zone_name: str) -> ActionResult:
-    controller = await Zone.from_name(zone_name)
-    return await controller.turn_off()
+    zone = await Zone.from_name(zone_name)
+    return await zone.turn_off()
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def set_zone_brightness(zone_name: str, percentage: float | int) -> ActionResult:
-    controller = await Zone.from_name(zone_name)
-    return await controller.set_brightness_percentage(percentage)
+    zone = await Zone.from_name(zone_name)
+    return await zone.set_brightness_percentage(percentage)
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def increase_zone_brightness(
     zone_name: str, percentage: float | int
 ) -> ActionResult:
-    controller = await Zone.from_name(zone_name)
-    return await controller.increase_brightness_percentage(percentage)
+    zone = await Zone.from_name(zone_name)
+    return await zone.increase_brightness_percentage(percentage)
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def decrease_zone_brightness(
     zone_name: str, percentage: float | int
 ) -> ActionResult:
-    controller = await Zone.from_name(zone_name)
-    return await controller.decrease_brightness_percentage(percentage)
+    zone = await Zone.from_name(zone_name)
+    return await zone.decrease_brightness_percentage(percentage)
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def set_zone_color_temperature(
     zone_name: str, percentage: float | int
 ) -> ActionResult:
-    controller = await Zone.from_name(zone_name)
-    return await controller.set_color_temperature_percentage(percentage)
+    zone = await Zone.from_name(zone_name)
+    return await zone.set_color_temperature_percentage(percentage)
 
 
-@mcp.tool()
+@mcp_server.tool()
 async def activate_zone_scene(zone_name: str, scene_name: str) -> ActionResult:
-    controller = await Zone.from_name(zone_name)
-    return await controller.activate_scene(scene_name)
+    zone = await Zone.from_name(zone_name)
+    return await zone.activate_scene(scene_name)
 
 
 if __name__ == "__main__":
-    mcp.run()
+    mcp_server.run()

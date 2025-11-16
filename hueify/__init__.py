@@ -8,7 +8,7 @@ from .groups import (
     ZoneNotFoundException,
 )
 from .lights import Light, LightInfo, LightLookup, LightNotFoundException
-from .mcp import mcp
+from .mcp import mcp_server
 from .prompts import SystemPromptTemplate
 from .scenes import SceneController, SceneInfo, SceneLookup, SceneNotFoundException
 from .shared.cache import LookupCache, get_cache
@@ -38,5 +38,5 @@ __all__ = [
     "ZoneNotFoundException",
     "get_cache",
     "get_event_bus",
-    "mcp",
+    "mcp_server",
 ]

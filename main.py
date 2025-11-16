@@ -31,7 +31,7 @@ async def main():
         name="My MCP Server",
     ) as server:
         agent = Agent(
-            name="Hue Controller",
+            name=server.name,
             instructions=system_prompt,
             mcp_servers=[server],
             model="gpt-4.1-mini",
@@ -60,9 +60,9 @@ async def main():
                 session=session,  # ← Session übergeben!
             )
 
-            # print("\n📋 Steps:")
-            # for step in result.new_items:
-            #     print(f"  {step}")
+            print("\n📋 Steps:")
+            for step in result.new_items:
+                print(f"  {step}")
 
             print(f"\n🤖 Agent: {result.final_output}")
 

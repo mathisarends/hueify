@@ -80,11 +80,11 @@ class Resource(ABC, Generic[TLightInfo], LoggingMixin):
         pass
 
     @property
-    def current_brightness_percentage(self) -> float:
+    def brightness_percentage(self) -> float:
         return self._light_info.dimming.brightness if self._light_info.dimming else 0.0
 
     @property
-    def current_color_temperature_percentage(self) -> int | None:
+    def color_temperature_percentage(self) -> int | None:
         if not self._light_info.color_temperature:
             return None
 
@@ -163,7 +163,7 @@ class Resource(ABC, Generic[TLightInfo], LoggingMixin):
         self, percentage: float | int
     ) -> ActionResult:
         percentage_int = normalize_percentage_input(percentage)
-        target_brightness = int(self.current_brightness_percentage + percentage_int)
+        target_brightness = int(self.brightness_percentage + percentage_int)
         new_brightness = clamp_brightness_percentage(target_brightness)
         was_clamped = new_brightness != target_brightness
 
@@ -188,7 +188,7 @@ class Resource(ABC, Generic[TLightInfo], LoggingMixin):
         self, percentage: float | int
     ) -> ActionResult:
         percentage_int = normalize_percentage_input(percentage)
-        target_brightness = int(self.current_brightness_percentage - percentage_int)
+        target_brightness = int(self.brightness_percentage - percentage_int)
         new_brightness = clamp_brightness_percentage(target_brightness)
         was_clamped = new_brightness != target_brightness
 

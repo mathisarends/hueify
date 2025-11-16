@@ -16,7 +16,7 @@ class BaseCache(LoggingMixin, Generic[T]):
         self._id_to_model: dict[UUID, T] = {}
         self._lock = asyncio.Lock()
 
-    async def get_all(self) -> list[T]:
+    def get_all(self) -> list[T]:
         return list(self._id_to_model.values())
 
     def get_by_name(self, name: str) -> T | None:

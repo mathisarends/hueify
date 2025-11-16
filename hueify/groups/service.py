@@ -35,14 +35,7 @@ class Group(Resource[GroupedLightState]):
         super().__init__(state, client)
         self._group_info = group_info
         self._scene_lookup = scene_lookup or SceneLookup(client=self._client)
-        self._grouped_light_id = self._extract_grouped_light_id()
-
-    def _extract_grouped_light_id(self) -> UUID:
-        for service in self._group_info.services:
-            if service.rtype == ResourceType.GROUPED_LIGHT:
-                return service.rid
-
-        raise ValueError(f"No grouped_light service found for group {self.id}")
+        self._grouped_light_id = self._extract_grouped_light_id(group_info)
 
     @classmethod
     @time_execution_async()
@@ -51,14 +44,20 @@ class Group(Resource[GroupedLightState]):
         group_lookup = cls._create_lookup(client)
         group_info = await group_lookup.get_entity_by_name(group_name)
 
-        temp_controller = cls.__new__(cls)
-        temp_controller._group_info = group_info
-        grouped_light_id = temp_controller._extract_grouped_light_id()
-
+        grouped_light_id = cls._extract_grouped_light_id(group_info)
         grouped_lights = await GroupedLights.from_id(grouped_light_id, client=client)
+
         instance = cls(group_info=group_info, state=grouped_lights.state, client=client)
         await instance.ensure_event_subscription()
         return instance
+
+    @staticmethod
+    def _extract_grouped_light_id(group_info: GroupInfo) -> UUID:
+        for service in group_info.services:
+            if service.rtype == ResourceType.GROUPED_LIGHT:
+                return service.rid
+
+        raise ValueError(f"No grouped_light service found for group {group_info.id}")
 
     @classmethod
     @abstractmethod

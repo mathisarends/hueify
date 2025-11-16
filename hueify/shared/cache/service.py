@@ -2,9 +2,14 @@ from collections.abc import Awaitable, Callable
 from typing import TypeVar
 from uuid import UUID
 
-from hueify.shared.cache.lookup.groups import GroupedLightsCache
-from hueify.shared.cache.lookup.lights import LightCache
-from hueify.shared.cache.lookup.scenes import SceneCache
+from hueify.shared.cache.lookup import (
+    BaseCache,
+    GroupedLightsCache,
+    LightCache,
+    RoomCache,
+    SceneCache,
+    ZoneCache,
+)
 from hueify.shared.resource.models import ResourceInfo, ResourceType
 from hueify.sse import get_event_bus
 from hueify.sse.models import GroupedLightEvent, LightEvent, SceneEvent
@@ -18,7 +23,17 @@ class LookupCache(LoggingMixin):
     def __init__(self) -> None:
         self._light_cache = LightCache()
         self._scene_cache = SceneCache()
+        self._room_cache = RoomCache()
+        self._zone_cache = ZoneCache()
         self._grouped_lights_cache = GroupedLightsCache()
+
+        self._cache_map = {
+            ResourceType.LIGHT: self._light_cache,
+            ResourceType.SCENE: self._scene_cache,
+            ResourceType.ROOM: self._room_cache,
+            ResourceType.ZONE: self._zone_cache,
+            ResourceType.GROUPED_LIGHT: self._grouped_lights_cache,
+        }
         self._event_subscription_initialized = False
 
     async def get_or_fetch(
@@ -29,7 +44,7 @@ class LookupCache(LoggingMixin):
         await self._ensure_event_subscription()
 
         cache = self._get_cache_for_type(entity_type)
-        cached_models = await cache.get_all()
+        cached_models = cache.get_all()
 
         if cached_models:
             self.logger.debug(f"Cache HIT for {entity_type}")
@@ -41,19 +56,11 @@ class LookupCache(LoggingMixin):
         self.logger.info(f"Cached {len(fresh)} entities for {entity_type}")
         return fresh
 
-    def _get_cache_for_type(self, resource_type: ResourceType):
-        if resource_type == ResourceType.LIGHT:
-            return self._light_cache
-        elif resource_type == ResourceType.SCENE:
-            return self._scene_cache
-        elif resource_type in (
-            ResourceType.GROUPED_LIGHT,
-            ResourceType.ROOM,
-            ResourceType.ZONE,
-        ):
-            return self._grouped_lights_cache
-        else:
+    def _get_cache_for_type(self, resource_type: ResourceType) -> BaseCache:
+        cache = self._cache_map.get(resource_type)
+        if cache is None:
             raise ValueError(f"Unsupported resource type: {resource_type}")
+        return cache
 
     def get_by_name(self, entity_type: ResourceType, name: str) -> ResourceInfo | None:
         cache = self._get_cache_for_type(entity_type)
@@ -68,6 +75,8 @@ class LookupCache(LoggingMixin):
     async def clear_all(self) -> None:
         await self._light_cache.clear()
         await self._scene_cache.clear()
+        await self._room_cache.clear()
+        await self._zone_cache.clear()
         await self._grouped_lights_cache.clear()
         self.logger.info("All caches cleared")
 
