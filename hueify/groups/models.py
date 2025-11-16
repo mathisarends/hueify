@@ -1,9 +1,15 @@
 from enum import StrEnum
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, TypeAdapter
 
-from hueify.shared.types import ColorTemperatureState, LightOnState, ResourceReference
+from hueify.shared.types import (
+    ColorTemperatureState,
+    LightOnState,
+    ResourceReference,
+    ResourceType,
+)
 from hueify.sse.models import DimmingState
 
 
@@ -125,7 +131,7 @@ GroupInfoListAdapter = TypeAdapter(list[GroupInfo])
 
 class GroupedLightState(BaseModel):
     id: UUID | None = None
-    type: str | None = None
+    type: Literal[ResourceType.GROUPED_LIGHT] = ResourceType.GROUPED_LIGHT
     on: LightOnState
     dimming: DimmingState | None = None
     color_temperature: ColorTemperatureState | None = None

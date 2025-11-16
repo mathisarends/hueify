@@ -1,4 +1,4 @@
-from hueify.exceptions import HueifyException
+from hueify.shared.exceptions import HueifyException
 
 
 class NotInColorTemperatureModeError(HueifyException):

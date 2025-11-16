@@ -1,4 +1,4 @@
-from hueify.exceptions import ResourceNotFoundException
+from hueify.shared.exceptions import ResourceNotFoundException
 
 
 class SceneNotFoundException(ResourceNotFoundException):
