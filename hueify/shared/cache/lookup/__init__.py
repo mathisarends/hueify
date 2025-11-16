@@ -1,16 +1,16 @@
-from .base import BaseCache
-from .groups import GroupedLightsCache
-from .lights import LightCache
-from .rooms import RoomCache
-from .scenes import SceneCache
-from .zones import ZoneCache
+from .base import EntityLookupCache
+from .groups import GroupedLightsLookupCache
+from .lights import LightsLookupCache
+from .rooms import RoomLookupCache
+from .scenes import SceneLookupCache
+from .zones import ZoneLookupCache
 
 __all__ = [
-    "BaseCache",
-    "GroupedLightsCache",
-    "LightCache",
+    "EntityLookupCache",
+    "GroupedLightsLookupCache",
+    "LightsLookupCache",
     "LookupCache",
-    "RoomCache",
-    "SceneCache",
-    "ZoneCache",
+    "RoomLookupCache",
+    "SceneLookupCache",
+    "ZoneLookupCache",
 ]

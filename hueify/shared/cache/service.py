@@ -3,17 +3,13 @@ from collections.abc import Awaitable, Callable
 from typing import TypeVar
 from uuid import UUID
 
-from hueify.groups.rooms.lookup import RoomLookup
-from hueify.groups.zones.lookup import ZoneLookup
-from hueify.lights.lookup import LightLookup
-from hueify.scenes.lookup import SceneLookup
 from hueify.shared.cache.lookup import (
-    BaseCache,
-    GroupedLightsCache,
-    LightCache,
-    RoomCache,
-    SceneCache,
-    ZoneCache,
+    EntityLookupCache,
+    GroupedLightsLookupCache,
+    LightsLookupCache,
+    RoomLookupCache,
+    SceneLookupCache,
+    ZoneLookupCache,
 )
 from hueify.shared.resource.models import ResourceInfo, ResourceType
 from hueify.sse import get_event_bus
@@ -26,11 +22,11 @@ Fetcher = Callable[[], Awaitable[list[T]]]
 
 class LookupCache(LoggingMixin):
     def __init__(self) -> None:
-        self._light_cache = LightCache()
-        self._scene_cache = SceneCache()
-        self._room_cache = RoomCache()
-        self._zone_cache = ZoneCache()
-        self._grouped_lights_cache = GroupedLightsCache()
+        self._light_cache = LightsLookupCache()
+        self._scene_cache = SceneLookupCache()
+        self._room_cache = RoomLookupCache()
+        self._zone_cache = ZoneLookupCache()
+        self._grouped_lights_cache = GroupedLightsLookupCache()
 
         self._cache_map = {
             ResourceType.LIGHT: self._light_cache,
@@ -41,7 +37,10 @@ class LookupCache(LoggingMixin):
         }
         self._event_subscription_initialized = False
 
-    async def warm_up(self) -> None:
+    async def populate(self) -> None:
+        # cirular import issue workaround
+        from hueify import LightLookup, RoomLookup, SceneLookup, ZoneLookup
+
         light_lookup = LightLookup()
         room_lookup = RoomLookup()
         zone_lookup = ZoneLookup()
@@ -75,7 +74,7 @@ class LookupCache(LoggingMixin):
         self.logger.info(f"Cached {len(fresh)} entities for {entity_type}")
         return fresh
 
-    def _get_cache_for_type(self, resource_type: ResourceType) -> BaseCache:
+    def _get_cache_for_type(self, resource_type: ResourceType) -> EntityLookupCache:
         cache = self._cache_map.get(resource_type)
         if cache is None:
             raise ValueError(f"Unsupported resource type: {resource_type}")

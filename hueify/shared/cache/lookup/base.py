@@ -10,7 +10,7 @@ from hueify.utils.logging import LoggingMixin
 T = TypeVar("T", bound=ResourceInfo)
 
 
-class BaseCache(LoggingMixin, Generic[T]):
+class EntityLookupCache(LoggingMixin, Generic[T]):
     def __init__(self) -> None:
         self._name_to_model: dict[str, T] = {}
         self._id_to_model: dict[UUID, T] = {}
