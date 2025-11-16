@@ -7,12 +7,12 @@ from hueify.http import HttpClient
 from hueify.lights.lookup import LightLookup
 from hueify.lights.models import (
     ColorTemperatureState,
-    LightDimmingState,
     LightInfo,
     LightOnState,
     LightState,
 )
 from hueify.shared.resource.base import Resource
+from hueify.shared.types import DimmingState
 from hueify.sse.events.bus import get_event_bus
 from hueify.sse.models import LightEvent
 from hueify.utils.decorators import time_execution_async
@@ -28,7 +28,7 @@ class Light(Resource):
         super().__init__(client)
         self._light_info = light_info
         self._state = state
-        self._event_subscription_initialized = False
+        self._is_syncing_events = False
 
     @property
     def is_on(self) -> bool:
@@ -53,21 +53,21 @@ class Light(Resource):
 
         state = await client.get_resource(f"light/{light_info.id}", LightState)
         instance = cls(light_info=light_info, state=state, client=client)
-        await instance.subscribe_to_events()
+        await instance.enable_event_sync()
         return instance
 
-    async def subscribe_to_events(self) -> None:
-        if self._event_subscription_initialized:
+    async def enable_event_sync(self) -> None:
+        if self._is_syncing_events:
             return
 
         event_bus = await get_event_bus()
         event_bus.subscribe_to_light(
-            handler=self._handle_light_event,
+            handler=self._sync_state_from_event,
             light_id=self.id,
         )
-        self._event_subscription_initialized = True
+        self._is_syncing_events = True
 
-    async def _handle_light_event(self, event: LightEvent) -> None:
+    def _sync_state_from_event(self, event: LightEvent) -> None:
         if event.on is not None:
             self._update_on_state(event.on.on)
 
@@ -88,7 +88,7 @@ class Light(Resource):
 
     def _update_dimming_state(self, brightness: float) -> None:
         if self._state.dimming is None:
-            self._state.dimming = LightDimmingState(brightness=brightness)
+            self._state.dimming = DimmingState(brightness=brightness)
         else:
             self._state.dimming.brightness = brightness
 
@@ -123,7 +123,7 @@ class Light(Resource):
 
     def _create_brightness_state(self, brightness: int) -> BaseModel:
         return LightState(
-            on=LightOnState(on=True), dimming=LightDimmingState(brightness=brightness)
+            on=LightOnState(on=True), dimming=DimmingState(brightness=brightness)
         )
 
     def _create_color_temperature_state(self, mirek: int) -> BaseModel:

@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from hueify.groups.base.exceptions import NotInColorTemperatureModeError
 from hueify.groups.models import (
     ColorTemperatureState,
-    GroupedLightDimmingState,
     GroupedLightState,
     GroupInfo,
 )
@@ -17,7 +16,7 @@ from hueify.scenes.controller import SceneController
 from hueify.scenes.lookup import SceneLookup
 from hueify.shared.resource.base import Resource
 from hueify.shared.resource.models import ActionResult
-from hueify.shared.types import LightOnState, ResourceType
+from hueify.shared.types import DimmingState, LightOnState, ResourceType
 from hueify.utils.decorators import time_execution_async
 
 if TYPE_CHECKING:
@@ -105,7 +104,7 @@ class Group(Resource):
     def _create_brightness_state(self, brightness: int) -> BaseModel:
         return GroupedLightState(
             on=LightOnState(on=True),
-            dimming=GroupedLightDimmingState(brightness=brightness),
+            dimming=DimmingState(brightness=brightness),
         )
 
     def _create_color_temperature_state(self, mirek: int) -> BaseModel:

@@ -1,7 +1,7 @@
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ResourceType(StrEnum):
@@ -32,6 +32,15 @@ class ResourceReference(BaseModel):
 
 class LightOnState(BaseModel):
     on: bool
+
+
+class DimmingState(BaseModel):
+    brightness: float = Field(ge=0, le=100)
+
+
+class ColorTemperatureState(BaseModel):
+    mirek: int | None = Field(default=None, ge=153, le=500)
+    mirek_valid: bool | None = None
 
 
 class ResourceMetadata(BaseModel):

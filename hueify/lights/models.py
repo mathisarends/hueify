@@ -4,7 +4,13 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, TypeAdapter
 
-from hueify.shared.types import LightOnState, ResourceReference, ResourceType
+from hueify.shared.types import (
+    ColorTemperatureState,
+    DimmingState,
+    LightOnState,
+    ResourceReference,
+    ResourceType,
+)
 
 
 class LightArchetype(StrEnum):
@@ -71,20 +77,9 @@ class LightArchetype(StrEnum):
     STRING_PERMANENT = "string_permanent"
 
 
-class LightDimmingState(BaseModel):
-    brightness: float = Field(ge=0, le=100)
-    min_dim_level: float = Field(default=0, ge=0, le=100)
-
-
 class MirekSchema(BaseModel):
     mirek_minimum: int = Field(ge=50, le=1000)
     mirek_maximum: int = Field(ge=50, le=1000)
-
-
-class ColorTemperatureState(BaseModel):
-    mirek: int | None = Field(default=None, ge=50, le=1000)
-    mirek_valid: bool = False
-    mirek_schema: MirekSchema | None = None
 
 
 class ColorXY(BaseModel):
@@ -118,7 +113,7 @@ class LightMetadata(BaseModel):
 
 class LightState(BaseModel):
     on: LightOnState | None = None
-    dimming: LightDimmingState | None = None
+    dimming: DimmingState | None = None
     color_temperature: ColorTemperatureState | None = None
     color: ColorState | None = None
 
@@ -129,7 +124,7 @@ class LightInfo(BaseModel):
     owner: ResourceReference
     metadata: LightMetadata
     on: LightOnState
-    dimming: LightDimmingState | None = None
+    dimming: DimmingState | None = None
     color_temperature: ColorTemperatureState | None = None
     color: ColorState | None = None
 

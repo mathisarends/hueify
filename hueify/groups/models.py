@@ -3,7 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, TypeAdapter
 
-from hueify.shared.types import LightOnState, ResourceReference
+from hueify.shared.types import ColorTemperatureState, LightOnState, ResourceReference
+from hueify.sse.models import DimmingState
 
 
 class GroupType(StrEnum):
@@ -122,18 +123,9 @@ class GroupInfo(BaseModel):
 GroupInfoListAdapter = TypeAdapter(list[GroupInfo])
 
 
-class GroupedLightDimmingState(BaseModel):
-    brightness: float = Field(ge=0, le=100)
-
-
-class ColorTemperatureState(BaseModel):
-    mirek: int | None = Field(default=None, ge=153, le=500)
-    mirek_valid: bool | None = None
-
-
 class GroupedLightState(BaseModel):
     id: UUID | None = None
     type: str | None = None
     on: LightOnState
-    dimming: GroupedLightDimmingState | None = None
+    dimming: DimmingState | None = None
     color_temperature: ColorTemperatureState | None = None
