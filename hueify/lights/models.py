@@ -1,13 +1,10 @@
 from enum import StrEnum
 from typing import Literal
-from uuid import UUID
 
 from pydantic import BaseModel, Field, TypeAdapter
 
 from hueify.shared.resource.models import (
-    ColorTemperatureState,
-    DimmingState,
-    LightOnState,
+    ControllableLight,
     ResourceReference,
     ResourceType,
 )
@@ -111,21 +108,10 @@ class LightMetadata(BaseModel):
     archetype: LightArchetype | None = None
 
 
-class LightState(BaseModel):
-    on: LightOnState | None = None
-    dimming: DimmingState | None = None
-    color_temperature: ColorTemperatureState | None = None
-    color: ColorState | None = None
-
-
-class LightInfo(BaseModel):
-    id: UUID
+class LightInfo(ControllableLight):
     type: Literal[ResourceType.LIGHT] = ResourceType.LIGHT
     owner: ResourceReference
     metadata: LightMetadata
-    on: LightOnState
-    dimming: DimmingState | None = None
-    color_temperature: ColorTemperatureState | None = None
     color: ColorState | None = None
 
 

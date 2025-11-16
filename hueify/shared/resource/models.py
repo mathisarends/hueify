@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Any
+from typing import Any, TypeVar
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -51,6 +51,7 @@ class ResourceMetadata(BaseModel):
 class ResourceInfo(BaseModel):
     id: UUID
     metadata: ResourceMetadata
+    type: ResourceType
 
 
 class ActionResult(BaseModel):
@@ -58,3 +59,19 @@ class ActionResult(BaseModel):
     success: bool = True
     clamped: bool = False
     final_value: Any | None = None
+
+
+class ControllableLight(BaseModel):
+    id: UUID
+    on: LightOnState
+    dimming: DimmingState | None
+    color_temperature: ColorTemperatureState | None
+
+
+class ControllableLightUpdate(BaseModel):
+    on: LightOnState | None = None
+    dimming: DimmingState | None = None
+    color_temperature: ColorTemperatureState | None = None
+
+
+TLightInfo = TypeVar("TLightInfo", bound=ControllableLight)

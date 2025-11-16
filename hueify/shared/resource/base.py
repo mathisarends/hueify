@@ -1,16 +1,22 @@
 from abc import ABC, abstractmethod
 from functools import cached_property
-from typing import Self
+from typing import Generic, Self
 from uuid import UUID
 
-from pydantic import BaseModel
-
 from hueify.http import HttpClient
-from hueify.shared.resource.models import ActionResult
+from hueify.shared.resource.models import (
+    ActionResult,
+    ColorTemperatureState,
+    ControllableLightUpdate,
+    DimmingState,
+    LightOnState,
+    TLightInfo,
+)
 from hueify.shared.validation import (
     build_clamped_message,
     clamp_brightness_percentage,
     clamp_temperature_percentage,
+    mirek_to_percentage,
     normalize_percentage_input,
     percentage_to_mirek,
 )
@@ -18,8 +24,11 @@ from hueify.utils.decorators import time_execution_async
 from hueify.utils.logging import LoggingMixin
 
 
-class Resource(ABC, LoggingMixin):
-    def __init__(self, client: HttpClient | None = None) -> None:
+class Resource(ABC, Generic[TLightInfo], LoggingMixin):
+    def __init__(
+        self, light_info: TLightInfo, client: HttpClient | None = None
+    ) -> None:
+        self._light_info = light_info
         self._client = client or HttpClient()
 
     @classmethod
@@ -28,14 +37,12 @@ class Resource(ABC, LoggingMixin):
         pass
 
     @property
-    @abstractmethod
     def is_on(self) -> bool:
-        pass
+        return self._light_info.on.on
 
     @cached_property
-    @abstractmethod
     def id(self) -> UUID:
-        pass
+        return self._light_info.id
 
     @cached_property
     @abstractmethod
@@ -47,33 +54,35 @@ class Resource(ABC, LoggingMixin):
         pass
 
     @property
-    @abstractmethod
-    def current_brightness(self) -> float:
-        pass
+    def current_brightness_percentage(self) -> float:
+        return self._light_info.dimming.brightness if self._light_info.dimming else 0.0
 
     @property
-    @abstractmethod
-    def current_color_temperature(self) -> int | None:
-        pass
+    def current_color_temperature_percentage(self) -> int | None:
+        if not self._light_info.color_temperature:
+            return None
+
+        return mirek_to_percentage(self._light_info.color_temperature.mirek)
+
+    def _create_on_state(self) -> ControllableLightUpdate:
+        return ControllableLightUpdate(on=LightOnState(on=True))
+
+    def _create_off_state(self) -> ControllableLightUpdate:
+        return ControllableLightUpdate(on=LightOnState(on=False))
+
+    def _create_brightness_state(self, brightness: int) -> ControllableLightUpdate:
+        return ControllableLightUpdate(
+            on=LightOnState(on=True), dimming=DimmingState(brightness=brightness)
+        )
+
+    def _create_color_temperature_state(self, mirek: int) -> ControllableLightUpdate:
+        return ControllableLightUpdate(
+            on=LightOnState(on=True),
+            color_temperature=ColorTemperatureState(mirek=mirek),
+        )
 
     @abstractmethod
-    def _create_on_state(self) -> BaseModel:
-        pass
-
-    @abstractmethod
-    def _create_off_state(self) -> BaseModel:
-        pass
-
-    @abstractmethod
-    def _create_brightness_state(self, brightness: int) -> BaseModel:
-        pass
-
-    @abstractmethod
-    def _create_color_temperature_state(self, mirek: int) -> BaseModel:
-        pass
-
-    @abstractmethod
-    async def _update_state(self, state: BaseModel) -> None:
+    async def _update_remote_state(self, state: ControllableLightUpdate) -> None:
         pass
 
     @time_execution_async()
@@ -82,7 +91,7 @@ class Resource(ABC, LoggingMixin):
             message = "Already on"
         else:
             state = self._create_on_state()
-            await self._update_state(state)
+            await self._update_remote_state(state)
             message = "Turned on successfully"
 
         return ActionResult(message=message)
@@ -93,7 +102,7 @@ class Resource(ABC, LoggingMixin):
             message = "Already off"
         else:
             state = self._create_off_state()
-            await self._update_state(state)
+            await self._update_remote_state(state)
             message = "Turned off successfully"
 
         return ActionResult(message=message)
@@ -118,7 +127,7 @@ class Resource(ABC, LoggingMixin):
             message = f"Brightness set to {clamped_percentage}%"
 
         state = self._create_brightness_state(clamped_percentage)
-        await self._update_state(state)
+        await self._update_remote_state(state)
         return ActionResult(
             message=message, clamped=was_clamped, final_value=clamped_percentage
         )
@@ -128,7 +137,7 @@ class Resource(ABC, LoggingMixin):
         self, percentage: float | int
     ) -> ActionResult:
         percentage_int = normalize_percentage_input(percentage)
-        target_brightness = int(self.current_brightness + percentage_int)
+        target_brightness = int(self.current_brightness_percentage + percentage_int)
         new_brightness = clamp_brightness_percentage(target_brightness)
         was_clamped = new_brightness != target_brightness
 
@@ -143,7 +152,7 @@ class Resource(ABC, LoggingMixin):
             message = f"Brightness increased to {new_brightness}%"
 
         state = self._create_brightness_state(new_brightness)
-        await self._update_state(state)
+        await self._update_remote_state(state)
         return ActionResult(
             message=message, clamped=was_clamped, final_value=new_brightness
         )
@@ -153,7 +162,7 @@ class Resource(ABC, LoggingMixin):
         self, percentage: float | int
     ) -> ActionResult:
         percentage_int = normalize_percentage_input(percentage)
-        target_brightness = int(self.current_brightness - percentage_int)
+        target_brightness = int(self.current_brightness_percentage - percentage_int)
         new_brightness = clamp_brightness_percentage(target_brightness)
         was_clamped = new_brightness != target_brightness
 
@@ -168,7 +177,7 @@ class Resource(ABC, LoggingMixin):
             message = f"Brightness decreased to {new_brightness}%"
 
         state = self._create_brightness_state(new_brightness)
-        await self._update_state(state)
+        await self._update_remote_state(state)
         return ActionResult(
             message=message, clamped=was_clamped, final_value=new_brightness
         )
@@ -196,7 +205,7 @@ class Resource(ABC, LoggingMixin):
 
         mirek = percentage_to_mirek(clamped_percentage)
         state = self._create_color_temperature_state(mirek)
-        await self._update_state(state)
+        await self._update_remote_state(state)
         return ActionResult(
             message=message, clamped=was_clamped, final_value=clamped_percentage
         )
