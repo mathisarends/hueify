@@ -13,6 +13,8 @@ from hueify.lights.models import (
     LightState,
 )
 from hueify.shared.resource.base import Resource
+from hueify.sse.events.bus import get_event_bus
+from hueify.sse.models import LightEvent
 from hueify.utils.decorators import time_execution_async
 
 
@@ -26,6 +28,7 @@ class Light(Resource):
         super().__init__(client)
         self._light_info = light_info
         self._state = state
+        self._event_subscription_initialized = False
 
     @property
     def is_on(self) -> bool:
@@ -49,7 +52,57 @@ class Light(Resource):
         light_info = await lookup.get_light_by_name(light_name)
 
         state = await client.get_resource(f"light/{light_info.id}", LightState)
-        return cls(light_info=light_info, state=state, client=client)
+        instance = cls(light_info=light_info, state=state, client=client)
+        await instance.subscribe_to_events()
+        return instance
+
+    async def subscribe_to_events(self) -> None:
+        if self._event_subscription_initialized:
+            return
+
+        event_bus = await get_event_bus()
+        event_bus.subscribe_to_light(
+            handler=self._handle_light_event,
+            light_id=self.id,
+        )
+        self._event_subscription_initialized = True
+
+    async def _handle_light_event(self, event: LightEvent) -> None:
+        if event.on is not None:
+            self._update_on_state(event.on.on)
+
+        if event.dimming is not None:
+            self._update_dimming_state(event.dimming.brightness)
+
+        if event.color_temperature is not None:
+            self._update_color_temperature_state(
+                event.color_temperature.mirek,
+                event.color_temperature.mirek_valid,
+            )
+
+    def _update_on_state(self, on: bool) -> None:
+        if self._state.on is None:
+            self._state.on = LightOnState(on=on)
+        else:
+            self._state.on.on = on
+
+    def _update_dimming_state(self, brightness: float) -> None:
+        if self._state.dimming is None:
+            self._state.dimming = LightDimmingState(brightness=brightness)
+        else:
+            self._state.dimming.brightness = brightness
+
+    def _update_color_temperature_state(
+        self, mirek: int | None, mirek_valid: bool
+    ) -> None:
+        if self._state.color_temperature is None:
+            self._state.color_temperature = ColorTemperatureState(
+                mirek=mirek,
+                mirek_valid=mirek_valid,
+            )
+        else:
+            self._state.color_temperature.mirek = mirek
+            self._state.color_temperature.mirek_valid = mirek_valid
 
     @property
     def id(self) -> UUID:
