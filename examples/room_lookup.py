@@ -10,6 +10,8 @@ async def main():
     room = await Room.from_name("Zimmer 1")
 
     scene = await room.get_active_scene()
+
+    await room.decrease_brightness_percentage(15)
     print("scene:", scene)
 
     # await room.turn_off()

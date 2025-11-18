@@ -12,8 +12,8 @@ class HueBridgeCredentials(BaseSettings):
         case_sensitive=False,
     )
 
-    hue_bridge_ip: str | None = Field(default=None, alias="HUE_BRIDGE_IP")
-    hue_app_key: str | None = Field(default=None, alias="HUE_APP_KEY")
+    hue_bridge_ip: str = Field(alias="HUE_BRIDGE_IP")
+    hue_app_key: str = Field(alias="HUE_APP_KEY")
 
     @field_validator("hue_bridge_ip")
     @classmethod

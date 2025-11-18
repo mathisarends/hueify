@@ -4,10 +4,7 @@ IP_ADDRESS_PART_MIN = 0
 IP_ADDRESS_PART_MAX = 255
 
 
-def validate_hue_app_key(value: str | None) -> str | None:
-    if value is None:
-        return value
-
+def validate_hue_app_key(value: str) -> str:
     if len(value) < MIN_APP_KEY_LENGTH:
         raise ValueError(
             f"Hue App Key must be at least {MIN_APP_KEY_LENGTH} characters, got {len(value)}"
@@ -19,7 +16,7 @@ def validate_hue_app_key(value: str | None) -> str | None:
     return value
 
 
-def validate_hue_bridge_ip(value: str | None) -> str | None:
+def validate_hue_bridge_ip(value: str) -> str:
     if value is None:
         return value
 
