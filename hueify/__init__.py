@@ -1,4 +1,3 @@
-from .bridge import HueBridge
 from .grouped_lights import GroupedLightLookup
 from .groups import (
     Room,
@@ -26,7 +25,6 @@ __all__ = [
     "ActionResult",
     "EventBus",
     "GroupedLightLookup",
-    "HueBridge",
     "Light",
     "LightInfo",
     "LightLookup",

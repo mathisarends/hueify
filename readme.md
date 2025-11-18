@@ -1,228 +1,170 @@
 # Hueify
 
-Hueify is a Python library for convenient control of Philips Hue lighting systems. The library provides an intuitive and asynchronous API for managing Hue groups, scenes, and lights.
-
-## Features
-
-- **Asynchronous API**: All operations use Python's asyncio for efficient, non-blocking I/O
-- **Group Control**: Easy management of light groups (rooms and zones)
-- **Scene Support**: Activate and manage scenes
-- **State Management**: Save and restore light states
-- **Brightness Control**: Convenient methods for percentage-based brightness adjustment
-
-## Installation
+Hueify is an async-first Python library for Philips Hue. It provides clean, focused entity classes (`Light`, `Room`, `Zone`, `Scene`) that match the Hue app and lets you build automations with minimal code. It also ships with an MCP server for LLM tools and keeps state fresh via server‑sent events.
 
 ```bash
 pip install hueify
 ```
 
-## Configuration
+---
 
-Hueify requires two environment variables:
+## What You Can Build
 
-- `HUE_BRIDGE_IP`: The IP address of your Philips Hue Bridge
-- `HUE_USER_ID`: The user ID for authentication with the Bridge
+- Turn lights on/off, set brightness and color temperature.
+- Control rooms and zones the same way you do in the Hue app.
+- Activate scenes for rooms or zones.
+- Run long-lived processes that stay up-to-date without polling.
 
-These can be stored in a `.env` file in your project directory or as system environment variables.
+Hueify includes a ready-to-use MCP server (`mcp_server`) so you can expose these controls to compatible LLM tools.
 
-### .env Example:
+### Hue domain model
 
+Hueify mirrors the structure of the Hue app:
+
+```mermaid
+flowchart LR
+    Bridge[HueBridge]
+
+    subgraph Core Entities
+        Light
+        Room
+        Zone
+        Scene
+        GroupedLight[Grouped Light]
+    end
+
+    Bridge --> Light
+    Bridge --> Room
+    Bridge --> Zone
+    Bridge --> Scene
+    Bridge --> GroupedLight
+
+    Room -->|contains| Light
+    Zone -->|contains| Light
+    GroupedLight -->|aggregates| Light
+    Scene -->|targets| Room
+    Scene -->|targets| Zone
 ```
-HUE_BRIDGE_IP=192.168.1.100
-HUE_USER_ID=abcdefghijklmnopqrstuvwxyz
-```
 
-### How to Get Your Hue User ID (HUE_USER_ID)
+Each entity type has:
 
-If you're using your Hue Bridge with this library for the first time, you need to generate a user ID for authentication:
+- A strongly-typed model (e.g. `LightInfo`, `SceneInfo`).
+- Async methods to read and change state.
+- Clear domain exceptions when a name isn’t found.
 
-1. **Press the physical button** on the top of your Hue Bridge. This allows registration of a new user for a short time (about 30 seconds).
-2. **Send a POST request to the Bridge API** (replace `<bridge-ip>` with your actual IP):
+---
 
-```bash
-curl -X POST -H "Content-Type: application/json" \
--d '{"devicetype":"hueify#your_device"}' \
-http://<bridge-ip>/api
-```
+## Lights by name
 
-3. **Get the username from the response**, which looks like this:
-
-```json
-[{ "success": { "username": "your-generated-username" } }]
-```
-
-4. **Save this username** in your `.env` file as `HUE_USER_ID`.
-
-⚠️ Make sure to press the bridge button **right before** running the request. If not, you will get an error like `"link button not pressed"`.
-
-## Usage
-
-### Example: Group Control
+Control a single light using the same name you see in the Hue app. If a name is not found, a `LightNotFoundException` is raised with similar name suggestions.
 
 ```python
 import asyncio
-from hueify.bridge import HueBridge
-from hueify.controllers.group_controller import GroupsManager
+from hueify import Light
 
-async def main():
-    # Connect to the Bridge
-    bridge = HueBridge()
 
-    # Initialize the groups manager
-    groups_manager = GroupsManager(bridge)
+async def main() -> None:
+    light = await Light.from_name("Living room lamp")
 
-    # Get a controller for a group (by name or ID)
-    living_room = await groups_manager.get_controller("Living Room")
+    await light.turn_on()
+    await light.set_brightness_percentage(75)
+    await light.set_color_temperature_percentage(30)
+    current = light.brightness_percentage
+    print("Brightness:", current)
 
-    # Display information
-    print(f"Group: {living_room.name} (ID: {living_room.group_id})")
-
-    # Turn on lights
-    await living_room.turn_on()
-
-    # Set brightness to 50%
-    await living_room.set_brightness_percentage(50)
-
-    # Activate a scene
-    await living_room.activate_scene("Relax")
-
-    # Save current state
-    state_id = await living_room.save_state("my_state")
-
-    # Increase brightness
-    await living_room.increase_brightness_percentage(20)
-
-    # Restore state
-    await living_room.restore_state(state_id)
-
-    # Turn off lights
-    await living_room.turn_off()
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
 
-### Listing All Available Groups
+---
+
+## Rooms
+
+Rooms group lights like in the Hue app. Use `from_name` to target by display name. Missing rooms raise `RoomNotFoundException` with suggestions.
 
 ```python
 import asyncio
-from hueify.bridge import HueBridge
-from hueify.controllers.group_controller import GroupsManager
+from hueify import Room
 
-async def list_groups():
-    bridge = HueBridge()
-    groups_manager = GroupsManager(bridge)
 
-    # Output formatted list of all groups
-    groups_list = await groups_manager.get_available_groups_formatted()
-    print(groups_list)
+async def main() -> None:
+    room = await Room.from_name("Living Room")
+
+    await room.turn_on()
+    await room.set_brightness_percentage(40)
+    await room.increase_brightness_percentage(20)
+    await room.set_color_temperature_percentage(35)
+
+    await room.activate_scene("Relax")
+    active = await room.get_active_scene()
+    print("Active scene:", active.name if active else None)
 
 if __name__ == "__main__":
-    asyncio.run(list_groups())
+    asyncio.run(main())
 ```
 
-## Common Use Cases
 
-### Smart Home Automation
+---
+
+## Zones
+
+Zones are cross-room groupings. Same control surface as rooms. Missing zones raise `ZoneNotFoundException` with suggestions.
 
 ```python
 import asyncio
-from hueify.bridge import HueBridge
-from hueify.controllers.group_controller import GroupsManager
+from hueify import Zone, ZoneNotFoundException
 
-async def morning_routine():
-    """Gradually increase lights in the bedroom and kitchen for a gentle wake-up."""
-    bridge = HueBridge()
-    groups = GroupsManager(bridge)
 
-    # Turn on bedroom lights at 10%
-    bedroom = await groups.get_controller("Bedroom")
-    await bedroom.set_brightness_percentage(10, transition_time=30)  # 3 second fade-in
+async def main() -> None:
+    zone = await Zone.from_name("Downstairs")
 
-    # Wait 5 minutes
-    await asyncio.sleep(300)
+    await zone.turn_on()
+    await zone.set_brightness_percentage(60)
+    await zone.decrease_brightness_percentage(10)
+    await zone.activate_scene("Focus")
 
-    # Increase to 40%
-    await bedroom.set_brightness_percentage(40, transition_time=100)  # 10 second transition
-
-    # Turn on kitchen lights
-    kitchen = await groups.get_controller("Kitchen")
-    await kitchen.set_brightness_percentage(70)
+    active = await zone.get_active_scene()
+    print("Active scene:", active.name if active else None)
 
 if __name__ == "__main__":
-    asyncio.run(morning_routine())
+    asyncio.run(main())
 ```
 
-### Movie Night Scene
+---
+
+## Caching and live sync
+
+Hueify maintains an internal cache and listens to the Hue bridge’s server‑sent events. Changes from outside your script (e.g. the Hue app) are applied automatically to instantiated objects and cached data, enabling fast responses and reliable state without polling.
+
+Optionally warm the cache up-front for the lowest latency:
 
 ```python
 import asyncio
-from hueify.bridge import HueBridge
-from hueify.controllers.group_controller import GroupsManager
+from hueify import get_cache
 
-async def movie_night():
-    """Set up the perfect lighting for movie night."""
-    bridge = HueBridge()
-    groups = GroupsManager(bridge)
 
-    # Get controllers for relevant rooms
-    living_room = await groups.get_controller("Living Room")
-    kitchen = await groups.get_controller("Kitchen")
-    hallway = await groups.get_controller("Hallway")
+async def main() -> None:
+    cache = get_cache()
+    await cache.populate()
 
-    # Save current states to restore later
-    lr_state = await living_room.save_state("pre_movie")
-
-    # Set living room to movie scene or dim the lights
-    try:
-        await living_room.activate_scene("Movie")
-    except:
-        # If scene doesn't exist, dim to 15%
-        await living_room.set_brightness_percentage(15)
-
-    # Turn kitchen lights to low
-    await kitchen.set_brightness_percentage(30)
-
-    # Dim hallway lights
-    await hallway.set_brightness_percentage(20)
-
-    print("Movie mode activated! Enjoy your film.")
-
-    # To restore after movie:
-    # await living_room.restore_state("pre_movie")
 
 if __name__ == "__main__":
-    asyncio.run(movie_night())
+    asyncio.run(main())
 ```
 
-## Development
+---
 
-### Requirements
+## MCP server
 
-- Python 3.9 or higher
-- A Philips Hue Bridge
-- A registered user ID on the Bridge
+Hueify includes a ready-to-use Model Context Protocol (MCP) server so you can control your Hue setup from compatible LLM tools. It exposes the same operations shown above (`turn_on`, `set_brightness_percentage`, `activate_scene`, etc.).
 
-### Development Setup
+- The server uses the same entity abstractions (`Light`, `Room`, `Zone`, `Scene`) and the shared cache.
+- Integration depends on your MCP host and is intentionally not covered here.
 
-1. Clone the repository
-2. Install dependencies
-   ```bash
-   pip install -e .
-   pip install -r requirements.txt
-   ```
-3. Create a `.env` file with your Bridge details
 
-### Running Tests
-
-```bash
-pytest tests/
-```
+---
 
 ## License
 
 [MIT](LICENSE)
-
-## Contributing
-
-Contributions are welcome! Please open an issue first to discuss changes before submitting pull requests.
