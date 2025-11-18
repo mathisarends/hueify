@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, TypeAdapter
 
-from hueify.shared.resource.models import ResourceReference
+from hueify.shared.resource.models import ResourceReference, ResourceType
 
 
 class GroupType(StrEnum):
@@ -117,6 +117,12 @@ class GroupInfo(BaseModel):
     @property
     def archetype(self) -> GroupArchetype:
         return self.metadata.archetype
+
+    def get_grouped_light_reference_if_exists(self) -> UUID | None:
+        for service in self.services:
+            if service.rtype == ResourceType.GROUPED_LIGHT:
+                return service.rid
+        return None
 
 
 GroupInfoListAdapter = TypeAdapter(list[GroupInfo])

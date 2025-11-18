@@ -7,12 +7,12 @@ from hueify.lights.lookup import LightLookup
 from hueify.lights.models import (
     LightInfo,
 )
-from hueify.shared.resource.base import Resource
+from hueify.shared.resource import NamedResourceMixin, Resource
 from hueify.sse.events.bus import get_event_bus
 from hueify.utils.decorators import time_execution_async
 
 
-class Light(Resource[LightInfo]):
+class Light(Resource[LightInfo], NamedResourceMixin):
     @classmethod
     @time_execution_async()
     async def from_name(cls, light_name: str, client: HttpClient | None = None) -> Self:

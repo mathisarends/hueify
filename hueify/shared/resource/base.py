@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from functools import cached_property
-from typing import Generic, Self
+from typing import Generic
 from uuid import UUID
 
 from hueify.http import HttpClient
@@ -31,11 +31,6 @@ class Resource(ABC, Generic[TLightInfo], LoggingMixin):
         self._light_info = light_info
         self._client = client or HttpClient()
         self._event_subscription_initialized = False
-
-    @classmethod
-    @abstractmethod
-    async def from_name(cls, name: str, client: HttpClient | None = None) -> Self:
-        pass
 
     @abstractmethod
     async def _subscribe_to_events(self) -> None:

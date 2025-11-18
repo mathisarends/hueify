@@ -39,7 +39,7 @@ class LookupCache(LoggingMixin):
 
     async def populate(self) -> None:
         from hueify import (
-            GroupedLightLookup,
+            GroupedLightClient,
             LightLookup,
             RoomLookup,
             SceneLookup,
@@ -50,14 +50,14 @@ class LookupCache(LoggingMixin):
         room_lookup = RoomLookup()
         zone_lookup = ZoneLookup()
         scene_lookup = SceneLookup()
-        _ = GroupedLightLookup()
+        grouped_light_client = GroupedLightClient()
 
         await asyncio.gather(
             light_lookup.get_lights(),
             room_lookup.get_all_entities(),
             zone_lookup.get_all_entities(),
             scene_lookup.get_scenes(),
-            # grouped_light_lookup.get_all_entities()
+            grouped_light_client.get_all(),
         )
         self.logger.info("Cache warmed up successfully")
 

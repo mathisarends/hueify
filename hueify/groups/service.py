@@ -4,8 +4,6 @@ from abc import abstractmethod
 from typing import TYPE_CHECKING, Self
 from uuid import UUID
 
-from pydantic import BaseModel
-
 from hueify.grouped_lights import GroupedLights
 from hueify.groups.models import GroupInfo
 from hueify.http import HttpClient
@@ -14,9 +12,7 @@ from hueify.scenes.controller import SceneController
 from hueify.scenes.lookup import SceneLookup
 from hueify.shared.resource.models import (
     ActionResult,
-    ResourceType,
 )
-from hueify.sse.events.bus import get_event_bus
 from hueify.utils.decorators import time_execution_async
 from hueify.utils.logging import LoggingMixin
 
@@ -52,11 +48,14 @@ class Group(LoggingMixin):
 
     @staticmethod
     def _extract_grouped_light_id(group_info: GroupInfo) -> UUID:
-        for service in group_info.services:
-            if service.rtype == ResourceType.GROUPED_LIGHT:
-                return service.rid
+        grouped_light_reference = group_info.get_grouped_light_reference_if_exists()
 
-        raise ValueError(f"No grouped_light service found for group {group_info.id}")
+        if grouped_light_reference is None:
+            raise ValueError(
+                f"No grouped_light service found for group {group_info.id}"
+            )
+
+        return grouped_light_reference
 
     @classmethod
     @abstractmethod
@@ -122,14 +121,3 @@ class Group(LoggingMixin):
     async def get_scenes(self) -> list[SceneInfo]:
         all_scenes = await self._scene_lookup.get_scenes()
         return [scene for scene in all_scenes if scene.group_id == self.id]
-
-    async def _update_remote_state(self, state: BaseModel) -> None:
-        endpoint = self._get_resource_endpoint()
-        await self._client.put(f"{endpoint}/{self.grouped_light_id}", data=state)
-
-    async def _subscribe_to_events(self) -> None:
-        event_bus = await get_event_bus()
-        event_bus.subscribe_to_grouped_light(
-            handler=self._handle_event,
-            group_id=self.grouped_light_id,
-        )

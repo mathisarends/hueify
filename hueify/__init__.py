@@ -1,5 +1,5 @@
 from .bridge import HueBridge
-from .grouped_lights import GroupedLightLookup
+from .grouped_lights import GroupedLightClient
 from .groups import (
     Room,
     RoomLookup,
@@ -19,7 +19,7 @@ from .sse import EventBus, get_event_bus
 __all__ = [
     "ActionResult",
     "EventBus",
-    "GroupedLightLookup",
+    "GroupedLightClient",
     "HueBridge",
     "Light",
     "LightInfo",

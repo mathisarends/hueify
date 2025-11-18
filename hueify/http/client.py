@@ -56,6 +56,7 @@ class HttpClient:
         response = await self._client.get(
             f"{self.base_url}/{endpoint}", headers=self._headers
         )
+
         response.raise_for_status()
 
         adapter = TypeAdapter(HueApiResponse[resource_type])
