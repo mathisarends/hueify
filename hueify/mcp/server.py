@@ -152,6 +152,16 @@ async def activate_room_scene(room_name: str, scene_name: str) -> ActionResult:
     return await room.activate_scene(scene_name)
 
 
+@mcp_server.tool()
+async def get_active_room_scene(room_name: str) -> str:
+    room = await Room.from_name(room_name)
+    active_scene = await room.get_active_scene()
+    if active_scene:
+        return f"Active scene in room '{room_name}': '{active_scene.name}'"
+    else:
+        return f"No active scene found in room '{room_name}'"
+
+
 # ===== Zones =====
 
 
@@ -201,6 +211,16 @@ async def set_zone_color_temperature(
 async def activate_zone_scene(zone_name: str, scene_name: str) -> ActionResult:
     zone = await Zone.from_name(zone_name)
     return await zone.activate_scene(scene_name)
+
+
+@mcp_server.tool()
+async def get_active_zone_scene(zone_name: str) -> str:
+    zone = await Zone.from_name(zone_name)
+    active_scene = await zone.get_active_scene()
+    if active_scene:
+        return f"Active scene in zone '{zone_name}': '{active_scene.name}'"
+    else:
+        return f"No active scene found in zone '{zone_name}'"
 
 
 if __name__ == "__main__":

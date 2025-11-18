@@ -8,21 +8,23 @@ async def main():
     await cache.populate()
 
     room = await Room.from_name("Zimmer 1")
-    await room.turn_on()
 
-    await room.turn_off()
+    scene = await room.get_active_scene()
+    print("scene:", scene)
 
-    await asyncio.sleep(5)
+    # await room.turn_off()
 
-    await room.turn_on()
+    # await asyncio.sleep(5)
 
-    await asyncio.sleep(5)
+    # await room.turn_on()
 
-    await room.increase_brightness_percentage(30)
+    # await asyncio.sleep(5)
 
-    await asyncio.sleep(5)
+    # await room.increase_brightness_percentage(30)
 
-    await room.decrease_brightness_percentage(20)
+    # await asyncio.sleep(5)
+
+    # await room.decrease_brightness_percentage(20)
 
     print(f"Turned on room: {room.brightness_percentage}")
 

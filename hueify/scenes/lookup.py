@@ -67,3 +67,7 @@ class SceneLookup(NamedResourceLookup[SceneInfo]):
     async def get_scenes_by_group_id(self, group_id: UUID) -> list[SceneInfo]:
         all_scenes = await self.get_scenes()
         return [scene for scene in all_scenes if scene.group_id == group_id]
+
+    async def get_active_scene_in_group(self, group_id: UUID) -> SceneInfo | None:
+        group_scenes = await self.get_scenes_by_group_id(group_id)
+        return next((scene for scene in group_scenes if scene.is_active), None)

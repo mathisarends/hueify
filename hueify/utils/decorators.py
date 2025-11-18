@@ -14,23 +14,6 @@ type _SyncDecorator = Callable[[_SyncFunc], _SyncFunc]
 type _AsyncDecorator = Callable[[_AsyncFunc], _AsyncFunc]
 
 
-def singleton(cls):
-    original_new = cls.__new__
-    instance = None
-
-    def new_new(cls_inner, *args, **kwargs):
-        nonlocal instance
-        if instance is None:
-            if original_new is object.__new__:
-                instance = original_new(cls_inner)
-            else:
-                instance = original_new(cls_inner, *args, **kwargs)
-        return instance
-
-    cls.__new__ = staticmethod(new_new)
-    return cls
-
-
 def time_execution_sync(
     additional_text: str = "", min_duration_to_log: float = 0.25
 ) -> _SyncDecorator:

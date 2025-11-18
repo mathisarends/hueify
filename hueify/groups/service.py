@@ -8,6 +8,7 @@ from hueify.grouped_lights import GroupedLights
 from hueify.groups.models import GroupInfo
 from hueify.http import HttpClient
 from hueify.scenes import SceneInfo
+from hueify.scenes.exceptions import NoActiveSceneException
 from hueify.scenes.lookup import SceneLookup
 from hueify.scenes.service import Scene
 from hueify.shared.resource.models import (
@@ -121,3 +122,18 @@ class Group(LoggingMixin):
     async def get_scenes(self) -> list[SceneInfo]:
         all_scenes = await self._scene_lookup.get_scenes()
         return [scene for scene in all_scenes if scene.group_id == self.id]
+
+    @time_execution_async()
+    async def get_active_scene(self) -> SceneInfo:
+        active_scene = await self._scene_lookup.get_active_scene_in_group(self.id)
+
+        if active_scene is None:
+            light_info = self._grouped_lights._light_info
+            raise NoActiveSceneException(
+                group_name=self.name,
+                is_light_on=light_info.on.on,
+                brightness=light_info.dimming.brightness
+                if light_info.dimming
+                else None,
+            )
+        return active_scene
