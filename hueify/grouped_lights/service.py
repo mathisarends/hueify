@@ -1,53 +1,46 @@
-from typing import Self
+from functools import cached_property
+from typing import Self, override
 from uuid import UUID
 
 from pydantic import BaseModel
 
-from hueify.grouped_lights.models import GroupedLightInfo, GroupedLightState
+from hueify.grouped_lights.lookup import GroupedLightLookup
+from hueify.grouped_lights.models import GroupedLightInfo
 from hueify.http import HttpClient
 from hueify.shared.resource import Resource
-from hueify.shared.resource.models import ResourceType
 from hueify.sse import get_event_bus
 from hueify.utils.decorators import time_execution_async
 
 
-class GroupedLights(Resource[GroupedLightState]):
-    def __init__(
-        self,
-        grouped_light_info: GroupedLightInfo,
-        state: GroupedLightState,
-        client: HttpClient | None = None,
-    ) -> None:
-        super().__init__(state, client)
-        self._grouped_light_info = grouped_light_info
-
+class GroupedLights(Resource[GroupedLightInfo]):
     @classmethod
     @time_execution_async()
     async def from_id(cls, id: UUID, client: HttpClient | None = None) -> Self:
         client = client or HttpClient()
+        lookup = GroupedLightLookup(client=client)
 
-        state = await client.get_resource(
-            f"grouped_light/{id}", resource_type=GroupedLightState
-        )
+        grouped_light_info = await lookup.get_entity_by_id(id)
 
-        grouped_light_info = GroupedLightInfo(
-            id=id,
-            type=ResourceType.GROUPED_LIGHT,
-        )
+        if not grouped_light_info:
+            raise ValueError(f"GroupedLight with id {id} not found")
 
-        return cls(grouped_light_info=grouped_light_info, state=state, client=client)
+        return cls(light_info=grouped_light_info, client=client)
 
-    @property
+    @cached_property
+    @override
     def name(self) -> str:
-        return self._grouped_light_info.name
+        return self._light_info.name
 
+    @override
     def _get_resource_endpoint(self) -> str:
         return "grouped_light"
 
+    @override
     async def _update_remote_state(self, state: BaseModel) -> None:
         endpoint = self._get_resource_endpoint()
         await self._client.put(f"{endpoint}/{self.id}", data=state)
 
+    @override
     async def _subscribe_to_events(self) -> None:
         event_bus = await get_event_bus()
         event_bus.subscribe_to_grouped_light(

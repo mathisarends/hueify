@@ -17,7 +17,7 @@ from hueify.utils.decorators import time_execution_async
 from hueify.utils.logging import LoggingMixin
 
 if TYPE_CHECKING:
-    from hueify.shared.resource import ResourceLookup
+    from hueify.shared.resource import NamedResourceLookup
 
 
 class Group(LoggingMixin):
@@ -59,7 +59,7 @@ class Group(LoggingMixin):
 
     @classmethod
     @abstractmethod
-    def _create_lookup(cls, client: HttpClient) -> ResourceLookup:
+    def _create_lookup(cls, client: HttpClient) -> NamedResourceLookup:
         pass
 
     @property

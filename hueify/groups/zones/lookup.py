@@ -1,22 +1,18 @@
-from hueify.groups.models import GroupInfo, GroupInfoListAdapter
+from hueify.groups.models import GroupInfo
 from hueify.groups.zones.exceptions import ZoneNotFoundException
-from hueify.http import ApiResponse
-from hueify.shared.resource.lookup import ResourceLookup
+from hueify.shared.resource.lookup import NamedResourceLookup
 from hueify.shared.resource.models import ResourceType
 
 
-class ZoneLookup(ResourceLookup[GroupInfo]):
+class ZoneLookup(NamedResourceLookup[GroupInfo]):
     def get_resource_type(self) -> ResourceType:
         return ResourceType.ZONE
 
+    def get_model_type(self) -> type[GroupInfo]:
+        return GroupInfo
+
     def _get_endpoint(self) -> str:
         return "zone"
-
-    def _parse_response(self, response: ApiResponse) -> list[GroupInfo]:
-        data = response.get("data", [])
-        if not data:
-            return []
-        return GroupInfoListAdapter.validate_python(data)
 
     def _create_not_found_exception(
         self, lookup_name: str, suggested_names: list[str]

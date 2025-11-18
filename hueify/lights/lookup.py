@@ -1,24 +1,20 @@
 from uuid import UUID
 
-from hueify.http import ApiResponse
 from hueify.lights.exceptions import LightNotFoundException
-from hueify.lights.models import LightInfo, LightInfoListAdapter
-from hueify.shared.resource.lookup import ResourceLookup
+from hueify.lights.models import LightInfo
+from hueify.shared.resource.lookup import NamedResourceLookup
 from hueify.shared.resource.models import ResourceType
 
 
-class LightLookup(ResourceLookup[LightInfo]):
+class LightLookup(NamedResourceLookup[LightInfo]):
     def get_resource_type(self) -> ResourceType:
         return ResourceType.LIGHT
 
+    def get_model_type(self) -> type[LightInfo]:
+        return LightInfo
+
     def _get_endpoint(self) -> str:
         return "light"
-
-    def _parse_response(self, response: ApiResponse) -> list[LightInfo]:
-        data = response.get("data", [])
-        if not data:
-            return []
-        return LightInfoListAdapter.validate_python(data)
 
     def _create_not_found_exception(
         self, lookup_name: str, suggested_names: list[str]

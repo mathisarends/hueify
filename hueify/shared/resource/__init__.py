@@ -1,5 +1,5 @@
 from .base import Resource
-from .lookup import ResourceLookup
+from .lookup import NamedResourceLookup, ResourceLookup
 from .mixins import NamedResourceMixin
 from .models import (
     ActionResult,
@@ -15,6 +15,7 @@ __all__ = [
     "ActionResult",
     "ColorTemperatureState",
     "LightOnState",
+    "NamedResourceLookup",
     "NamedResourceMixin",
     "Resource",
     "ResourceInfo",
