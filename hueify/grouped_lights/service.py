@@ -3,10 +3,10 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from hueify.grouped_lights.client import GroupedLightClient
 from hueify.grouped_lights.models import GroupedLightInfo, GroupedLightState
 from hueify.http import HttpClient
 from hueify.shared.resource import Resource
+from hueify.shared.resource.models import ResourceType
 from hueify.sse import get_event_bus
 from hueify.utils.decorators import time_execution_async
 
@@ -25,12 +25,14 @@ class GroupedLights(Resource[GroupedLightState]):
     @time_execution_async()
     async def from_id(cls, id: UUID, client: HttpClient | None = None) -> Self:
         client = client or HttpClient()
-        grouped_light_client = GroupedLightClient(client)
-
-        grouped_light_info = await grouped_light_client.get_by_id(id)
 
         state = await client.get_resource(
             f"grouped_light/{id}", resource_type=GroupedLightState
+        )
+
+        grouped_light_info = GroupedLightInfo(
+            id=id,
+            type=ResourceType.GROUPED_LIGHT,
         )
 
         return cls(grouped_light_info=grouped_light_info, state=state, client=client)
