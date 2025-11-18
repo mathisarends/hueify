@@ -1,3 +1,4 @@
+from typing import override
 from uuid import UUID
 
 from hueify.scenes.exceptions import SceneNotFoundException
@@ -8,15 +9,19 @@ from hueify.utils.fuzzy import find_all_matches_sorted
 
 
 class SceneLookup(NamedResourceLookup[SceneInfo]):
+    @override
     def get_resource_type(self) -> ResourceType:
         return ResourceType.SCENE
 
+    @override
     def get_model_type(self) -> type[SceneInfo]:
         return SceneInfo
 
+    @override
     def _get_endpoint(self) -> str:
         return "scene"
 
+    @override
     def _create_not_found_exception(
         self, lookup_name: str, suggested_names: list[str]
     ) -> Exception:

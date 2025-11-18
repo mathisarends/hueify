@@ -15,7 +15,7 @@ from hueify.utils.decorators import time_execution_async
 from hueify.utils.logging import LoggingMixin
 
 
-class SceneController(LoggingMixin):
+class Scene(LoggingMixin):
     def __init__(
         self,
         scene_info: SceneInfo,

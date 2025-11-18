@@ -11,7 +11,7 @@ from .groups import (
 from .lights import Light, LightInfo, LightLookup, LightNotFoundException
 from .mcp import mcp_server
 from .prompts import SystemPromptTemplate
-from .scenes import SceneController, SceneInfo, SceneLookup, SceneNotFoundException
+from .scenes import Scene, SceneInfo, SceneLookup, SceneNotFoundException
 from .shared.cache import LookupCache, get_cache
 from .shared.resource import ActionResult
 from .sse import EventBus, get_event_bus
@@ -29,7 +29,7 @@ __all__ = [
     "Room",
     "RoomLookup",
     "RoomNotFoundException",
-    "SceneController",
+    "Scene",
     "SceneInfo",
     "SceneLookup",
     "SceneNotFoundException",

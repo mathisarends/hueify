@@ -1,10 +1,10 @@
-from .controller import SceneController
 from .exceptions import SceneNotFoundException
 from .lookup import SceneLookup
 from .models import SceneInfo, SceneStatusValue, ShortSceneInfo
+from .service import Scene
 
 __all__ = [
-    "SceneController",
+    "Scene",
     "SceneInfo",
     "SceneLookup",
     "SceneNotFoundException",

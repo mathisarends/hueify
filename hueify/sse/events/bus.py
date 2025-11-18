@@ -142,4 +142,4 @@ async def get_event_bus() -> EventBus:
             _event_bus = EventBus()
             await _event_bus._ensure_connected()
 
-        return _event_bus
+    return _event_bus

@@ -8,8 +8,8 @@ from hueify.grouped_lights import GroupedLights
 from hueify.groups.models import GroupInfo
 from hueify.http import HttpClient
 from hueify.scenes import SceneInfo
-from hueify.scenes.controller import SceneController
 from hueify.scenes.lookup import SceneLookup
+from hueify.scenes.service import Scene
 from hueify.shared.resource.models import (
     ActionResult,
 )
@@ -112,10 +112,10 @@ class Group(LoggingMixin):
 
     @time_execution_async()
     async def activate_scene(self, scene_name: str) -> ActionResult:
-        scene_controller = await SceneController.from_name_in_group(
+        scene = await Scene.from_name_in_group(
             scene_name=scene_name, group_id=self.id, client=self._client
         )
-        return await scene_controller.activate()
+        return await scene.activate()
 
     @time_execution_async()
     async def get_scenes(self) -> list[SceneInfo]:

@@ -1,3 +1,4 @@
+from typing import override
 from uuid import UUID
 
 from hueify.lights.exceptions import LightNotFoundException
@@ -7,15 +8,19 @@ from hueify.shared.resource.models import ResourceType
 
 
 class LightLookup(NamedResourceLookup[LightInfo]):
+    @override
     def get_resource_type(self) -> ResourceType:
         return ResourceType.LIGHT
 
+    @override
     def get_model_type(self) -> type[LightInfo]:
         return LightInfo
 
+    @override
     def _get_endpoint(self) -> str:
         return "light"
 
+    @override
     def _create_not_found_exception(
         self, lookup_name: str, suggested_names: list[str]
     ) -> Exception:
