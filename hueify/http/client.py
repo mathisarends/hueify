@@ -1,4 +1,3 @@
-from functools import cached_property
 from typing import TypeVar
 
 import httpx
@@ -9,6 +8,8 @@ from hueify.http.models import ApiResponse, HueApiResponse
 
 T = TypeVar("T", bound=BaseModel)
 
+_HUE_API_BASE_PATH = "/clip/v2/resource"
+
 
 class HttpClient:
     def __init__(
@@ -17,34 +18,31 @@ class HttpClient:
         timeout: float = 10.0,
         verify_ssl: bool = False,
     ) -> None:
-        self._credentials = credentials or HueBridgeCredentials()
-        self._client = httpx.AsyncClient(timeout=timeout, verify=verify_ssl)
+        credentials = credentials or HueBridgeCredentials()
 
-    @cached_property
-    def base_url(self) -> str:
-        if not self._credentials.hue_bridge_ip:
-            raise ValueError("Credentials not properly configured (missing IP)")
-        return f"https://{self._credentials.hue_bridge_ip}/clip/v2/resource"
-
-    @cached_property
-    def _headers(self) -> dict[str, str]:
-        if not self._credentials.hue_app_key:
-            raise ValueError("Credentials not properly configured (missing App Key)")
-        return {
-            "hue-application-key": self._credentials.hue_app_key,
+        self._base_url = f"https://{credentials.hue_bridge_ip}{_HUE_API_BASE_PATH}"
+        self._headers = {
+            "hue-application-key": credentials.hue_app_key,
             "Content-Type": "application/json",
         }
+        self._client = httpx.AsyncClient(timeout=timeout, verify=verify_ssl)
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
 
     async def get(self, endpoint: str) -> ApiResponse:
         response = await self._client.get(
-            f"{self.base_url}/{endpoint}", headers=self._headers
+            f"{self._base_url}/{endpoint}", headers=self._headers
         )
         response.raise_for_status()
         return response.json()
 
     async def get_resources(self, endpoint: str, resource_type: type[T]) -> list[T]:
         response = await self._client.get(
-            f"{self.base_url}/{endpoint}", headers=self._headers
+            f"{self._base_url}/{endpoint}", headers=self._headers
         )
         response.raise_for_status()
 
@@ -54,9 +52,8 @@ class HttpClient:
 
     async def get_resource(self, endpoint: str, resource_type: type[T]) -> T:
         response = await self._client.get(
-            f"{self.base_url}/{endpoint}", headers=self._headers
+            f"{self._base_url}/{endpoint}", headers=self._headers
         )
-
         response.raise_for_status()
 
         adapter = TypeAdapter(HueApiResponse[resource_type])
@@ -65,7 +62,7 @@ class HttpClient:
 
     async def put(self, endpoint: str, data: BaseModel) -> ApiResponse:
         response = await self._client.put(
-            f"{self.base_url}/{endpoint}",
+            f"{self._base_url}/{endpoint}",
             headers=self._headers,
             json=data.model_dump(mode="json", exclude_none=True),
         )
@@ -74,9 +71,3 @@ class HttpClient:
 
     async def close(self) -> None:
         await self._client.aclose()
-
-    async def __aenter__(self):
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        await self.close()

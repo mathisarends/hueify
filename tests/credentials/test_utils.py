@@ -1,6 +1,5 @@
 import pytest
-
-from hueify.credentials.utils import validate_hue_app_key, validate_hue_bridge_ip
+from hueify.credentials.service import validate_hue_app_key, validate_hue_bridge_ip
 
 
 class TestValidateHueAppKey:

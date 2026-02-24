@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from hueify.grouped_lights.models import GroupedLightInfo
 from hueify.shared.cache.lookup.base import EntityLookupCache
 

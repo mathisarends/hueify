@@ -11,7 +11,6 @@ from hueify.scenes.models import (
     SceneStatusValue,
 )
 from hueify.shared.resource.models import ActionResult
-from hueify.utils.decorators import time_execution_async
 from hueify.utils.logging import LoggingMixin
 
 
@@ -25,7 +24,6 @@ class Scene(LoggingMixin):
         self._client = client or HttpClient()
 
     @classmethod
-    @time_execution_async()
     async def from_name(cls, scene_name: str, client: HttpClient | None = None) -> Self:
         client = client or HttpClient()
         lookup = SceneLookup(client)
@@ -33,7 +31,6 @@ class Scene(LoggingMixin):
         return cls(scene_info=scene_info, client=client)
 
     @classmethod
-    @time_execution_async()
     async def from_name_in_group(
         cls, scene_name: str, group_id: UUID, client: HttpClient | None = None
     ) -> Self:
