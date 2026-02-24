@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
+from hueify.utils.fuzzy import find_all_matches_sorted
+
 from hueify.http import HttpClient
 from hueify.shared.cache import LookupCache, get_cache
 from hueify.shared.resource.models import ResourceInfo, ResourceType
-from hueify.utils.decorators import time_execution_async
-from hueify.utils.fuzzy import find_all_matches_sorted
 
 T = TypeVar("T", bound=ResourceInfo)
 
@@ -19,7 +19,6 @@ class ResourceLookup(ABC, Generic[T]):
         self._client = client or HttpClient()
         self._cache = cache or get_cache()
 
-    @time_execution_async()
     async def get_all_entities(self) -> list[T]:
         resource_type = self.get_resource_type()
         return await self._cache.get_or_fetch(

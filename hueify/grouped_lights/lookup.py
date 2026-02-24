@@ -1,4 +1,3 @@
-from typing import override
 from uuid import UUID
 
 from hueify.grouped_lights.models import GroupedLightInfo
@@ -18,14 +17,11 @@ class GroupedLightLookup(ResourceLookup[GroupedLightInfo]):
 
         return self._cache.get_by_id(resource_type, entity_id)
 
-    @override
     def get_resource_type(self) -> ResourceType:
         return ResourceType.GROUPED_LIGHT
 
-    @override
     def get_model_type(self) -> type[GroupedLightInfo]:
         return GroupedLightInfo
 
-    @override
     def _get_endpoint(self) -> str:
         return "grouped_light"

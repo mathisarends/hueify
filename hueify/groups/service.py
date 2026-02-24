@@ -14,7 +14,6 @@ from hueify.scenes.service import Scene
 from hueify.shared.resource.models import (
     ActionResult,
 )
-from hueify.utils.decorators import time_execution_async
 
 if TYPE_CHECKING:
     from hueify.shared.resource import NamedResourceLookup
@@ -34,7 +33,6 @@ class Group:
         self._scene_lookup = scene_lookup or SceneLookup(client=self._client)
 
     @classmethod
-    @time_execution_async()
     async def from_name(cls, group_name: str, client: HttpClient | None = None) -> Self:
         client = client or HttpClient()
         group_lookup = cls._create_lookup(client)
@@ -110,19 +108,16 @@ class Group:
     ) -> ActionResult:
         return await self._grouped_lights.set_color_temperature_percentage(percentage)
 
-    @time_execution_async()
     async def activate_scene(self, scene_name: str) -> ActionResult:
         scene = await Scene.from_name_in_group(
             scene_name=scene_name, group_id=self.id, client=self._client
         )
         return await scene.activate()
 
-    @time_execution_async()
     async def get_scenes(self) -> list[SceneInfo]:
         all_scenes = await self._scene_lookup.get_scenes()
         return [scene for scene in all_scenes if scene.group_id == self.id]
 
-    @time_execution_async()
     async def get_active_scene(self) -> SceneInfo:
         active_scene = await self._scene_lookup.get_active_scene_in_group(self.id)
 

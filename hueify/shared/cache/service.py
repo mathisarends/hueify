@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable
 from typing import TypeVar
 from uuid import UUID
 
+from hueify.events import get_event_bus
 from hueify.shared.cache.lookup import (
     EntityLookupCache,
     GroupedLightsLookupCache,
@@ -13,7 +14,6 @@ from hueify.shared.cache.lookup import (
     ZoneLookupCache,
 )
 from hueify.shared.resource.models import ResourceInfo, ResourceType
-from hueify.sse import get_event_bus
 from hueify.sse.models import GroupedLightEvent, LightEvent, SceneEvent
 
 T = TypeVar("T", bound=ResourceInfo)

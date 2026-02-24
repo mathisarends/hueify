@@ -23,18 +23,6 @@ def find_all_matches_sorted(
     return [match.item for match in matches]
 
 
-def find_all_matches(
-    query: str,
-    items: list[T],
-    text_extractor: Callable[[T], str],
-    min_similarity: float,
-) -> list[T]:
-    matches = _find_best_matches(
-        query, items, text_extractor, min_similarity, limit=None
-    )
-    return [match.item for match in matches]
-
-
 def _find_best_matches(
     query: str,
     items: list[T],
@@ -59,15 +47,15 @@ def _find_best_matches(
     return results
 
 
-def _sort_by_highest_similarity_first(
-    results: list[_MatchResult],
-) -> list[_MatchResult]:
-    return sorted(results, key=lambda x: x.similarity, reverse=True)
-
-
 def _calculate_similarity(query: str, target: str) -> float:
     return difflib.SequenceMatcher(
         isjunk=None,
         a=query.lower().strip(),
         b=target.lower().strip(),
     ).ratio()
+
+
+def _sort_by_highest_similarity_first(
+    results: list[_MatchResult],
+) -> list[_MatchResult]:
+    return sorted(results, key=lambda x: x.similarity, reverse=True)

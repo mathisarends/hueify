@@ -10,7 +10,7 @@ except ImportError as e:
 
 from hueify.groups import Room, Zone
 from hueify.lights import Light
-from hueify.prompts import SystemPromptTemplate
+from hueify.mcp.prompts import SystemPromptTemplate
 from hueify.shared.cache import get_cache
 from hueify.shared.resource import ActionResult
 

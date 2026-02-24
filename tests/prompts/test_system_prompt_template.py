@@ -6,7 +6,7 @@ from conftest import (
     MockZoneLookup,
 )
 
-from hueify.prompts.service import SystemPromptTemplate
+from hueify.mcp.prompts import SystemPromptTemplate
 
 
 @pytest.mark.asyncio

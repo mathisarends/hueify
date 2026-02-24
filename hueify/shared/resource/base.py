@@ -1,6 +1,5 @@
 import logging
 from abc import ABC, abstractmethod
-from functools import cached_property
 from typing import Generic
 from uuid import UUID
 
@@ -13,17 +12,15 @@ from hueify.shared.resource.models import (
     LightOnState,
     TLightInfo,
 )
-from hueify.shared.validation import (
-    build_clamped_message,
-    clamp_brightness_percentage,
-    clamp_temperature_percentage,
-    mirek_to_percentage,
-    normalize_percentage_input,
-    percentage_to_mirek,
-)
-from hueify.utils.decorators import time_execution_async
 
 logger = logging.getLogger(__name__)
+
+_MIN_BRIGHTNESS = 0
+_MAX_BRIGHTNESS = 100
+_MIN_TEMPERATURE = 0
+_MAX_TEMPERATURE = 100
+_MIREK_MIN = 153
+_MIREK_MAX = 500
 
 
 class Resource(ABC, Generic[TLightInfo]):
@@ -38,7 +35,6 @@ class Resource(ABC, Generic[TLightInfo]):
     async def _subscribe_to_events(self) -> None:
         pass
 
-    @time_execution_async()
     async def ensure_event_subscription(self) -> None:
         if self._event_subscription_initialized:
             return
@@ -63,11 +59,9 @@ class Resource(ABC, Generic[TLightInfo]):
     def is_on(self) -> bool:
         return self._light_info.on.on
 
-    @cached_property
     def id(self) -> UUID:
         return self._light_info.id
 
-    @cached_property
     @abstractmethod
     def name(self) -> str:
         pass
@@ -85,7 +79,8 @@ class Resource(ABC, Generic[TLightInfo]):
         if not self._light_info.color_temperature:
             return None
 
-        return mirek_to_percentage(self._light_info.color_temperature.mirek)
+        mirek = self._light_info.color_temperature.mirek
+        return int(((mirek - _MIREK_MIN) / (_MIREK_MAX - _MIREK_MIN)) * 100)
 
     def _create_on_state(self) -> ControllableLightUpdate:
         return ControllableLightUpdate(on=LightOnState(on=True))
@@ -108,7 +103,6 @@ class Resource(ABC, Generic[TLightInfo]):
     async def _update_remote_state(self, state: ControllableLightUpdate) -> None:
         pass
 
-    @time_execution_async()
     async def turn_on(self) -> ActionResult:
         if self.is_on:
             message = "Already on"
@@ -119,7 +113,6 @@ class Resource(ABC, Generic[TLightInfo]):
 
         return ActionResult(message=message)
 
-    @time_execution_async()
     async def turn_off(self) -> ActionResult:
         if not self.is_on:
             message = "Already off"
@@ -130,105 +123,101 @@ class Resource(ABC, Generic[TLightInfo]):
 
         return ActionResult(message=message)
 
-    @time_execution_async()
     async def set_brightness_percentage(self, percentage: float | int) -> ActionResult:
-        percentage_int = normalize_percentage_input(percentage)
-        clamped_percentage = clamp_brightness_percentage(percentage_int)
-        was_clamped = clamped_percentage != percentage_int
+        percentage_int = (
+            int(percentage * 100)
+            if isinstance(percentage, float) and 0 <= percentage <= 1
+            else int(percentage)
+        )
+        clamped = max(_MIN_BRIGHTNESS, min(_MAX_BRIGHTNESS, percentage_int))
+        was_clamped = clamped != percentage_int
 
         if was_clamped:
             logger.warning(
-                f"Brightness {percentage_int}% is out of range. Clamping to {clamped_percentage}%."
+                f"Brightness {percentage_int}% is out of range. Clamping to {clamped}%."
             )
-            message = build_clamped_message(
-                property_name="Brightness",
-                clamped_value=clamped_percentage,
-                requested_value=percentage_int,
-                unit="%",
+            message = (
+                f"Brightness clamped to {clamped}%. "
+                f"Requested value {percentage_int}% was out of range."
             )
         else:
-            message = f"Brightness set to {clamped_percentage}%"
+            message = f"Brightness set to {clamped}%"
 
-        state = self._create_brightness_state(clamped_percentage)
+        state = self._create_brightness_state(clamped)
         await self._update_remote_state(state)
-        return ActionResult(
-            message=message, clamped=was_clamped, final_value=clamped_percentage
-        )
+        return ActionResult(message=message, clamped=was_clamped, final_value=clamped)
 
-    @time_execution_async()
     async def increase_brightness_percentage(
         self, percentage: float | int
     ) -> ActionResult:
-        percentage_int = normalize_percentage_input(percentage)
-        target_brightness = int(self.brightness_percentage + percentage_int)
-        new_brightness = clamp_brightness_percentage(target_brightness)
-        was_clamped = new_brightness != target_brightness
+        percentage_int = (
+            int(percentage * 100)
+            if isinstance(percentage, float) and 0 <= percentage <= 1
+            else int(percentage)
+        )
+        target = int(self.brightness_percentage + percentage_int)
+        clamped = max(_MIN_BRIGHTNESS, min(_MAX_BRIGHTNESS, target))
+        was_clamped = clamped != target
 
         if was_clamped:
-            message = build_clamped_message(
-                property_name="Brightness",
-                clamped_value=new_brightness,
-                requested_value=target_brightness,
-                unit="%",
+            message = (
+                f"Brightness clamped to {clamped}%. "
+                f"Requested value {target}% was out of range."
             )
         else:
-            message = f"Brightness increased to {new_brightness}%"
+            message = f"Brightness increased to {clamped}%"
 
-        state = self._create_brightness_state(new_brightness)
+        state = self._create_brightness_state(clamped)
         await self._update_remote_state(state)
-        return ActionResult(
-            message=message, clamped=was_clamped, final_value=new_brightness
-        )
+        return ActionResult(message=message, clamped=was_clamped, final_value=clamped)
 
-    @time_execution_async()
     async def decrease_brightness_percentage(
         self, percentage: float | int
     ) -> ActionResult:
-        percentage_int = normalize_percentage_input(percentage)
-        target_brightness = int(self.brightness_percentage - percentage_int)
-        new_brightness = clamp_brightness_percentage(target_brightness)
-        was_clamped = new_brightness != target_brightness
+        percentage_int = (
+            int(percentage * 100)
+            if isinstance(percentage, float) and 0 <= percentage <= 1
+            else int(percentage)
+        )
+        target = int(self.brightness_percentage - percentage_int)
+        clamped = max(_MIN_BRIGHTNESS, min(_MAX_BRIGHTNESS, target))
+        was_clamped = clamped != target
 
         if was_clamped:
-            message = build_clamped_message(
-                property_name="Brightness",
-                clamped_value=new_brightness,
-                requested_value=target_brightness,
-                unit="%",
+            message = (
+                f"Brightness clamped to {clamped}%. "
+                f"Requested value {target}% was out of range."
             )
         else:
-            message = f"Brightness decreased to {new_brightness}%"
+            message = f"Brightness decreased to {clamped}%"
 
-        state = self._create_brightness_state(new_brightness)
+        state = self._create_brightness_state(clamped)
         await self._update_remote_state(state)
-        return ActionResult(
-            message=message, clamped=was_clamped, final_value=new_brightness
-        )
+        return ActionResult(message=message, clamped=was_clamped, final_value=clamped)
 
-    @time_execution_async()
     async def set_color_temperature_percentage(
         self, percentage: float | int
     ) -> ActionResult:
-        percentage_int = normalize_percentage_input(percentage)
-        clamped_percentage = clamp_temperature_percentage(percentage_int)
-        was_clamped = clamped_percentage != percentage_int
+        percentage_int = (
+            int(percentage * 100)
+            if isinstance(percentage, float) and 0 <= percentage <= 1
+            else int(percentage)
+        )
+        clamped = max(_MIN_TEMPERATURE, min(_MAX_TEMPERATURE, percentage_int))
+        was_clamped = clamped != percentage_int
 
         if was_clamped:
             logger.warning(
-                f"Temperature {percentage_int}% is out of range. Clamping to {clamped_percentage}%."
+                f"Temperature {percentage_int}% is out of range. Clamping to {clamped}%."
             )
-            message = build_clamped_message(
-                property_name="Temperature",
-                clamped_value=clamped_percentage,
-                requested_value=percentage_int,
-                unit="%",
+            message = (
+                f"Temperature clamped to {clamped}%. "
+                f"Requested value {percentage_int}% was out of range."
             )
         else:
-            message = f"Temperature set to {clamped_percentage}%"
+            message = f"Temperature set to {clamped}%"
 
-        mirek = percentage_to_mirek(clamped_percentage)
+        mirek = int(_MIREK_MIN + (clamped / 100) * (_MIREK_MAX - _MIREK_MIN))
         state = self._create_color_temperature_state(mirek)
         await self._update_remote_state(state)
-        return ActionResult(
-            message=message, clamped=was_clamped, final_value=clamped_percentage
-        )
+        return ActionResult(message=message, clamped=was_clamped, final_value=clamped)

@@ -1,3 +1,4 @@
+from ._logging import configure_logging
 from .grouped_lights import GroupedLightLookup
 from .groups import (
     Room,
@@ -9,7 +10,7 @@ from .groups import (
 )
 from .lights import Light, LightInfo, LightLookup, LightNotFoundException
 from .mcp import mcp_server
-from .prompts import SystemPromptTemplate
+from .mcp.prompts import SystemPromptTemplate
 from .scenes import (
     NoActiveSceneException,
     Scene,
@@ -19,7 +20,6 @@ from .scenes import (
 )
 from .shared.cache import LookupCache, get_cache
 from .shared.resource import ActionResult
-from .sse import EventBus, get_event_bus
 
 __all__ = [
     "ActionResult",
@@ -42,6 +42,7 @@ __all__ = [
     "Zone",
     "ZoneLookup",
     "ZoneNotFoundException",
+    "configure_logging",
     "get_cache",
     "get_event_bus",
     "mcp_server",

@@ -7,7 +7,6 @@ import httpx
 from httpx_sse import ServerSentEvent, aconnect_sse
 
 from hueify.credentials import HueBridgeCredentials
-from hueify.http import HttpMethods
 from hueify.sse.models import Event, EventData
 
 logger = logging.getLogger(__name__)
@@ -23,10 +22,6 @@ class EventStream:
             "hue-application-key": self._credentials.hue_app_key,
             "Accept": "text/event-stream",
         }
-
-    @property
-    def url(self) -> str:
-        return self._url
 
     def subscribe(self, handler: Callable[[EventData], None]) -> None:
         self._subscribers.append(handler)
@@ -44,8 +39,8 @@ class EventStream:
                 httpx.AsyncClient(verify=False, timeout=None) as client,
                 aconnect_sse(
                     client=client,
-                    method=HttpMethods.GET,
-                    url=self.url,
+                    method="GET",
+                    url=self._url,
                     headers=self._headers,
                 ) as event_source,
             ):

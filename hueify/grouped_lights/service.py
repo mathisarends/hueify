@@ -4,11 +4,11 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from hueify.events import get_event_bus
 from hueify.grouped_lights.lookup import GroupedLightLookup
 from hueify.grouped_lights.models import GroupedLightInfo
 from hueify.http import HttpClient
 from hueify.shared.resource import Resource
-from hueify.sse import get_event_bus
 
 
 class GroupedLights(Resource[GroupedLightInfo]):
