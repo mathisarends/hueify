@@ -1,14 +1,16 @@
 import asyncio
+import logging
 from typing import Generic, TypeVar
 from uuid import UUID
 
 from hueify.shared.resource.models import ResourceInfo
-from hueify.utils.logging import LoggingMixin
 
 T = TypeVar("T", bound=ResourceInfo)
 
+logger = logging.getLogger(__name__)
 
-class EntityLookupCache(LoggingMixin, Generic[T]):
+
+class EntityLookupCache(Generic[T]):
     def __init__(self) -> None:
         self._id_to_model: dict[UUID, T] = {}
         self._lock = asyncio.Lock()
@@ -36,9 +38,9 @@ class EntityLookupCache(LoggingMixin, Generic[T]):
         try:
             updated_resource = cached_resource.model_copy(update=event_data, deep=True)
             self._id_to_model[resource_id] = updated_resource
-            self.logger.debug(f"Updated cached resource with ID {resource_id}")
+            logger.debug(f"Updated cached resource with ID {resource_id}")
         except Exception as e:
-            self.logger.error(
+            logger.error(
                 f"Failed to update cached resource {resource_id}: {e}",
                 exc_info=True,
             )
@@ -63,7 +65,7 @@ class NamedEntityLookupCache(EntityLookupCache[T]):
         existing = self._name_to_model.get(entity_name)
 
         if existing is not None and existing.id != entity.id:
-            self.logger.warning(
+            logger.warning(
                 f"Name collision for '{entity_name}': IDs {existing.id} and {entity.id}"
             )
 

@@ -1,3 +1,4 @@
+import logging
 from typing import Self
 from uuid import UUID
 
@@ -11,10 +12,11 @@ from hueify.scenes.models import (
     SceneStatusValue,
 )
 from hueify.shared.resource.models import ActionResult
-from hueify.utils.logging import LoggingMixin
+
+logger = logging.getLogger(__name__)
 
 
-class Scene(LoggingMixin):
+class Scene:
     def __init__(
         self,
         scene_info: SceneInfo,

@@ -1,7 +1,12 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastmcp import FastMCP
+try:
+    from fastmcp import FastMCP
+except ImportError as e:
+    raise ImportError(
+        "MCP support requires 'fastmcp'. Install with: pip install hueify[mcp]"
+    ) from e
 
 from hueify.groups import Room, Zone
 from hueify.lights import Light
@@ -11,7 +16,7 @@ from hueify.shared.resource import ActionResult
 
 
 @asynccontextmanager
-async def lifespan(server: FastMCP) -> AsyncIterator[None]:
+async def lifespan(_: FastMCP) -> AsyncIterator[None]:
     cache = get_cache()
     await cache.populate()
 

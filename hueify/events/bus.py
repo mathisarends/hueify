@@ -1,4 +1,6 @@
 import asyncio
+import inspect
+import logging
 from collections.abc import Callable
 from typing import TypeVar
 from uuid import UUID
@@ -16,12 +18,13 @@ from hueify.sse.models import (
     UnknownEvent,
 )
 from hueify.sse.stream import get_event_stream
-from hueify.utils.logging import LoggingMixin
 
 T = TypeVar("T", bound=HueEvent)
 
+logger = logging.getLogger(__name__)
 
-class EventBus(LoggingMixin):
+
+class EventBus:
     def __init__(self) -> None:
         self._stream = get_event_stream()
         self._handlers: dict[type[HueEvent], list[Callable[[HueEvent], None]]] = {}
@@ -31,7 +34,7 @@ class EventBus(LoggingMixin):
         if self._connection_task is None or self._connection_task.done():
             self._stream.subscribe(self._dispatch_event)
             self._connection_task = asyncio.create_task(self._stream.connect())
-            self.logger.info("Event stream connection started")
+            logger.info("Event stream connection started")
 
     def subscribe_to_light(
         self,
@@ -103,12 +106,12 @@ class EventBus(LoggingMixin):
                     continue
 
                 try:
-                    if asyncio.iscoroutinefunction(handler):
+                    if inspect.iscoroutinefunction(handler):
                         await handler(hue_event)
                     else:
                         handler(hue_event)
                 except Exception as e:
-                    self.logger.error(
+                    logger.error(
                         f"Error in handler for {event_class.__name__}: {e}",
                         exc_info=True,
                     )
@@ -127,7 +130,7 @@ class EventBus(LoggingMixin):
         self._stream.disconnect()
         if self._connection_task and not self._connection_task.done():
             self._connection_task.cancel()
-        self.logger.info("Event stream stopped")
+        logger.info("Event stream stopped")
 
 
 _event_bus: EventBus | None = None

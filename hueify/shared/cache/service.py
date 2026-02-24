@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
 from uuid import UUID
@@ -14,13 +15,14 @@ from hueify.shared.cache.lookup import (
 from hueify.shared.resource.models import ResourceInfo, ResourceType
 from hueify.sse import get_event_bus
 from hueify.sse.models import GroupedLightEvent, LightEvent, SceneEvent
-from hueify.utils.logging import LoggingMixin
 
 T = TypeVar("T", bound=ResourceInfo)
 Fetcher = Callable[[], Awaitable[list[T]]]
 
+logger = logging.getLogger(__name__)
 
-class LookupCache(LoggingMixin):
+
+class LookupCache:
     def __init__(self) -> None:
         self._light_cache = LightsLookupCache()
         self._scene_cache = SceneLookupCache()
@@ -59,7 +61,7 @@ class LookupCache(LoggingMixin):
             scene_lookup.get_scenes(),
             grouped_light_lookup.get_all_entities(),
         )
-        self.logger.info("Cache warmed up successfully")
+        logger.info("Cache warmed up successfully")
 
     async def get_or_fetch(
         self,
@@ -72,13 +74,13 @@ class LookupCache(LoggingMixin):
         cached_models = cache.get_all()
 
         if cached_models:
-            self.logger.debug(f"Cache HIT for {entity_type}")
+            logger.debug(f"Cache HIT for {entity_type}")
             return cached_models
 
-        self.logger.debug(f"Cache MISS for {entity_type}. Fetching...")
+        logger.debug(f"Cache MISS for {entity_type}. Fetching...")
         fresh = await all_entities_fetcher()
         await cache.store_all(fresh)
-        self.logger.info(f"Cached {len(fresh)} entities for {entity_type}")
+        logger.info(f"Cached {len(fresh)} entities for {entity_type}")
         return fresh
 
     def _get_cache_for_type(self, resource_type: ResourceType) -> EntityLookupCache:
@@ -105,12 +107,12 @@ class LookupCache(LoggingMixin):
             self._zone_cache.clear(),
             self._grouped_lights_cache.clear(),
         )
-        self.logger.info("All caches cleared")
+        logger.info("All caches cleared")
 
     async def clear_by_type(self, resource_type: ResourceType) -> None:
         cache = self._get_cache_for_type(resource_type)
         await cache.clear()
-        self.logger.info(f"Cache cleared for {resource_type}")
+        logger.info(f"Cache cleared for {resource_type}")
 
     async def _ensure_event_subscription(self) -> None:
         if self._event_subscription_initialized:
@@ -124,9 +126,9 @@ class LookupCache(LoggingMixin):
             event_bus.subscribe_to_scene(self._handle_scene_event)
 
             self._event_subscription_initialized = True
-            self.logger.info("Event subscriptions initialized for cache updates")
+            logger.info("Event subscriptions initialized for cache updates")
         except Exception as e:
-            self.logger.warning(
+            logger.warning(
                 f"Failed to initialize event subscriptions: {e}", exc_info=True
             )
 

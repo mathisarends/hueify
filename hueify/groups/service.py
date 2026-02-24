@@ -15,13 +15,12 @@ from hueify.shared.resource.models import (
     ActionResult,
 )
 from hueify.utils.decorators import time_execution_async
-from hueify.utils.logging import LoggingMixin
 
 if TYPE_CHECKING:
     from hueify.shared.resource import NamedResourceLookup
 
 
-class Group(LoggingMixin):
+class Group:
     def __init__(
         self,
         group_info: GroupInfo,

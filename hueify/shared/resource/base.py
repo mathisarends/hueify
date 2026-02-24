@@ -1,3 +1,4 @@
+import logging
 from abc import ABC, abstractmethod
 from functools import cached_property
 from typing import Generic
@@ -21,10 +22,11 @@ from hueify.shared.validation import (
     percentage_to_mirek,
 )
 from hueify.utils.decorators import time_execution_async
-from hueify.utils.logging import LoggingMixin
+
+logger = logging.getLogger(__name__)
 
 
-class Resource(ABC, Generic[TLightInfo], LoggingMixin):
+class Resource(ABC, Generic[TLightInfo]):
     def __init__(
         self, light_info: TLightInfo, client: HttpClient | None = None
     ) -> None:
@@ -43,7 +45,7 @@ class Resource(ABC, Generic[TLightInfo], LoggingMixin):
 
         await self._subscribe_to_events()
         self._event_subscription_initialized = True
-        self.logger.info(f"Event subscription initialized for {self.name}")
+        logger.info(f"Event subscription initialized for {self.name}")
 
     def _handle_event(self, event: TLightInfo) -> None:
         try:
@@ -53,9 +55,9 @@ class Resource(ABC, Generic[TLightInfo], LoggingMixin):
             current_info_data.update(event_data)
             self._light_info = type(self._light_info).model_validate(current_info_data)
 
-            self.logger.debug(f"Updated state for {self.id} from event")
+            logger.debug(f"Updated state for {self.id} from event")
         except Exception as e:
-            self.logger.error(f"Failed to update state from event: {e}", exc_info=True)
+            logger.error(f"Failed to update state from event: {e}", exc_info=True)
 
     @property
     def is_on(self) -> bool:
@@ -135,7 +137,7 @@ class Resource(ABC, Generic[TLightInfo], LoggingMixin):
         was_clamped = clamped_percentage != percentage_int
 
         if was_clamped:
-            self.logger.warning(
+            logger.warning(
                 f"Brightness {percentage_int}% is out of range. Clamping to {clamped_percentage}%."
             )
             message = build_clamped_message(
@@ -212,7 +214,7 @@ class Resource(ABC, Generic[TLightInfo], LoggingMixin):
         was_clamped = clamped_percentage != percentage_int
 
         if was_clamped:
-            self.logger.warning(
+            logger.warning(
                 f"Temperature {percentage_int}% is out of range. Clamping to {clamped_percentage}%."
             )
             message = build_clamped_message(

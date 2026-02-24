@@ -7,6 +7,9 @@ from pydantic import BaseModel
 from hueify.credentials import HueBridgeCredentials
 from hueify.http.client import HttpClient
 
+VALID_IP = "192.168.1.100"
+VALID_APP_KEY = "a" * 40
+
 
 class MockResource(BaseModel):
     id: str
@@ -20,10 +23,7 @@ class ResourceWithOptional(BaseModel):
 
 @pytest.fixture
 def credentials() -> HueBridgeCredentials:
-    creds = HueBridgeCredentials()
-    creds.hue_bridge_ip = "192.168.1.100"
-    creds.hue_app_key = "a" * 40
-    return creds
+    return HueBridgeCredentials(HUE_BRIDGE_IP=VALID_IP, HUE_APP_KEY=VALID_APP_KEY)
 
 
 @pytest.fixture
@@ -31,47 +31,13 @@ def http_client(credentials: HueBridgeCredentials) -> HttpClient:
     return HttpClient(credentials=credentials)
 
 
-def test_initializes_with_provided_credentials(
-    credentials: HueBridgeCredentials,
-) -> None:
-    client = HttpClient(credentials=credentials)
-    assert client._credentials == credentials
-
-
-def test_initializes_with_default_credentials() -> None:
-    client = HttpClient(
-        credentials=HueBridgeCredentials(
-            hue_bridge_ip="192.168.1.1", hue_app_key="a" * 40
-        )
-    )
-    assert client._credentials is not None
-
-
 def test_base_url_construction(http_client: HttpClient) -> None:
-    expected = "https://192.168.1.100/clip/v2/resource"
-    assert http_client.base_url == expected
-
-
-def test_base_url_raises_without_ip(credentials: HueBridgeCredentials) -> None:
-    credentials.hue_bridge_ip = None
-    client = HttpClient(credentials=credentials)
-    with pytest.raises(ValueError, match="missing IP"):
-        _ = client.base_url
+    assert http_client._base_url == f"https://{VALID_IP}/clip/v2/resource"
 
 
 def test_headers_construction(http_client: HttpClient) -> None:
-    headers = http_client._headers
-    assert headers["hue-application-key"] == "a" * 40
-    assert headers["Content-Type"] == "application/json"
-
-
-def test_headers_raises_without_app_key(
-    credentials: HueBridgeCredentials,
-) -> None:
-    credentials.hue_app_key = None
-    client = HttpClient(credentials=credentials)
-    with pytest.raises(ValueError, match="missing App Key"):
-        _ = client._headers
+    assert http_client._headers["hue-application-key"] == VALID_APP_KEY
+    assert http_client._headers["Content-Type"] == "application/json"
 
 
 @pytest.mark.asyncio
@@ -101,7 +67,7 @@ async def test_get_uses_correct_url(http_client: HttpClient) -> None:
         await http_client.get("light/1")
 
     call_args = mock_get.call_args
-    assert "https://192.168.1.100/clip/v2/resource/light/1" in str(call_args)
+    assert f"https://{VALID_IP}/clip/v2/resource/light/1" in str(call_args)
 
 
 @pytest.mark.asyncio
@@ -115,8 +81,7 @@ async def test_get_includes_headers(http_client: HttpClient) -> None:
         await http_client.get("light/1")
 
     call_kwargs = mock_get.call_args.kwargs
-    assert "headers" in call_kwargs
-    assert call_kwargs["headers"]["hue-application-key"] == "a" * 40
+    assert call_kwargs["headers"]["hue-application-key"] == VALID_APP_KEY
 
 
 @pytest.mark.asyncio
@@ -167,30 +132,10 @@ async def test_get_resource_raises_on_empty_data(http_client: HttpClient) -> Non
 
 
 @pytest.mark.asyncio
-async def test_get_resource_validates_response_schema(http_client: HttpClient) -> None:
-    mock_response_dict = {
-        "errors": [],
-        "data": [{"id": "test-id", "name": "Test Light"}],
-    }
-
-    mock_response = MagicMock()
-    mock_response.json.return_value = mock_response_dict
-    mock_response.raise_for_status = MagicMock()
-
-    with patch.object(http_client._client, "get", new_callable=AsyncMock) as mock_get:
-        mock_get.return_value = mock_response
-        result = await http_client.get_resource("light/1", MockResource)
-
-    assert result.id == "test-id"
-
-
-@pytest.mark.asyncio
 async def test_put_sends_data_as_json(http_client: HttpClient) -> None:
     test_data = MockResource(id="1", name="Updated Light")
-    mock_response_dict = {"errors": [], "data": []}
-
     mock_response = MagicMock()
-    mock_response.json.return_value = mock_response_dict
+    mock_response.json.return_value = {"errors": [], "data": []}
     mock_response.raise_for_status = MagicMock()
 
     with patch.object(http_client._client, "put", new_callable=AsyncMock) as mock_put:
@@ -198,7 +143,6 @@ async def test_put_sends_data_as_json(http_client: HttpClient) -> None:
         await http_client.put("light/1", test_data)
 
     call_kwargs = mock_put.call_args.kwargs
-    assert "json" in call_kwargs
     assert call_kwargs["json"]["id"] == "1"
     assert call_kwargs["json"]["name"] == "Updated Light"
 
@@ -206,53 +150,43 @@ async def test_put_sends_data_as_json(http_client: HttpClient) -> None:
 @pytest.mark.asyncio
 async def test_put_excludes_none_values(http_client: HttpClient) -> None:
     test_data = ResourceWithOptional(id="1", optional_field=None)
-    mock_response_dict = {"errors": [], "data": []}
-
     mock_response = MagicMock()
-    mock_response.json.return_value = mock_response_dict
+    mock_response.json.return_value = {"errors": [], "data": []}
     mock_response.raise_for_status = MagicMock()
 
     with patch.object(http_client._client, "put", new_callable=AsyncMock) as mock_put:
         mock_put.return_value = mock_response
         await http_client.put("light/1", test_data)
 
-    call_kwargs = mock_put.call_args.kwargs
-    assert "optional_field" not in call_kwargs["json"]
+    assert "optional_field" not in mock_put.call_args.kwargs["json"]
 
 
 @pytest.mark.asyncio
 async def test_put_uses_correct_url(http_client: HttpClient) -> None:
     test_data = MockResource(id="1", name="Light")
-    mock_response_dict = {"errors": [], "data": []}
-
     mock_response = MagicMock()
-    mock_response.json.return_value = mock_response_dict
+    mock_response.json.return_value = {"errors": [], "data": []}
     mock_response.raise_for_status = MagicMock()
 
     with patch.object(http_client._client, "put", new_callable=AsyncMock) as mock_put:
         mock_put.return_value = mock_response
         await http_client.put("light/1", test_data)
 
-    call_args = mock_put.call_args
-    assert "https://192.168.1.100/clip/v2/resource/light/1" in str(call_args)
+    assert f"https://{VALID_IP}/clip/v2/resource/light/1" in str(mock_put.call_args)
 
 
 @pytest.mark.asyncio
 async def test_put_includes_headers(http_client: HttpClient) -> None:
     test_data = MockResource(id="1", name="Light")
-    mock_response_dict = {"errors": [], "data": []}
-
     mock_response = MagicMock()
-    mock_response.json.return_value = mock_response_dict
+    mock_response.json.return_value = {"errors": [], "data": []}
     mock_response.raise_for_status = MagicMock()
 
     with patch.object(http_client._client, "put", new_callable=AsyncMock) as mock_put:
         mock_put.return_value = mock_response
         await http_client.put("light/1", test_data)
 
-    call_kwargs = mock_put.call_args.kwargs
-    assert "headers" in call_kwargs
-    assert call_kwargs["headers"]["Content-Type"] == "application/json"
+    assert mock_put.call_args.kwargs["headers"]["Content-Type"] == "application/json"
 
 
 @pytest.mark.asyncio

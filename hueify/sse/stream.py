@@ -1,26 +1,32 @@
-import asyncio
+import inspect
 import json
+import logging
 from collections.abc import Callable
-from functools import cached_property
 
 import httpx
 from httpx_sse import ServerSentEvent, aconnect_sse
 
-from hueify.credentials.service import HueBridgeCredentials
+from hueify.credentials import HueBridgeCredentials
 from hueify.http import HttpMethods
 from hueify.sse.models import Event, EventData
-from hueify.utils.logging import LoggingMixin
+
+logger = logging.getLogger(__name__)
 
 
-class EventStream(LoggingMixin):
+class EventStream:
     def __init__(self, credentials: HueBridgeCredentials | None = None) -> None:
         self._credentials = credentials or HueBridgeCredentials()
         self._is_running = False
         self._subscribers: list[Callable[[EventData], None]] = []
+        self._url = f"https://{self._credentials.hue_bridge_ip}/eventstream/clip/v2"
+        self._headers = {
+            "hue-application-key": self._credentials.hue_app_key,
+            "Accept": "text/event-stream",
+        }
 
-    @cached_property
+    @property
     def url(self) -> str:
-        return f"https://{self._credentials.hue_bridge_ip}/eventstream/clip/v2"
+        return self._url
 
     def subscribe(self, handler: Callable[[EventData], None]) -> None:
         self._subscribers.append(handler)
@@ -31,23 +37,19 @@ class EventStream(LoggingMixin):
 
     async def connect(self) -> None:
         self._is_running = True
-        self.logger.info(
-            f"Connecting to event stream at {self._credentials.hue_bridge_ip}"
-        )
-
-        headers = {
-            "hue-application-key": self._credentials.hue_app_key,
-            "Accept": "text/event-stream",
-        }
+        logger.info(f"Connecting to event stream at {self._credentials.hue_bridge_ip}")
 
         try:
             async with (
                 httpx.AsyncClient(verify=False, timeout=None) as client,
                 aconnect_sse(
-                    client=client, method=HttpMethods.GET, url=self.url, headers=headers
+                    client=client,
+                    method=HttpMethods.GET,
+                    url=self.url,
+                    headers=self._headers,
                 ) as event_source,
             ):
-                self.logger.info("Connected to event stream")
+                logger.info("Connected to event stream")
 
                 async for sse in event_source.aiter_sse():
                     if not self._is_running:
@@ -56,9 +58,9 @@ class EventStream(LoggingMixin):
                     await self._publish_event(sse)
 
         except Exception as e:
-            self.logger.error(f"Event stream error: {e}", exc_info=True)
+            logger.error(f"Event stream error: {e}", exc_info=True)
         finally:
-            self.logger.info("Disconnected from event stream")
+            logger.info("Disconnected from event stream")
 
     async def _publish_event(self, sse: ServerSentEvent) -> None:
         try:
@@ -69,23 +71,23 @@ class EventStream(LoggingMixin):
                 await self._notify_subscribers(event_data)
 
         except json.JSONDecodeError as e:
-            self.logger.warning(f"Failed to parse event: {e}")
+            logger.warning(f"Failed to parse event: {e}")
         except Exception as e:
-            self.logger.error(f"Error processing event: {e}", exc_info=True)
+            logger.error(f"Error processing event: {e}", exc_info=True)
 
     async def _notify_subscribers(self, event_data: EventData) -> None:
         for subscriber in self._subscribers:
             try:
-                if asyncio.iscoroutinefunction(subscriber):
+                if inspect.iscoroutinefunction(subscriber):
                     await subscriber(event_data)
                 else:
                     subscriber(event_data)
             except Exception as e:
-                self.logger.error(f"Error in subscriber: {e}", exc_info=True)
+                logger.error(f"Error in subscriber: {e}", exc_info=True)
 
     def disconnect(self) -> None:
         self._is_running = False
-        self.logger.info("Stopping event stream")
+        logger.info("Stopping event stream")
 
 
 _event_stream_instance: EventStream | None = None
