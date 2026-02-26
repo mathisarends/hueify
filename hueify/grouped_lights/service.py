@@ -3,9 +3,9 @@ from pydantic import BaseModel
 from hueify.grouped_lights.models import GroupedLightInfo, GroupInfo
 from hueify.http import HttpClient
 from hueify.scenes.cache import SceneCache
-from hueify.scenes.exceptions import SceneNotFoundException
 from hueify.scenes.schemas import SceneInfo
 from hueify.scenes.service import Scene
+from hueify.shared.exceptions import ResourceNotFoundException
 from hueify.shared.fuzzy import find_all_matches_sorted
 from hueify.shared.resource import Resource
 from hueify.shared.resource.models import ActionResult
@@ -71,7 +71,8 @@ class GroupedLights(Resource[GroupedLightInfo]):
             items=scenes,
             text_extractor=lambda s: s.name,
         )
-        raise SceneNotFoundException(
+        raise ResourceNotFoundException(
+            resource_type="scene",
             lookup_name=scene_name,
             suggested_names=[s.name for s in matching_scenes],
         )

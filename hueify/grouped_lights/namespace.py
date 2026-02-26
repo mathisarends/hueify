@@ -17,13 +17,13 @@ class GroupNamespace:
     def __init__(
         self,
         group_cache: NamedEntityLookupCache[GroupInfo],
-        not_found_exception: type[ResourceNotFoundException],
+        resource_type: str,
         grouped_light_cache: GroupedLightCache,
         http_client: HttpClient,
         scene_cache: SceneCache,
     ) -> None:
         self._group_cache = group_cache
-        self._not_found_exception = not_found_exception
+        self._resource_type = resource_type
         self._grouped_light_cache = grouped_light_cache
         self._http_client = http_client
         self._scene_cache = scene_cache
@@ -36,7 +36,11 @@ class GroupNamespace:
         group_info = self._group_cache.get_by_name(name)
         if group_info is None:
             available = [g.metadata.name for g in self._group_cache.get_all()]
-            raise self._not_found_exception(lookup_name=name, suggested_names=available)
+            raise ResourceNotFoundException(
+                resource_type=self._resource_type,
+                lookup_name=name,
+                suggested_names=available,
+            )
 
         grouped_light_id = group_info.get_grouped_light_reference_if_exists()
         if grouped_light_id is None:
