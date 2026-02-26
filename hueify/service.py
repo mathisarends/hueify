@@ -52,16 +52,16 @@ class Hueify:
 
         self.lights = LightNamespace(self._light_cache, self._http_client)
         self.rooms = RoomNamespace(
-            self._room_cache,
-            self._grouped_light_cache,
-            self._http_client,
-            self._scene_cache,
+            room_cache=self._room_cache,
+            grouped_light_cache=self._grouped_light_cache,
+            http_client=self._http_client,
+            scene_cache=self._scene_cache,
         )
         self.zones = ZoneNamespace(
-            self._zone_cache,
-            self._grouped_light_cache,
-            self._http_client,
-            self._scene_cache,
+            zone_cache=self._zone_cache,
+            grouped_light_cache=self._grouped_light_cache,
+            http_client=self._http_client,
+            scene_cache=self._scene_cache,
         )
         logger.info("Hueify initialized successfully")
 
@@ -75,12 +75,7 @@ class Hueify:
         return HueBridgeCredentials()
 
     async def __aenter__(self) -> Self:
-        logger.info("Connecting to Hue Bridge")
-        self._stream_task = asyncio.create_task(self._event_stream.connect())
-        logger.debug("Event stream connection task created")
-
-        await self._populate_caches()
-        logger.info("Caches populated successfully")
+        await self.connect()
         return self
 
     async def __aexit__(
@@ -89,6 +84,17 @@ class Hueify:
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> None:
+        await self.close()
+
+    async def connect(self) -> None:
+        logger.info("Connecting to Hue Bridge")
+        self._stream_task = asyncio.create_task(self._event_stream.connect())
+        logger.debug("Event stream connection task created")
+
+        await self._populate_caches()
+        logger.info("Caches populated successfully")
+
+    async def close(self) -> None:
         logger.info("Disconnecting from Hue Bridge")
         self._event_stream.disconnect()
         logger.debug("Event stream disconnected")

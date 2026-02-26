@@ -1,6 +1,6 @@
-# Hueify
+﻿# Hueify
 
-Hueify is an async-first Python library for Philips Hue. It provides clean, focused entity classes (`Light`, `Room`, `Zone`, `Scene`) that match the Hue app and lets you build automations with minimal code. It also ships with an MCP server for LLM tools and keeps state fresh via server‑sent events.
+Hueify is an async-first Python library for Philips Hue. It lets you control lights, rooms, zones and scenes using the same names you see in the Hue app, with state kept fresh via serversent events. It also ships an MCP server for LLM tools.
 
 ```bash
 pip install hueify
@@ -8,160 +8,121 @@ pip install hueify
 
 ---
 
-## What You Can Build
+## Usage
 
-- Turn lights on/off, set brightness and color temperature.
-- Control rooms and zones the same way you do in the Hue app.
-- Activate scenes for rooms or zones.
-- Run long-lived processes that stay up-to-date without polling.
-
-Hueify includes a ready-to-use MCP server (`mcp_server`) so you can expose these controls to compatible LLM tools.
-
-### Hue domain model
-
-Hueify mirrors the structure of the Hue app:
-
-```mermaid
-flowchart LR
-    Bridge[HueBridge]
-
-    subgraph Core Entities
-        Light
-        Room
-        Zone
-        Scene
-        GroupedLight[Grouped Light]
-    end
-
-    Bridge --> Light
-    Bridge --> Room
-    Bridge --> Zone
-    Bridge --> Scene
-    Bridge --> GroupedLight
-
-    Room -->|contains| Light
-    Zone -->|contains| Light
-    GroupedLight -->|aggregates| Light
-    Scene -->|targets| Room
-    Scene -->|targets| Zone
-```
-
-Each entity type has:
-
-- A strongly-typed model (e.g. `LightInfo`, `SceneInfo`).
-- Async methods to read and change state.
-- Clear domain exceptions when a name isn’t found.
-
----
-
-## Lights by name
-
-Control a single light using the same name you see in the Hue app. If a name is not found, a `LightNotFoundException` is raised with similar name suggestions.
+All interaction goes through the `Hueify` async context manager. It connects to the bridge, populates the cache from the REST API, and subscribes to SSE events  so state is always current without polling.
 
 ```python
 import asyncio
-from hueify import Light
+from hueify import Hueify
 
 
 async def main() -> None:
-    light = await Light.from_name("Living room lamp")
-
-    await light.turn_on()
-    await light.set_brightness_percentage(75)
-    await light.set_color_temperature_percentage(30)
-    current = light.brightness_percentage
-    print("Brightness:", current)
+    async with Hueify() as hue:
+        # lights, rooms, zones are namespaces on the hue object
+        await hue.rooms.turn_on("Living Room")
 
 
-if __name__ == "__main__":
-    asyncio.run(main())
+asyncio.run(main())
+```
+
+Credentials are read from the environment by default (`HUE_BRIDGE_IP`, `HUE_APP_KEY`). You can also pass them explicitly:
+
+```python
+async with Hueify(bridge_ip="192.168.1.10", app_key="your-app-key") as hue:
+    ...
+```
+
+---
+
+## Lights
+
+```python
+async with Hueify() as hue:
+    await hue.lights.turn_on("Desk lamp")
+    await hue.lights.turn_off("Desk lamp")
+
+    await hue.lights.set_brightness("Desk lamp", 75)
+    await hue.lights.increase_brightness("Desk lamp", 10)
+    await hue.lights.decrease_brightness("Desk lamp", 10)
+
+    await hue.lights.set_color_temperature("Desk lamp", 30)
+
+    brightness = hue.lights.get_brightness("Desk lamp")
+    print("Brightness:", brightness)
 ```
 
 ---
 
 ## Rooms
 
-Rooms group lights like in the Hue app. Use `from_name` to target by display name. Missing rooms raise `RoomNotFoundException` with suggestions.
-
 ```python
-import asyncio
-from hueify import Room
+async with Hueify() as hue:
+    print(hue.rooms.names)  # list of all room names
 
+    await hue.rooms.turn_on("Living Room")
+    await hue.rooms.set_brightness("Living Room", 40)
+    await hue.rooms.increase_brightness("Living Room", 20)
+    await hue.rooms.set_color_temperature("Living Room", 35)
 
-async def main() -> None:
-    room = await Room.from_name("Living Room")
+    await hue.rooms.activate_scene("Living Room", "Relax")
 
-    await room.turn_on()
-    await room.set_brightness_percentage(40)
-    await room.increase_brightness_percentage(20)
-    await room.set_color_temperature_percentage(35)
-
-    await room.activate_scene("Relax")
-    active = await room.get_active_scene()
+    active = hue.rooms.get_active_scene("Living Room")
     print("Active scene:", active.name if active else None)
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    scenes = hue.rooms.scene_names("Living Room")
+    print("Available scenes:", scenes)
 ```
-
 
 ---
 
 ## Zones
 
-Zones are cross-room groupings. Same control surface as rooms. Missing zones raise `ZoneNotFoundException` with suggestions.
+Zones work identically to rooms:
 
 ```python
-import asyncio
-from hueify import Zone, ZoneNotFoundException
+async with Hueify() as hue:
+    print(hue.zones.names)
 
-
-async def main() -> None:
-    zone = await Zone.from_name("Downstairs")
-
-    await zone.turn_on()
-    await zone.set_brightness_percentage(60)
-    await zone.decrease_brightness_percentage(10)
-    await zone.activate_scene("Focus")
-
-    active = await zone.get_active_scene()
-    print("Active scene:", active.name if active else None)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    await hue.zones.turn_on("Downstairs")
+    await hue.zones.set_brightness("Downstairs", 60)
+    await hue.zones.activate_scene("Downstairs", "Focus")
 ```
 
 ---
 
-## Caching and live sync
+## Error handling
 
-Hueify maintains an internal cache and listens to the Hue bridge’s server‑sent events. Changes from outside your script (e.g. the Hue app) are applied automatically to instantiated objects and cached data, enabling fast responses and reliable state without polling.
-
-Optionally warm the cache up-front for the lowest latency:
+All not-found errors raise `ResourceNotFoundException` with the resource type, the lookup name, and a list of fuzzy-matched suggestions:
 
 ```python
-import asyncio
-from hueify import get_cache
+from hueify import Hueify, ResourceNotFoundException
 
-
-async def main() -> None:
-    cache = get_cache()
-    await cache.populate()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+async with Hueify() as hue:
+    try:
+        await hue.rooms.turn_on("Livng Room")  # typo
+    except ResourceNotFoundException as e:
+        print(e)
+        # room 'Livng Room' not found. Did you mean: 'Living Room'?
 ```
+
+---
+
+## Live sync
+
+Hueify subscribes to the Hue bridge's serversent event stream inside `__aenter__`. State changes made outside your script (e.g. via the Hue app or a physical switch) are applied to the cache automatically  no polling required.
 
 ---
 
 ## MCP server
 
-Hueify includes a ready-to-use Model Context Protocol (MCP) server so you can control your Hue setup from compatible LLM tools. It exposes the same operations shown above (`turn_on`, `set_brightness_percentage`, `activate_scene`, etc.).
+Hueify includes a Model Context Protocol server that exposes lights, rooms, and zones to compatible LLM tools. Requires the `mcp` extra:
 
-- The server uses the same entity abstractions (`Light`, `Room`, `Zone`, `Scene`) and the shared cache.
-- Integration depends on your MCP host and is intentionally not covered here.
+```bash
+pip install hueify[mcp]
+```
 
+The server uses the same `Hueify` context manager internally. Integration with a specific MCP host is not covered here.
 
 ---
 
