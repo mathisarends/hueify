@@ -1,7 +1,6 @@
 from pydantic import BaseModel
 
-from hueify.grouped_lights.models import GroupedLightInfo
-from hueify.groups.models import GroupInfo
+from hueify.grouped_lights.models import GroupedLightInfo, GroupInfo
 from hueify.http import HttpClient
 from hueify.scenes.cache import SceneCache
 from hueify.scenes.exceptions import SceneNotFoundException

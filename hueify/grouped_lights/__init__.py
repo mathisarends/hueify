@@ -1,13 +1,18 @@
 from .cache import GroupedLightCache
-from .exception import GroupedLightNotFoundException
-from .lookup import GroupedLightLookup
+from .exceptions import RoomNotFoundException, ZoneNotFoundException
 from .models import GroupedLightInfo
+from .rooms import RoomCache, RoomNamespace
 from .service import GroupedLights
+from .zones import ZoneCache, ZoneNamespace
 
 __all__ = [
     "GroupedLightCache",
     "GroupedLightInfo",
-    "GroupedLightLookup",
-    "GroupedLightNotFoundException",
     "GroupedLights",
+    "RoomCache",
+    "RoomNamespace",
+    "RoomNotFoundException",
+    "ZoneCache",
+    "ZoneNamespace",
+    "ZoneNotFoundException",
 ]

@@ -1,6 +1,6 @@
 import logging
 
-from hueify.groups.models import GroupInfo
+from hueify.grouped_lights.models import GroupInfo
 from hueify.shared.lookup import NamedEntityLookupCache
 
 logger = logging.getLogger(__name__)

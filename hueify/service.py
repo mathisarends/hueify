@@ -4,17 +4,15 @@ from types import TracebackType
 from typing import Self
 
 from hueify.credentials import HueBridgeCredentials
+from hueify.grouped_lights import RoomCache, RoomNamespace, ZoneCache, ZoneNamespace
 from hueify.grouped_lights.cache import GroupedLightCache
-from hueify.grouped_lights.models import GroupedLightInfo
-from hueify.groups.models import GroupInfo
+from hueify.grouped_lights.models import GroupedLightInfo, GroupInfo
 from hueify.http import HttpClient
 from hueify.light import LightCache, LightNamespace
 from hueify.light.models import LightInfo
-from hueify.room import RoomCache, RoomNamespace
 from hueify.scenes import SceneCache
 from hueify.scenes.models import SceneInfo
 from hueify.sse import EventBus, ServerSentEventStream
-from hueify.zone import ZoneCache, ZoneNamespace
 
 logger = logging.getLogger(__name__)
 
@@ -26,9 +24,8 @@ class Hueify:
         app_key: str | None = None,
     ) -> None:
         logger.debug(f"Initializing Hueify with bridge_ip={bridge_ip}")
-        credentials = self._resolve_credentials(bridge_ip, app_key)
+        self._credentials = self._resolve_credentials(bridge_ip, app_key)
 
-        self._credentials = credentials
         self._http_client = HttpClient(self._credentials)
         self._event_bus = EventBus()
         self._event_stream = ServerSentEventStream(
