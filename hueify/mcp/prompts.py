@@ -1,7 +1,7 @@
 import asyncio
 
 from hueify.groups import RoomLookup, ZoneLookup
-from hueify.lights import LightLookup
+from hueify.light import LightLookup
 from hueify.scenes import SceneLookup
 
 _BASE_PROMPT = """# Hueify Lighting Control Assistant

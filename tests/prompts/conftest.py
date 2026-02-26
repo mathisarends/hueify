@@ -3,7 +3,7 @@ from uuid import uuid4
 import pytest
 
 from hueify.groups.models import GroupArchetype, GroupInfo, GroupMetadata, GroupType
-from hueify.lights.models import (
+from hueify.light.models import (
     LightInfo,
     LightMetadata,
 )

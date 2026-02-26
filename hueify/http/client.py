@@ -4,7 +4,7 @@ import httpx
 from pydantic import BaseModel, TypeAdapter
 
 from hueify.credentials import HueBridgeCredentials
-from hueify.http.models import ApiResponse, HueApiResponse
+from hueify.http.schemas import ApiResponse, HueApiResponse
 
 T = TypeVar("T", bound=BaseModel)
 

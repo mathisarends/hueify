@@ -1,17 +1,12 @@
 from typing import override
 from uuid import UUID
 
-from hueify.lights.exceptions import LightNotFoundException
-from hueify.lights.models import LightInfo
+from hueify.light.exceptions import LightNotFoundException
+from hueify.light.models import LightInfo
 from hueify.shared.resource.lookup import NamedResourceLookup
-from hueify.shared.resource.models import ResourceType
 
 
 class LightLookup(NamedResourceLookup[LightInfo]):
-    @override
-    def get_resource_type(self) -> ResourceType:
-        return ResourceType.LIGHT
-
     @override
     def get_model_type(self) -> type[LightInfo]:
         return LightInfo

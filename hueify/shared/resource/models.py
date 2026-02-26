@@ -16,6 +16,7 @@ class ResourceType(StrEnum):
     # Scenes
     SCENE = "scene"
     SMART_SCENE = "smart_scene"
+    PUBLIC_IMAGE = "public_image"
     # Sensors
     MOTION = "motion"
     CAMERA_MOTION = "camera_motion"

@@ -8,9 +8,7 @@ from .groups import (
     ZoneLookup,
     ZoneNotFoundException,
 )
-from .lights import Light, LightInfo, LightLookup, LightNotFoundException
-from .mcp import mcp_server
-from .mcp.prompts import SystemPromptTemplate
+from .light import Light, LightInfo, LightLookup, LightNotFoundException
 from .scenes import (
     NoActiveSceneException,
     Scene,
@@ -20,6 +18,7 @@ from .scenes import (
 )
 from .service import Hueify
 from .shared.resource import ActionResult
+from .sse.bus import EventBus
 
 __all__ = [
     "ActionResult",
@@ -30,7 +29,6 @@ __all__ = [
     "LightInfo",
     "LightLookup",
     "LightNotFoundException",
-    "LookupCache",
     "NoActiveSceneException",
     "Room",
     "RoomLookup",
@@ -39,12 +37,8 @@ __all__ = [
     "SceneInfo",
     "SceneLookup",
     "SceneNotFoundException",
-    "SystemPromptTemplate",
     "Zone",
     "ZoneLookup",
     "ZoneNotFoundException",
     "configure_logging",
-    "get_cache",
-    "get_event_bus",
-    "mcp_server",
 ]

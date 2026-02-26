@@ -1,4 +1,4 @@
-from .base import EntityLookupCache
+from .base import EntityLookupCache, NamedEntityLookupCache
 from .groups import GroupedLightsLookupCache
 from .lights import LightsLookupCache
 from .rooms import RoomLookupCache
@@ -9,7 +9,7 @@ __all__ = [
     "EntityLookupCache",
     "GroupedLightsLookupCache",
     "LightsLookupCache",
-    "LookupCache",
+    "NamedEntityLookupCache",
     "RoomLookupCache",
     "SceneLookupCache",
     "ZoneLookupCache",

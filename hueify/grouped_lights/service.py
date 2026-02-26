@@ -4,7 +4,6 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from hueify.events import get_event_bus
 from hueify.grouped_lights.lookup import GroupedLightLookup
 from hueify.grouped_lights.models import GroupedLightInfo
 from hueify.http import HttpClient
@@ -34,10 +33,3 @@ class GroupedLights(Resource[GroupedLightInfo]):
     async def _update_remote_state(self, state: BaseModel) -> None:
         endpoint = self._get_resource_endpoint()
         await self._client.put(f"{endpoint}/{self.id}", data=state)
-
-    async def _subscribe_to_events(self) -> None:
-        event_bus = await get_event_bus()
-        event_bus.subscribe_to_grouped_light(
-            handler=self._handle_event,
-            group_id=self.id,
-        )

@@ -1,39 +1,24 @@
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-from hueify.utils.fuzzy import find_all_matches_sorted
-
 from hueify.http import HttpClient
-from hueify.shared.cache import LookupCache, get_cache
-from hueify.shared.resource.models import ResourceInfo, ResourceType
+from hueify.shared.fuzzy import find_all_matches_sorted
+from hueify.shared.resource.models import ResourceInfo
 
 T = TypeVar("T", bound=ResourceInfo)
 
 
 class ResourceLookup(ABC, Generic[T]):
-    def __init__(
-        self,
-        client: HttpClient | None = None,
-        cache: LookupCache | None = None,
-    ) -> None:
+    def __init__(self, client: HttpClient | None = None) -> None:
         self._client = client or HttpClient()
-        self._cache = cache or get_cache()
 
     async def get_all_entities(self) -> list[T]:
-        resource_type = self.get_resource_type()
-        return await self._cache.get_or_fetch(
-            entity_type=resource_type,
-            all_entities_fetcher=self._fetch_all_entities,
-        )
+        return await self._fetch_all_entities()
 
     async def _fetch_all_entities(self) -> list[T]:
         endpoint = self._get_endpoint()
         model_type = self.get_model_type()
         return await self._client.get_resources(endpoint, model_type)
-
-    @abstractmethod
-    def get_resource_type(self) -> ResourceType:
-        pass
 
     @abstractmethod
     def get_model_type(self) -> type[T]:

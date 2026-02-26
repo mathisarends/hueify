@@ -3,9 +3,9 @@ import logging
 from typing import Generic, TypeVar
 from uuid import UUID
 
-from hueify.shared.resource.models import ResourceInfo
+from pydantic import BaseModel
 
-T = TypeVar("T", bound=ResourceInfo)
+T = TypeVar("T", bound=BaseModel)
 
 logger = logging.getLogger(__name__)
 

@@ -7,7 +7,7 @@ from pydantic import TypeAdapter
 
 from hueify.credentials import HueBridgeCredentials
 from hueify.sse.bus import EventBus
-from hueify.sse.schemas import HueEvent, UnknownEvent
+from hueify.sse.views import HueEvent, UnknownEvent
 
 logger = logging.getLogger(__name__)
 

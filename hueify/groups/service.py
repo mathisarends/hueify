@@ -7,10 +7,6 @@ from uuid import UUID
 from hueify.grouped_lights import GroupedLights
 from hueify.groups.models import GroupInfo
 from hueify.http import HttpClient
-from hueify.scenes import SceneInfo
-from hueify.scenes.exceptions import NoActiveSceneException
-from hueify.scenes.lookup import SceneLookup
-from hueify.scenes.service import Scene
 from hueify.shared.resource.models import (
     ActionResult,
 )
@@ -25,12 +21,10 @@ class Group:
         group_info: GroupInfo,
         grouped_lights: GroupedLights,
         client: HttpClient | None = None,
-        scene_lookup: SceneLookup | None = None,
     ) -> None:
         self._group_info = group_info
         self._grouped_lights = grouped_lights
         self._client = client or HttpClient()
-        self._scene_lookup = scene_lookup or SceneLookup(client=self._client)
 
     @classmethod
     async def from_name(cls, group_name: str, client: HttpClient | None = None) -> Self:
@@ -40,8 +34,6 @@ class Group:
 
         grouped_light_id = cls._extract_grouped_light_id(group_info)
         grouped_lights = await GroupedLights.from_id(grouped_light_id, client=client)
-        await grouped_lights.ensure_event_subscription()
-
         return cls(group_info=group_info, grouped_lights=grouped_lights, client=client)
 
     @staticmethod
@@ -90,44 +82,14 @@ class Group:
     async def turn_off(self) -> ActionResult:
         return await self._grouped_lights.turn_off()
 
-    async def set_brightness_percentage(self, percentage: float | int) -> ActionResult:
-        return await self._grouped_lights.set_brightness_percentage(percentage)
+    async def set_brightness(self, percentage: float | int) -> ActionResult:
+        return await self._grouped_lights.set_brightness(percentage)
 
-    async def increase_brightness_percentage(
-        self, percentage: float | int
-    ) -> ActionResult:
-        return await self._grouped_lights.increase_brightness_percentage(percentage)
+    async def increase_brightness(self, percentage: float | int) -> ActionResult:
+        return await self._grouped_lights.increase_brightness(percentage)
 
-    async def decrease_brightness_percentage(
-        self, percentage: float | int
-    ) -> ActionResult:
-        return await self._grouped_lights.decrease_brightness_percentage(percentage)
+    async def decrease_brightness(self, percentage: float | int) -> ActionResult:
+        return await self._grouped_lights.decrease_brightness(percentage)
 
-    async def set_color_temperature_percentage(
-        self, percentage: float | int
-    ) -> ActionResult:
-        return await self._grouped_lights.set_color_temperature_percentage(percentage)
-
-    async def activate_scene(self, scene_name: str) -> ActionResult:
-        scene = await Scene.from_name_in_group(
-            scene_name=scene_name, group_id=self.id, client=self._client
-        )
-        return await scene.activate()
-
-    async def get_scenes(self) -> list[SceneInfo]:
-        all_scenes = await self._scene_lookup.get_scenes()
-        return [scene for scene in all_scenes if scene.group_id == self.id]
-
-    async def get_active_scene(self) -> SceneInfo:
-        active_scene = await self._scene_lookup.get_active_scene_in_group(self.id)
-
-        if active_scene is None:
-            light_info = self._grouped_lights._light_info
-            raise NoActiveSceneException(
-                group_name=self.name,
-                is_light_on=light_info.on.on,
-                brightness=light_info.dimming.brightness
-                if light_info.dimming
-                else None,
-            )
-        return active_scene
+    async def set_color_temperature(self, percentage: float | int) -> ActionResult:
+        return await self._grouped_lights.set_color_temperature(percentage)

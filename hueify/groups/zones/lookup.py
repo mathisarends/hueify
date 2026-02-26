@@ -1,13 +1,9 @@
 from hueify.groups.models import GroupInfo
 from hueify.groups.zones.exceptions import ZoneNotFoundException
 from hueify.shared.resource.lookup import NamedResourceLookup
-from hueify.shared.resource.models import ResourceType
 
 
 class ZoneLookup(NamedResourceLookup[GroupInfo]):
-    def get_resource_type(self) -> ResourceType:
-        return ResourceType.ZONE
-
     def get_model_type(self) -> type[GroupInfo]:
         return GroupInfo
 

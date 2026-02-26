@@ -2,10 +2,9 @@ from typing import Self
 
 from pydantic import BaseModel
 
-from hueify.events import get_event_bus
 from hueify.http import HttpClient
-from hueify.lights.lookup import LightLookup
-from hueify.lights.models import (
+from hueify.light.lookup import LightLookup
+from hueify.light.models import (
     LightInfo,
 )
 from hueify.shared.resource import NamedResourceMixin, Resource
@@ -17,17 +16,7 @@ class Light(Resource[LightInfo], NamedResourceMixin):
         client = client or HttpClient()
         lookup = LightLookup(client)
         light_info = await lookup.get_light_by_name(light_name)
-
-        instance = cls(light_info=light_info, client=client)
-        await instance.ensure_event_subscription()
-        return instance
-
-    async def _subscribe_to_events(self) -> None:
-        event_bus = await get_event_bus()
-        event_bus.subscribe_to_light(
-            handler=self._handle_event,
-            light_id=self.id,
-        )
+        return cls(light_info=light_info, client=client)
 
     @property
     def name(self) -> str:
