@@ -1,12 +1,14 @@
 import logging
 
+from hueify.cache import PopulatableCache
+from hueify.cache.lookup import NamedEntityLookupCache
 from hueify.grouped_lights.models import GroupInfo
-from hueify.shared.lookup import NamedEntityLookupCache
+from hueify.http import HttpClient
 
 logger = logging.getLogger(__name__)
 
 
-class ZoneCache(NamedEntityLookupCache[GroupInfo]):
+class ZoneCache(NamedEntityLookupCache[GroupInfo], PopulatableCache):
     """Cache for zone resources.
 
     Zones don't emit SSE events themselves — their live state is tracked via
@@ -17,3 +19,9 @@ class ZoneCache(NamedEntityLookupCache[GroupInfo]):
     def __init__(self) -> None:
         super().__init__()
         logger.debug("ZoneCache initialised")
+
+    async def populate(self, http_client: HttpClient) -> None:
+        zones = await http_client.get_resources(
+            endpoint="/zone", resource_type=GroupInfo
+        )
+        await self.store_all(zones)

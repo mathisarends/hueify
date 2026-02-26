@@ -61,13 +61,21 @@ class HttpClient:
         api_response = adapter.validate_python(response.json())
         return api_response.get_single_resource()
 
-    async def put(self, endpoint: str, data: BaseModel) -> ApiResponse:
+    async def put(
+        self, endpoint: str, data: BaseModel, resource_type: type[T] | None = None
+    ) -> ApiResponse | T:
         response = await self._client.put(
             f"{self._base_url}/{self._normalize_endpoint(endpoint)}",
             headers=self._headers,
             json=data.model_dump(mode="json", exclude_none=True),
         )
         response.raise_for_status()
+
+        if resource_type is not None:
+            adapter = TypeAdapter(HueApiResponse[resource_type])
+            api_response = adapter.validate_python(response.json())
+            return api_response.get_single_resource()
+
         return response.json()
 
     async def close(self) -> None:

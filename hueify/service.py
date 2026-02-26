@@ -3,15 +3,17 @@ import logging
 from types import TracebackType
 from typing import Self
 
+from hueify.cache import PopulatableCache
 from hueify.credentials import HueBridgeCredentials
-from hueify.grouped_lights import RoomCache, RoomNamespace, ZoneCache, ZoneNamespace
 from hueify.grouped_lights.cache import GroupedLightCache
-from hueify.grouped_lights.models import GroupedLightInfo, GroupInfo
+from hueify.grouped_lights.rooms.cache import RoomCache
+from hueify.grouped_lights.rooms.namespace import RoomNamespace
+from hueify.grouped_lights.zones.cache import ZoneCache
+from hueify.grouped_lights.zones.namespace import ZoneNamespace
 from hueify.http import HttpClient
-from hueify.light import LightCache, LightNamespace
-from hueify.light.models import LightInfo
-from hueify.scenes import SceneCache
-from hueify.scenes.models import SceneInfo
+from hueify.light import LightNamespace
+from hueify.light.cache import LightCache
+from hueify.scenes.cache import SceneCache
 from hueify.sse import EventBus, ServerSentEventStream
 
 logger = logging.getLogger(__name__)
@@ -38,6 +40,14 @@ class Hueify:
         self._room_cache = RoomCache()
         self._zone_cache = ZoneCache()
         self._scene_cache = SceneCache(self._event_bus)
+
+        self._caches: list[PopulatableCache] = [
+            self._light_cache,
+            self._grouped_light_cache,
+            self._room_cache,
+            self._zone_cache,
+            self._scene_cache,
+        ]
 
         self.lights = LightNamespace(self._light_cache, self._http_client)
         self.rooms = RoomNamespace(
@@ -90,34 +100,9 @@ class Hueify:
         await self._clear_caches()
 
     async def _populate_caches(self) -> None:
-        lights, rooms, zones, scenes, grouped_lights = await asyncio.gather(
-            self._http_client.get_resources(endpoint="/light", resource_type=LightInfo),
-            self._http_client.get_resources(endpoint="/room", resource_type=GroupInfo),
-            self._http_client.get_resources(endpoint="/zone", resource_type=GroupInfo),
-            self._http_client.get_resources(endpoint="/scene", resource_type=SceneInfo),
-            self._http_client.get_resources(
-                endpoint="/grouped_light", resource_type=GroupedLightInfo
-            ),
-        )
-        await asyncio.gather(
-            self._light_cache.store_all(lights),
-            self._room_cache.store_all(rooms),
-            self._zone_cache.store_all(zones),
-            self._scene_cache.store_all(scenes),
-            self._grouped_light_cache.store_all(grouped_lights),
-        )
-        logger.info(
-            f"Caches populated — lights={len(lights)}, rooms={len(rooms)}, "
-            f"zones={len(zones)}, scenes={len(scenes)}, "
-            f"grouped_lights={len(grouped_lights)}"
-        )
+        await asyncio.gather(*[c.populate(self._http_client) for c in self._caches])
+        logger.info("Caches populated successfully")
 
     async def _clear_caches(self) -> None:
-        await asyncio.gather(
-            self._light_cache.clear(),
-            self._room_cache.clear(),
-            self._zone_cache.clear(),
-            self._scene_cache.clear(),
-            self._grouped_light_cache.clear(),
-        )
+        await asyncio.gather(*[c.clear() for c in self._caches])
         logger.info("All caches cleared")

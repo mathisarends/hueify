@@ -1,4 +1,3 @@
-from .cache import ZoneCache
 from .namespace import ZoneNamespace
 
-__all__ = ["ZoneCache", "ZoneNamespace"]
+__all__ = ["ZoneNamespace"]

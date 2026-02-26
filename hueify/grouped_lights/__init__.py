@@ -1,9 +1,8 @@
-from .cache import GroupedLightCache
 from .exceptions import RoomNotFoundException, ZoneNotFoundException
 from .models import GroupedLightInfo
-from .rooms import RoomCache, RoomNamespace
+from .rooms import RoomNamespace
 from .service import GroupedLights
-from .zones import ZoneCache, ZoneNamespace
+from .zones import ZoneNamespace
 
 __all__ = [
     "GroupedLightCache",

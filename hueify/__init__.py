@@ -8,7 +8,6 @@ from .scenes import (
     NoActiveSceneException,
     Scene,
     SceneInfo,
-    SceneLookup,
     SceneNotFoundException,
 )
 from .service import Hueify
@@ -25,7 +24,6 @@ __all__ = [
     "RoomNotFoundException",
     "Scene",
     "SceneInfo",
-    "SceneLookup",
     "SceneNotFoundException",
     "ZoneNotFoundException",
     "configure_logging",

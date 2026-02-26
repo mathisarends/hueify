@@ -4,7 +4,7 @@ from hueify.grouped_lights.models import GroupedLightInfo, GroupInfo
 from hueify.http import HttpClient
 from hueify.scenes.cache import SceneCache
 from hueify.scenes.exceptions import SceneNotFoundException
-from hueify.scenes.models import SceneInfo
+from hueify.scenes.schemas import SceneInfo
 from hueify.scenes.service import Scene
 from hueify.shared.fuzzy import find_all_matches_sorted
 from hueify.shared.resource import Resource

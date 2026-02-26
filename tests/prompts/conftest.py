@@ -1,13 +1,13 @@
 from uuid import uuid4
 
 import pytest
-
 from hueify.groups.models import GroupArchetype, GroupInfo, GroupMetadata, GroupType
+
 from hueify.light.models import (
     LightInfo,
     LightMetadata,
 )
-from hueify.scenes.models import (
+from hueify.scenes.schemas import (
     SceneInfo,
     SceneMetadata,
     SceneStatus,
