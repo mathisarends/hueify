@@ -2,7 +2,7 @@ import logging
 
 from hueify.grouped_lights.cache import GroupedLightCache
 from hueify.grouped_lights.service import GroupedLights
-from hueify.groups import Room, RoomNotFoundException
+from hueify.groups import RoomNotFoundException
 from hueify.http import HttpClient
 from hueify.room.cache import RoomCache
 from hueify.scenes.cache import SceneCache
@@ -29,57 +29,7 @@ class RoomNamespace:
     def names(self) -> list[str]:
         return [r.metadata.name for r in self._room_cache.get_all()]
 
-    async def turn_on(self, name: str) -> ActionResult:
-        room = self.get_room(name)
-        return await room.turn_on()
-
-    async def turn_off(self, name: str) -> ActionResult:
-        room = self.get_room(name)
-        return await room.turn_off()
-
-    async def set_brightness(self, name: str, percentage: float | int) -> ActionResult:
-        room = self.get_room(name)
-        return await room.set_brightness(percentage)
-
-    async def increase_brightness(
-        self, name: str, percentage: float | int
-    ) -> ActionResult:
-        room = self.get_room(name)
-        return await room.increase_brightness(percentage)
-
-    async def decrease_brightness(
-        self, name: str, percentage: float | int
-    ) -> ActionResult:
-        room = self.get_room(name)
-        return await room.decrease_brightness(percentage)
-
-    async def set_color_temperature(
-        self, name: str, percentage: float | int
-    ) -> ActionResult:
-        room = self.get_room(name)
-        return await room.set_color_temperature(percentage)
-
-    def get_brightness(self, name: str) -> float:
-        room = self.get_room(name)
-        return room.brightness_percentage
-
-    def scene_names(self, name: str) -> list[str]:
-        room = self.get_room(name)
-        return room.scene_names
-
-    def list_scenes(self, name: str) -> list[SceneInfo]:
-        room = self.get_room(name)
-        return room.list_scenes()
-
-    def get_active_scene(self, name: str) -> SceneInfo | None:
-        room = self.get_room(name)
-        return room.get_active_scene()
-
-    async def activate_scene(self, name: str, scene_name: str) -> ActionResult:
-        room = self.get_room(name)
-        return await room.activate_scene(scene_name)
-
-    def get_room(self, name: str) -> Room:
+    def from_name(self, name: str) -> GroupedLights:
         group_info = self._room_cache.get_by_name(name)
         if group_info is None:
             available = [r.metadata.name for r in self._room_cache.get_all()]
@@ -95,12 +45,59 @@ class RoomNamespace:
                 f"GroupedLight {grouped_light_id} not in cache for room '{name}'"
             )
 
-        grouped_lights = GroupedLights(
-            light_info=grouped_light_info, client=self._http_client
-        )
-        return Room(
-            group_info=group_info,
-            grouped_lights=grouped_lights,
+        return GroupedLights(
+            light_info=grouped_light_info,
             client=self._http_client,
+            group_info=group_info,
             scene_cache=self._scene_cache,
         )
+
+    async def turn_on(self, name: str) -> ActionResult:
+        room = self.from_name(name)
+        return await room.turn_on()
+
+    async def turn_off(self, name: str) -> ActionResult:
+        room = self.from_name(name)
+        return await room.turn_off()
+
+    async def set_brightness(self, name: str, percentage: float | int) -> ActionResult:
+        room = self.from_name(name)
+        return await room.set_brightness(percentage)
+
+    async def increase_brightness(
+        self, name: str, percentage: float | int
+    ) -> ActionResult:
+        room = self.from_name(name)
+        return await room.increase_brightness(percentage)
+
+    async def decrease_brightness(
+        self, name: str, percentage: float | int
+    ) -> ActionResult:
+        room = self.from_name(name)
+        return await room.decrease_brightness(percentage)
+
+    async def set_color_temperature(
+        self, name: str, percentage: float | int
+    ) -> ActionResult:
+        room = self.from_name(name)
+        return await room.set_color_temperature(percentage)
+
+    def get_brightness(self, name: str) -> float:
+        room = self.from_name(name)
+        return room.brightness_percentage
+
+    def scene_names(self, name: str) -> list[str]:
+        room = self.from_name(name)
+        return room.scene_names
+
+    def list_scenes(self, name: str) -> list[SceneInfo]:
+        room = self.from_name(name)
+        return room.list_scenes()
+
+    def get_active_scene(self, name: str) -> SceneInfo | None:
+        room = self.from_name(name)
+        return room.get_active_scene()
+
+    async def activate_scene(self, name: str, scene_name: str) -> ActionResult:
+        room = self.from_name(name)
+        return await room.activate_scene(scene_name)

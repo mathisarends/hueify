@@ -2,7 +2,7 @@ import logging
 
 from hueify.grouped_lights.cache import GroupedLightCache
 from hueify.grouped_lights.service import GroupedLights
-from hueify.groups import Zone, ZoneNotFoundException
+from hueify.groups import ZoneNotFoundException
 from hueify.http import HttpClient
 from hueify.scenes.cache import SceneCache
 from hueify.scenes.models import SceneInfo
@@ -29,57 +29,7 @@ class ZoneNamespace:
     def names(self) -> list[str]:
         return [z.metadata.name for z in self._zone_cache.get_all()]
 
-    async def turn_on(self, name: str) -> ActionResult:
-        zone = self.get_zone(name)
-        return await zone.turn_on()
-
-    async def turn_off(self, name: str) -> ActionResult:
-        zone = self.get_zone(name)
-        return await zone.turn_off()
-
-    async def set_brightness(self, name: str, percentage: float | int) -> ActionResult:
-        zone = self.get_zone(name)
-        return await zone.set_brightness(percentage)
-
-    async def increase_brightness(
-        self, name: str, percentage: float | int
-    ) -> ActionResult:
-        zone = self.get_zone(name)
-        return await zone.increase_brightness(percentage)
-
-    async def decrease_brightness(
-        self, name: str, percentage: float | int
-    ) -> ActionResult:
-        zone = self.get_zone(name)
-        return await zone.decrease_brightness(percentage)
-
-    async def set_color_temperature(
-        self, name: str, percentage: float | int
-    ) -> ActionResult:
-        zone = self.get_zone(name)
-        return await zone.set_color_temperature(percentage)
-
-    def get_brightness(self, name: str) -> float:
-        zone = self.get_zone(name)
-        return zone.brightness_percentage
-
-    def scene_names(self, name: str) -> list[str]:
-        zone = self.get_zone(name)
-        return zone.scene_names
-
-    def list_scenes(self, name: str) -> list[SceneInfo]:
-        zone = self.get_zone(name)
-        return zone.list_scenes()
-
-    def get_active_scene(self, name: str) -> SceneInfo | None:
-        zone = self.get_zone(name)
-        return zone.get_active_scene()
-
-    async def activate_scene(self, name: str, scene_name: str) -> ActionResult:
-        zone = self.get_zone(name)
-        return await zone.activate_scene(scene_name)
-
-    def get_zone(self, name: str) -> Zone:
+    def from_name(self, name: str) -> GroupedLights:
         group_info = self._zone_cache.get_by_name(name)
         if group_info is None:
             available = [z.metadata.name for z in self._zone_cache.get_all()]
@@ -95,12 +45,59 @@ class ZoneNamespace:
                 f"GroupedLight {grouped_light_id} not in cache for zone '{name}'"
             )
 
-        grouped_lights = GroupedLights(
-            light_info=grouped_light_info, client=self._http_client
-        )
-        return Zone(
-            group_info=group_info,
-            grouped_lights=grouped_lights,
+        return GroupedLights(
+            light_info=grouped_light_info,
             client=self._http_client,
+            group_info=group_info,
             scene_cache=self._scene_cache,
         )
+
+    async def turn_on(self, name: str) -> ActionResult:
+        zone = self.from_name(name)
+        return await zone.turn_on()
+
+    async def turn_off(self, name: str) -> ActionResult:
+        zone = self.from_name(name)
+        return await zone.turn_off()
+
+    async def set_brightness(self, name: str, percentage: float | int) -> ActionResult:
+        zone = self.from_name(name)
+        return await zone.set_brightness(percentage)
+
+    async def increase_brightness(
+        self, name: str, percentage: float | int
+    ) -> ActionResult:
+        zone = self.from_name(name)
+        return await zone.increase_brightness(percentage)
+
+    async def decrease_brightness(
+        self, name: str, percentage: float | int
+    ) -> ActionResult:
+        zone = self.from_name(name)
+        return await zone.decrease_brightness(percentage)
+
+    async def set_color_temperature(
+        self, name: str, percentage: float | int
+    ) -> ActionResult:
+        zone = self.from_name(name)
+        return await zone.set_color_temperature(percentage)
+
+    def get_brightness(self, name: str) -> float:
+        zone = self.from_name(name)
+        return zone.brightness_percentage
+
+    def scene_names(self, name: str) -> list[str]:
+        zone = self.from_name(name)
+        return zone.scene_names
+
+    def list_scenes(self, name: str) -> list[SceneInfo]:
+        zone = self.from_name(name)
+        return zone.list_scenes()
+
+    def get_active_scene(self, name: str) -> SceneInfo | None:
+        zone = self.from_name(name)
+        return zone.get_active_scene()
+
+    async def activate_scene(self, name: str, scene_name: str) -> ActionResult:
+        zone = self.from_name(name)
+        return await zone.activate_scene(scene_name)

@@ -7,47 +7,57 @@ from hueify.zone import ZoneNamespace
 mcp_server = HueifyMCP("Hueify MCP Server", lifespan=lifespan)
 
 
+# ===== Lights =====
+
+
 @mcp_server.light_tool()
 async def turn_on_light(light_name: str, lights: LightNamespace) -> ActionResult:
-    return await lights.turn_on(light_name)
+    light = lights.from_name(light_name)
+    return await light.turn_on()
 
 
 @mcp_server.light_tool()
 async def turn_off_light(light_name: str, lights: LightNamespace) -> ActionResult:
-    return await lights.turn_off(light_name)
+    light = lights.from_name(light_name)
+    return await light.turn_off()
 
 
 @mcp_server.light_tool()
 async def set_light_brightness(
     light_name: str, percentage: float, lights: LightNamespace
 ) -> ActionResult:
-    return await lights.set_brightness(light_name, percentage)
+    light = lights.from_name(light_name)
+    return await light.set_brightness(percentage)
 
 
 @mcp_server.light_tool()
 async def increase_light_brightness(
     light_name: str, percentage: float, lights: LightNamespace
 ) -> ActionResult:
-    return await lights.increase_brightness(light_name, percentage)
+    light = lights.from_name(light_name)
+    return await light.increase_brightness(percentage)
 
 
 @mcp_server.light_tool()
 async def decrease_light_brightness(
     light_name: str, percentage: float, lights: LightNamespace
 ) -> ActionResult:
-    return await lights.decrease_brightness(light_name, percentage)
+    light = lights.from_name(light_name)
+    return await light.decrease_brightness(percentage)
 
 
 @mcp_server.light_tool()
 async def set_light_color_temperature(
     light_name: str, percentage: float, lights: LightNamespace
 ) -> ActionResult:
-    return await lights.set_color_temperature(light_name, percentage)
+    light = lights.from_name(light_name)
+    return await light.set_color_temperature(percentage)
 
 
 @mcp_server.light_tool()
 async def get_light_brightness(light_name: str, lights: LightNamespace) -> float:
-    return await lights.get_brightness(light_name)
+    light = lights.from_name(light_name)
+    return light.brightness_percentage
 
 
 # ===== Rooms =====
@@ -55,106 +65,66 @@ async def get_light_brightness(light_name: str, lights: LightNamespace) -> float
 
 @mcp_server.room_tool()
 async def turn_on_room(room_name: str, rooms: RoomNamespace) -> ActionResult:
-    return await rooms.turn_on(room_name)
+    room = rooms.from_name(room_name)
+    return await room.turn_on()
 
 
 @mcp_server.room_tool()
 async def turn_off_room(room_name: str, rooms: RoomNamespace) -> ActionResult:
-    return await rooms.turn_off(room_name)
+    room = rooms.from_name(room_name)
+    return await room.turn_off()
 
 
 @mcp_server.room_tool()
 async def set_room_brightness(
     room_name: str, percentage: float, rooms: RoomNamespace
 ) -> ActionResult:
-    return await rooms.set_brightness(room_name, percentage)
+    room = rooms.from_name(room_name)
+    return await room.set_brightness(percentage)
 
 
 @mcp_server.room_tool()
 async def increase_room_brightness(
     room_name: str, percentage: float, rooms: RoomNamespace
 ) -> ActionResult:
-    return await rooms.increase_brightness(room_name, percentage)
+    room = rooms.from_name(room_name)
+    return await room.increase_brightness(percentage)
 
 
 @mcp_server.room_tool()
 async def decrease_room_brightness(
     room_name: str, percentage: float, rooms: RoomNamespace
 ) -> ActionResult:
-    return await rooms.decrease_brightness(room_name, percentage)
+    room = rooms.from_name(room_name)
+    return await room.decrease_brightness(percentage)
 
 
 @mcp_server.room_tool()
 async def set_room_color_temperature(
     room_name: str, percentage: float, rooms: RoomNamespace
 ) -> ActionResult:
-    return await rooms.set_color_temperature(room_name, percentage)
+    room = rooms.from_name(room_name)
+    return await room.set_color_temperature(percentage)
 
 
 @mcp_server.room_tool()
 async def get_room_brightness(room_name: str, rooms: RoomNamespace) -> float:
-    return await rooms.get_brightness(room_name)
-
-
-# ===== Zones =====
-
-
-@mcp_server.zone_tool()
-async def turn_on_zone(zone_name: str, zones: ZoneNamespace) -> ActionResult:
-    return await zones.turn_on(zone_name)
-
-
-@mcp_server.zone_tool()
-async def turn_off_zone(zone_name: str, zones: ZoneNamespace) -> ActionResult:
-    return await zones.turn_off(zone_name)
-
-
-@mcp_server.zone_tool()
-async def set_zone_brightness(
-    zone_name: str, percentage: float, zones: ZoneNamespace
-) -> ActionResult:
-    return await zones.set_brightness(zone_name, percentage)
-
-
-@mcp_server.zone_tool()
-async def increase_zone_brightness(
-    zone_name: str, percentage: float, zones: ZoneNamespace
-) -> ActionResult:
-    return await zones.increase_brightness(zone_name, percentage)
-
-
-@mcp_server.zone_tool()
-async def decrease_zone_brightness(
-    zone_name: str, percentage: float, zones: ZoneNamespace
-) -> ActionResult:
-    return await zones.decrease_brightness(zone_name, percentage)
-
-
-@mcp_server.zone_tool()
-async def set_zone_color_temperature(
-    zone_name: str, percentage: float, zones: ZoneNamespace
-) -> ActionResult:
-    return await zones.set_color_temperature(zone_name, percentage)
-
-
-@mcp_server.zone_tool()
-async def get_zone_brightness(zone_name: str, zones: ZoneNamespace) -> float:
-    return await zones.get_brightness(zone_name)
-
-
-# ===== Scenes (via Rooms) =====
+    room = rooms.from_name(room_name)
+    return room.brightness_percentage
 
 
 @mcp_server.room_tool()
 async def activate_scene_in_room(
     room_name: str, scene_name: str, rooms: RoomNamespace
 ) -> ActionResult:
-    return await rooms.activate_scene(room_name, scene_name)
+    room = rooms.from_name(room_name)
+    return await room.activate_scene(scene_name)
 
 
 @mcp_server.room_tool()
 async def get_active_scene_in_room(room_name: str, rooms: RoomNamespace) -> str:
-    active_scene = rooms.get_active_scene(room_name)
+    room = rooms.from_name(room_name)
+    active_scene = room.get_active_scene()
     return (
         f"Active scene: '{active_scene.name}'"
         if active_scene
@@ -164,22 +134,75 @@ async def get_active_scene_in_room(room_name: str, rooms: RoomNamespace) -> str:
 
 @mcp_server.room_tool()
 async def list_scenes_in_room(room_name: str, rooms: RoomNamespace) -> list[str]:
-    return rooms.scene_names(room_name)
+    room = rooms.from_name(room_name)
+    return room.scene_names
 
 
-# ===== Scenes (via Zones) =====
+# ===== Zones =====
+
+
+@mcp_server.zone_tool()
+async def turn_on_zone(zone_name: str, zones: ZoneNamespace) -> ActionResult:
+    zone = zones.from_name(zone_name)
+    return await zone.turn_on()
+
+
+@mcp_server.zone_tool()
+async def turn_off_zone(zone_name: str, zones: ZoneNamespace) -> ActionResult:
+    zone = zones.from_name(zone_name)
+    return await zone.turn_off()
+
+
+@mcp_server.zone_tool()
+async def set_zone_brightness(
+    zone_name: str, percentage: float, zones: ZoneNamespace
+) -> ActionResult:
+    zone = zones.from_name(zone_name)
+    return await zone.set_brightness(percentage)
+
+
+@mcp_server.zone_tool()
+async def increase_zone_brightness(
+    zone_name: str, percentage: float, zones: ZoneNamespace
+) -> ActionResult:
+    zone = zones.from_name(zone_name)
+    return await zone.increase_brightness(percentage)
+
+
+@mcp_server.zone_tool()
+async def decrease_zone_brightness(
+    zone_name: str, percentage: float, zones: ZoneNamespace
+) -> ActionResult:
+    zone = zones.from_name(zone_name)
+    return await zone.decrease_brightness(percentage)
+
+
+@mcp_server.zone_tool()
+async def set_zone_color_temperature(
+    zone_name: str, percentage: float, zones: ZoneNamespace
+) -> ActionResult:
+    zone = zones.from_name(zone_name)
+    return await zone.set_color_temperature(percentage)
+
+
+@mcp_server.zone_tool()
+async def get_zone_brightness(zone_name: str, zones: ZoneNamespace) -> float:
+    zone = zones.from_name(zone_name)
+    return zone.brightness_percentage
 
 
 @mcp_server.zone_tool()
 async def activate_scene_in_zone(
     zone_name: str, scene_name: str, zones: ZoneNamespace
 ) -> ActionResult:
-    return await zones.activate_scene(zone_name, scene_name)
+    zone = zones.from_name(zone_name)
+    return await zone.activate_scene(scene_name)
 
 
 @mcp_server.zone_tool()
 async def get_active_scene_in_zone(zone_name: str, zones: ZoneNamespace) -> str:
-    active_scene = zones.get_active_scene(zone_name)
+    zone = zones.from_name(zone_name)
+    active_scene = zone.get_active_scene()
     return (
         f"Active scene: '{active_scene.name}'"
         if active_scene
@@ -189,7 +212,8 @@ async def get_active_scene_in_zone(zone_name: str, zones: ZoneNamespace) -> str:
 
 @mcp_server.zone_tool()
 async def list_scenes_in_zone(zone_name: str, zones: ZoneNamespace) -> list[str]:
-    return zones.scene_names(zone_name)
+    zone = zones.from_name(zone_name)
+    return zone.scene_names
 
 
 if __name__ == "__main__":

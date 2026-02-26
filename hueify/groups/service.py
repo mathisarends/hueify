@@ -1,7 +1,3 @@
-from __future__ import annotations
-
-from abc import abstractmethod
-from typing import TYPE_CHECKING
 from uuid import UUID
 
 from hueify.grouped_lights import GroupedLights
@@ -16,9 +12,6 @@ from hueify.shared.resource.models import (
     ActionResult,
 )
 
-if TYPE_CHECKING:
-    from hueify.shared.resource import NamedResourceLookup
-
 
 class Group:
     def __init__(
@@ -32,11 +25,6 @@ class Group:
         self._grouped_lights = grouped_lights
         self._client = client
         self._scene_cache = scene_cache
-
-    @classmethod
-    @abstractmethod
-    def _create_lookup(cls, client: HttpClient) -> NamedResourceLookup:
-        pass
 
     @property
     def id(self) -> UUID:
@@ -62,6 +50,10 @@ class Group:
     def color_temperature_percentage(self) -> int | None:
         return self._grouped_lights.color_temperature_percentage
 
+    @property
+    def scene_names(self) -> list[str]:
+        return [s.name for s in self._list_scenes()]
+
     async def turn_on(self) -> ActionResult:
         return await self._grouped_lights.turn_on()
 
@@ -79,13 +71,6 @@ class Group:
 
     async def set_color_temperature(self, percentage: float | int) -> ActionResult:
         return await self._grouped_lights.set_color_temperature(percentage)
-
-    @property
-    def scene_names(self) -> list[str]:
-        return [s.name for s in self._list_scenes()]
-
-    def list_scenes(self) -> list[SceneInfo]:
-        return self._list_scenes()
 
     def get_active_scene(self) -> SceneInfo | None:
         return next((s for s in self._list_scenes() if s.is_active), None)

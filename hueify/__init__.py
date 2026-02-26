@@ -1,10 +1,8 @@
 from ._logging import configure_logging
 from .grouped_lights import GroupedLightLookup
 from .groups import (
-    Room,
     RoomLookup,
     RoomNotFoundException,
-    Zone,
     ZoneLookup,
     ZoneNotFoundException,
 )
@@ -30,14 +28,12 @@ __all__ = [
     "LightLookup",
     "LightNotFoundException",
     "NoActiveSceneException",
-    "Room",
     "RoomLookup",
     "RoomNotFoundException",
     "Scene",
     "SceneInfo",
     "SceneLookup",
     "SceneNotFoundException",
-    "Zone",
     "ZoneLookup",
     "ZoneNotFoundException",
     "configure_logging",
