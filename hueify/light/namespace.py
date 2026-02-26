@@ -1,9 +1,9 @@
 import logging
 
+from hueify.exceptions import ResourceNotFoundException
 from hueify.http import HttpClient
 from hueify.light.cache import LightCache
 from hueify.light.service import Light
-from hueify.shared.exceptions import ResourceNotFoundException
 from hueify.shared.resource import ActionResult
 
 logger = logging.getLogger(__name__)
@@ -14,6 +14,10 @@ class LightNamespace:
         self._light_cache = light_cache
         self._http_client = http_client
 
+    @property
+    def names(self) -> list[str]:
+        return [light.metadata.name for light in self._light_cache.get_all()]
+
     def from_name(self, name: str) -> Light:
         cached_info = self._light_cache.get_by_name(name)
         if cached_info is None:
@@ -23,7 +27,9 @@ class LightNamespace:
                 lookup_name=name,
                 suggested_names=available,
             )
-        return Light(light_info=cached_info, client=self._http_client)
+        return Light(
+            light_info=cached_info, client=self._http_client, cache=self._light_cache
+        )
 
     async def turn_on(self, name: str) -> ActionResult:
         light = self.from_name(name)

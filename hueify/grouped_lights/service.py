@@ -1,11 +1,12 @@
 from pydantic import BaseModel
 
+from hueify.cache.lookup import EntityLookupCache
+from hueify.exceptions import ResourceNotFoundException
 from hueify.grouped_lights.models import GroupedLightInfo, GroupInfo
 from hueify.http import HttpClient
 from hueify.scenes.cache import SceneCache
 from hueify.scenes.schemas import SceneInfo
 from hueify.scenes.service import Scene
-from hueify.shared.exceptions import ResourceNotFoundException
 from hueify.shared.fuzzy import find_all_matches_sorted
 from hueify.shared.resource import Resource
 from hueify.shared.resource.models import ActionResult
@@ -18,8 +19,9 @@ class GroupedLights(Resource[GroupedLightInfo]):
         client: HttpClient,
         group_info: GroupInfo | None = None,
         scene_cache: SceneCache | None = None,
+        cache: EntityLookupCache[GroupedLightInfo] | None = None,
     ) -> None:
-        super().__init__(light_info=light_info, client=client)
+        super().__init__(light_info=light_info, client=client, cache=cache)
         self._group_info = group_info
         self._scene_cache = scene_cache
 

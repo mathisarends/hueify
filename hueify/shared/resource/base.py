@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from typing import Generic
 from uuid import UUID
 
+from hueify.cache.lookup import EntityLookupCache
 from hueify.http import HttpClient
 from hueify.shared.resource.models import (
     ActionResult,
@@ -24,9 +25,24 @@ class Resource(ABC, Generic[TLightInfo]):
     _MIREK_MIN = 153
     _MIREK_MAX = 500
 
-    def __init__(self, light_info: TLightInfo, client: HttpClient) -> None:
-        self._light_info = light_info
+    def __init__(
+        self,
+        light_info: TLightInfo,
+        client: HttpClient,
+        cache: EntityLookupCache[TLightInfo] | None = None,
+    ) -> None:
+        self._id = light_info.id
+        self._fallback_info = light_info
+        self._cache = cache
         self._client = client
+
+    @property
+    def _light_info(self) -> TLightInfo:
+        if self._cache is not None:
+            fresh = self._cache.get_by_id(self._id)
+            if fresh is not None:
+                return fresh
+        return self._fallback_info
 
     @property
     def is_on(self) -> bool:
@@ -48,7 +64,7 @@ class Resource(ABC, Generic[TLightInfo]):
 
     @property
     def id(self) -> UUID:
-        return self._light_info.id
+        return self._id
 
     @property
     @abstractmethod

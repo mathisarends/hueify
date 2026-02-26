@@ -1,13 +1,12 @@
 import logging
 
 from hueify.cache.lookup import NamedEntityLookupCache
+from hueify.exceptions import ResourceNotFoundException
 from hueify.grouped_lights.cache import GroupedLightCache
 from hueify.grouped_lights.models import GroupInfo
 from hueify.grouped_lights.service import GroupedLights
 from hueify.http import HttpClient
 from hueify.scenes.cache import SceneCache
-from hueify.scenes.schemas import SceneInfo
-from hueify.shared.exceptions import ResourceNotFoundException
 from hueify.shared.resource import ActionResult
 
 logger = logging.getLogger(__name__)
@@ -57,6 +56,7 @@ class GroupNamespace:
             client=self._http_client,
             group_info=group_info,
             scene_cache=self._scene_cache,
+            cache=self._grouped_light_cache,
         )
 
     async def turn_on(self, name: str) -> ActionResult:
@@ -96,14 +96,6 @@ class GroupNamespace:
     def scene_names(self, name: str) -> list[str]:
         group = self.from_name(name)
         return group.scene_names
-
-    def list_scenes(self, name: str) -> list[SceneInfo]:
-        group = self.from_name(name)
-        return group.list_scenes()
-
-    def get_active_scene(self, name: str) -> SceneInfo | None:
-        group = self.from_name(name)
-        return group.get_active_scene()
 
     async def activate_scene(self, name: str, scene_name: str) -> ActionResult:
         group = self.from_name(name)
