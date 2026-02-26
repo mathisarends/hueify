@@ -18,13 +18,14 @@ from .scenes import (
     SceneLookup,
     SceneNotFoundException,
 )
-from .shared.cache import LookupCache, get_cache
+from .service import Hueify
 from .shared.resource import ActionResult
 
 __all__ = [
     "ActionResult",
     "EventBus",
     "GroupedLightLookup",
+    "Hueify",
     "Light",
     "LightInfo",
     "LightLookup",

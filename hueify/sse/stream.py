@@ -1,34 +1,29 @@
-import inspect
 import json
 import logging
-from collections.abc import Callable
 
 import httpx
 from httpx_sse import ServerSentEvent, aconnect_sse
+from pydantic import TypeAdapter
 
 from hueify.credentials import HueBridgeCredentials
-from hueify.sse.models import Event, EventData
+from hueify.sse.bus import EventBus
+from hueify.sse.schemas import HueEvent, UnknownEvent
 
 logger = logging.getLogger(__name__)
 
+_event_adapter = TypeAdapter(HueEvent | UnknownEvent)
 
-class EventStream:
-    def __init__(self, credentials: HueBridgeCredentials | None = None) -> None:
-        self._credentials = credentials or HueBridgeCredentials()
+
+class ServerSentEventStream:
+    def __init__(self, credentials: HueBridgeCredentials, event_bus: EventBus) -> None:
+        self._credentials = credentials
+        self._event_bus = event_bus
         self._is_running = False
-        self._subscribers: list[Callable[[EventData], None]] = []
         self._url = f"https://{self._credentials.hue_bridge_ip}/eventstream/clip/v2"
         self._headers = {
             "hue-application-key": self._credentials.hue_app_key,
             "Accept": "text/event-stream",
         }
-
-    def subscribe(self, handler: Callable[[EventData], None]) -> None:
-        self._subscribers.append(handler)
-
-    def unsubscribe(self, handler: Callable[[EventData], None]) -> None:
-        if handler in self._subscribers:
-            self._subscribers.remove(handler)
 
     async def connect(self) -> None:
         self._is_running = True
@@ -49,47 +44,27 @@ class EventStream:
                 async for sse in event_source.aiter_sse():
                     if not self._is_running:
                         break
-
-                    await self._publish_event(sse)
+                    await self._handle_sse(sse)
 
         except Exception as e:
             logger.error(f"Event stream error: {e}", exc_info=True)
         finally:
             logger.info("Disconnected from event stream")
 
-    async def _publish_event(self, sse: ServerSentEvent) -> None:
+    async def _handle_sse(self, sse: ServerSentEvent) -> None:
         try:
-            raw_data = json.loads(sse.data)
-            event = Event.from_sse_data(raw_data)
+            containers: list[dict] = json.loads(sse.data)
 
-            for event_data in event.events:
-                await self._notify_subscribers(event_data)
+            for container in containers:
+                for raw_event in container.get("data", []):
+                    event = _event_adapter.validate_python(raw_event)
+                    await self._event_bus.dispatch(event)
 
         except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse event: {e}")
+            logger.warning(f"Failed to parse SSE payload: {e}")
         except Exception as e:
             logger.error(f"Error processing event: {e}", exc_info=True)
-
-    async def _notify_subscribers(self, event_data: EventData) -> None:
-        for subscriber in self._subscribers:
-            try:
-                if inspect.iscoroutinefunction(subscriber):
-                    await subscriber(event_data)
-                else:
-                    subscriber(event_data)
-            except Exception as e:
-                logger.error(f"Error in subscriber: {e}", exc_info=True)
 
     def disconnect(self) -> None:
         self._is_running = False
         logger.info("Stopping event stream")
-
-
-_event_stream_instance: EventStream | None = None
-
-
-def get_event_stream() -> EventStream:
-    global _event_stream_instance
-    if _event_stream_instance is None:
-        _event_stream_instance = EventStream()
-    return _event_stream_instance

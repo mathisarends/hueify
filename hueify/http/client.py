@@ -8,19 +8,17 @@ from hueify.http.models import ApiResponse, HueApiResponse
 
 T = TypeVar("T", bound=BaseModel)
 
-_HUE_API_BASE_PATH = "/clip/v2/resource"
-
 
 class HttpClient:
+    _HUE_API_BASE_PATH = "/clip/v2/resource"
+
     def __init__(
         self,
-        credentials: HueBridgeCredentials | None = None,
+        credentials: HueBridgeCredentials,
         timeout: float = 10.0,
         verify_ssl: bool = False,
     ) -> None:
-        credentials = credentials or HueBridgeCredentials()
-
-        self._base_url = f"https://{credentials.hue_bridge_ip}{_HUE_API_BASE_PATH}"
+        self._base_url = f"https://{credentials.hue_bridge_ip}{self._HUE_API_BASE_PATH}"
         self._headers = {
             "hue-application-key": credentials.hue_app_key,
             "Content-Type": "application/json",

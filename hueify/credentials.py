@@ -13,6 +13,7 @@ class HueBridgeCredentials(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
         case_sensitive=False,
+        populate_by_name=True,
     )
 
     hue_bridge_ip: str = Field(alias="HUE_BRIDGE_IP")
