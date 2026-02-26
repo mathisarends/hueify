@@ -24,11 +24,9 @@ class Resource(ABC, Generic[TLightInfo]):
     _MIREK_MIN = 153
     _MIREK_MAX = 500
 
-    def __init__(
-        self, light_info: TLightInfo, client: HttpClient | None = None
-    ) -> None:
+    def __init__(self, light_info: TLightInfo, client: HttpClient) -> None:
         self._light_info = light_info
-        self._client = client or HttpClient()
+        self._client = client
 
     @property
     def is_on(self) -> bool:
@@ -48,9 +46,11 @@ class Resource(ABC, Generic[TLightInfo]):
             ((mirek - self._MIREK_MIN) / (self._MIREK_MAX - self._MIREK_MIN)) * 100
         )
 
+    @property
     def id(self) -> UUID:
         return self._light_info.id
 
+    @property
     @abstractmethod
     def name(self) -> str:
         pass
@@ -65,6 +65,10 @@ class Resource(ABC, Generic[TLightInfo]):
 
         await self._update_remote_state(self._create_on_state())
         return ActionResult(message="Turned on successfully")
+
+    @abstractmethod
+    async def _update_remote_state(self, state: ControllableLightUpdate) -> None:
+        pass
 
     def _create_on_state(self) -> ControllableLightUpdate:
         return ControllableLightUpdate(on=LightOnState(on=True))
@@ -159,7 +163,3 @@ class Resource(ABC, Generic[TLightInfo]):
             on=LightOnState(on=True),
             color_temperature=ColorTemperatureState(mirek=mirek),
         )
-
-    @abstractmethod
-    async def _update_remote_state(self, state: ControllableLightUpdate) -> None:
-        pass

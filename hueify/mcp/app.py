@@ -48,6 +48,3 @@ class HueifyMCP(FastMCP):
 
     def zone_tool(self, **tool_kwargs):
         return self._namespace_tool("zones", **tool_kwargs)
-
-    def scene_tool(self, **tool_kwargs):
-        return self._namespace_tool("scenes", **tool_kwargs)

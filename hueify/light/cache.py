@@ -1,7 +1,7 @@
 import logging
 
-from hueify.cache.lookup.base import NamedEntityLookupCache
 from hueify.light.models import LightInfo
+from hueify.shared.lookup import NamedEntityLookupCache
 from hueify.sse.bus import EventBus
 from hueify.sse.views import LightEvent
 

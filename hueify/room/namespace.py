@@ -5,6 +5,8 @@ from hueify.grouped_lights.service import GroupedLights
 from hueify.groups import Room, RoomNotFoundException
 from hueify.http import HttpClient
 from hueify.room.cache import RoomCache
+from hueify.scenes.cache import SceneCache
+from hueify.scenes.models import SceneInfo
 from hueify.shared.resource import ActionResult
 
 logger = logging.getLogger(__name__)
@@ -16,10 +18,12 @@ class RoomNamespace:
         room_cache: RoomCache,
         grouped_light_cache: GroupedLightCache,
         http_client: HttpClient,
+        scene_cache: SceneCache,
     ) -> None:
         self._room_cache = room_cache
         self._grouped_light_cache = grouped_light_cache
         self._http_client = http_client
+        self._scene_cache = scene_cache
 
     @property
     def names(self) -> list[str]:
@@ -59,6 +63,22 @@ class RoomNamespace:
         room = self.get_room(name)
         return room.brightness_percentage
 
+    def scene_names(self, name: str) -> list[str]:
+        room = self.get_room(name)
+        return room.scene_names
+
+    def list_scenes(self, name: str) -> list[SceneInfo]:
+        room = self.get_room(name)
+        return room.list_scenes()
+
+    def get_active_scene(self, name: str) -> SceneInfo | None:
+        room = self.get_room(name)
+        return room.get_active_scene()
+
+    async def activate_scene(self, name: str, scene_name: str) -> ActionResult:
+        room = self.get_room(name)
+        return await room.activate_scene(scene_name)
+
     def get_room(self, name: str) -> Room:
         group_info = self._room_cache.get_by_name(name)
         if group_info is None:
@@ -82,4 +102,5 @@ class RoomNamespace:
             group_info=group_info,
             grouped_lights=grouped_lights,
             client=self._http_client,
+            scene_cache=self._scene_cache,
         )

@@ -1,7 +1,7 @@
 import logging
 
-from hueify.cache.lookup.base import EntityLookupCache
 from hueify.grouped_lights.models import GroupedLightInfo
+from hueify.shared.lookup import EntityLookupCache
 from hueify.sse.bus import EventBus
 from hueify.sse.views import GroupedLightEvent
 

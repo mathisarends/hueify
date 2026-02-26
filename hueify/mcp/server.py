@@ -1,7 +1,6 @@
 from hueify.light import LightNamespace
 from hueify.mcp.app import HueifyMCP, lifespan
 from hueify.room import RoomNamespace
-from hueify.scenes import SceneNamespace
 from hueify.shared.resource import ActionResult
 from hueify.zone import ZoneNamespace
 
@@ -143,26 +142,19 @@ async def get_zone_brightness(zone_name: str, zones: ZoneNamespace) -> float:
     return await zones.get_brightness(zone_name)
 
 
-# ===== Scenes =====
+# ===== Scenes (via Rooms) =====
 
 
-@mcp_server.scene_tool()
+@mcp_server.room_tool()
 async def activate_scene_in_room(
-    scene_name: str, room_name: str, scenes: SceneNamespace
+    room_name: str, scene_name: str, rooms: RoomNamespace
 ) -> ActionResult:
-    return await scenes.activate_in_room(scene_name, room_name)
+    return await rooms.activate_scene(room_name, scene_name)
 
 
-@mcp_server.scene_tool()
-async def activate_scene_in_zone(
-    scene_name: str, zone_name: str, scenes: SceneNamespace
-) -> ActionResult:
-    return await scenes.activate_in_zone(scene_name, zone_name)
-
-
-@mcp_server.scene_tool()
-async def get_active_scene_in_room(room_name: str, scenes: SceneNamespace) -> str:
-    active_scene = scenes.get_active_scene_for_room(room_name)
+@mcp_server.room_tool()
+async def get_active_scene_in_room(room_name: str, rooms: RoomNamespace) -> str:
+    active_scene = rooms.get_active_scene(room_name)
     return (
         f"Active scene: '{active_scene.name}'"
         if active_scene
@@ -170,9 +162,24 @@ async def get_active_scene_in_room(room_name: str, scenes: SceneNamespace) -> st
     )
 
 
-@mcp_server.scene_tool()
-async def get_active_scene_in_zone(zone_name: str, scenes: SceneNamespace) -> str:
-    active_scene = scenes.get_active_scene_for_zone(zone_name)
+@mcp_server.room_tool()
+async def list_scenes_in_room(room_name: str, rooms: RoomNamespace) -> list[str]:
+    return rooms.scene_names(room_name)
+
+
+# ===== Scenes (via Zones) =====
+
+
+@mcp_server.zone_tool()
+async def activate_scene_in_zone(
+    zone_name: str, scene_name: str, zones: ZoneNamespace
+) -> ActionResult:
+    return await zones.activate_scene(zone_name, scene_name)
+
+
+@mcp_server.zone_tool()
+async def get_active_scene_in_zone(zone_name: str, zones: ZoneNamespace) -> str:
+    active_scene = zones.get_active_scene(zone_name)
     return (
         f"Active scene: '{active_scene.name}'"
         if active_scene
@@ -180,14 +187,9 @@ async def get_active_scene_in_zone(zone_name: str, scenes: SceneNamespace) -> st
     )
 
 
-@mcp_server.scene_tool()
-async def list_scenes_in_room(room_name: str, scenes: SceneNamespace) -> list[str]:
-    return [s.name for s in scenes.list_scenes_for_room(room_name)]
-
-
-@mcp_server.scene_tool()
-async def list_scenes_in_zone(zone_name: str, scenes: SceneNamespace) -> list[str]:
-    return [s.name for s in scenes.list_scenes_for_zone(zone_name)]
+@mcp_server.zone_tool()
+async def list_scenes_in_zone(zone_name: str, zones: ZoneNamespace) -> list[str]:
+    return zones.scene_names(zone_name)
 
 
 if __name__ == "__main__":

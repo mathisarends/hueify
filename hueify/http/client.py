@@ -33,14 +33,16 @@ class HttpClient:
 
     async def get(self, endpoint: str) -> ApiResponse:
         response = await self._client.get(
-            f"{self._base_url}/{endpoint}", headers=self._headers
+            f"{self._base_url}/{self._normalize_endpoint(endpoint)}",
+            headers=self._headers,
         )
         response.raise_for_status()
         return response.json()
 
     async def get_resources(self, endpoint: str, resource_type: type[T]) -> list[T]:
         response = await self._client.get(
-            f"{self._base_url}/{endpoint}", headers=self._headers
+            f"{self._base_url}/{self._normalize_endpoint(endpoint)}",
+            headers=self._headers,
         )
         response.raise_for_status()
 
@@ -50,7 +52,8 @@ class HttpClient:
 
     async def get_resource(self, endpoint: str, resource_type: type[T]) -> T:
         response = await self._client.get(
-            f"{self._base_url}/{endpoint}", headers=self._headers
+            f"{self._base_url}/{self._normalize_endpoint(endpoint)}",
+            headers=self._headers,
         )
         response.raise_for_status()
 
@@ -60,7 +63,7 @@ class HttpClient:
 
     async def put(self, endpoint: str, data: BaseModel) -> ApiResponse:
         response = await self._client.put(
-            f"{self._base_url}/{endpoint}",
+            f"{self._base_url}/{self._normalize_endpoint(endpoint)}",
             headers=self._headers,
             json=data.model_dump(mode="json", exclude_none=True),
         )
@@ -69,3 +72,6 @@ class HttpClient:
 
     async def close(self) -> None:
         await self._client.aclose()
+
+    def _normalize_endpoint(self, endpoint: str) -> str:
+        return endpoint.lstrip("/")

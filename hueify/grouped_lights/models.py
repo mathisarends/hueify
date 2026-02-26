@@ -1,7 +1,5 @@
 from typing import Literal
 
-from pydantic import TypeAdapter
-
 from hueify.shared.resource.models import (
     ControllableLight,
     ResourceReference,
@@ -16,6 +14,3 @@ class GroupedLightInfo(ControllableLight):
     @property
     def name(self) -> str:
         return f"GroupedLight-{self.id}"
-
-
-GroupedLightInfoListAdapter = TypeAdapter(list[GroupedLightInfo])

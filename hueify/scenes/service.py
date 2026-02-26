@@ -17,13 +17,9 @@ logger = logging.getLogger(__name__)
 
 
 class Scene:
-    def __init__(
-        self,
-        scene_info: SceneInfo,
-        client: HttpClient | None = None,
-    ) -> None:
+    def __init__(self, scene_info: SceneInfo, client: HttpClient) -> None:
         self._scene_info = scene_info
-        self._client = client or HttpClient()
+        self._client = client
 
     @classmethod
     async def from_name(cls, scene_name: str, client: HttpClient | None = None) -> Self:

@@ -4,6 +4,8 @@ from hueify.grouped_lights.cache import GroupedLightCache
 from hueify.grouped_lights.service import GroupedLights
 from hueify.groups import Zone, ZoneNotFoundException
 from hueify.http import HttpClient
+from hueify.scenes.cache import SceneCache
+from hueify.scenes.models import SceneInfo
 from hueify.shared.resource import ActionResult
 from hueify.zone.cache import ZoneCache
 
@@ -16,10 +18,12 @@ class ZoneNamespace:
         zone_cache: ZoneCache,
         grouped_light_cache: GroupedLightCache,
         http_client: HttpClient,
+        scene_cache: SceneCache,
     ) -> None:
         self._zone_cache = zone_cache
         self._grouped_light_cache = grouped_light_cache
         self._http_client = http_client
+        self._scene_cache = scene_cache
 
     @property
     def names(self) -> list[str]:
@@ -59,6 +63,22 @@ class ZoneNamespace:
         zone = self.get_zone(name)
         return zone.brightness_percentage
 
+    def scene_names(self, name: str) -> list[str]:
+        zone = self.get_zone(name)
+        return zone.scene_names
+
+    def list_scenes(self, name: str) -> list[SceneInfo]:
+        zone = self.get_zone(name)
+        return zone.list_scenes()
+
+    def get_active_scene(self, name: str) -> SceneInfo | None:
+        zone = self.get_zone(name)
+        return zone.get_active_scene()
+
+    async def activate_scene(self, name: str, scene_name: str) -> ActionResult:
+        zone = self.get_zone(name)
+        return await zone.activate_scene(scene_name)
+
     def get_zone(self, name: str) -> Zone:
         group_info = self._zone_cache.get_by_name(name)
         if group_info is None:
@@ -82,4 +102,5 @@ class ZoneNamespace:
             group_info=group_info,
             grouped_lights=grouped_lights,
             client=self._http_client,
+            scene_cache=self._scene_cache,
         )

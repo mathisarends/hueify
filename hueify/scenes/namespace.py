@@ -35,12 +35,14 @@ class SceneNamespace:
     async def activate_in_room(self, scene_name: str, room_name: str) -> ActionResult:
         room_id = self._resolve_room_id(room_name)
         scene_info = self._find_scene_in_group(scene_name, room_id)
-        return await Scene(scene_info=scene_info, client=self._http_client).activate()
+        scene = Scene(scene_info=scene_info, client=self._http_client)
+        return await scene.activate()
 
     async def activate_in_zone(self, scene_name: str, zone_name: str) -> ActionResult:
         zone_id = self._resolve_zone_id(zone_name)
         scene_info = self._find_scene_in_group(scene_name, zone_id)
-        return await Scene(scene_info=scene_info, client=self._http_client).activate()
+        scene = Scene(scene_info=scene_info, client=self._http_client)
+        return await scene.activate()
 
     def get_active_scene_for_room(self, room_name: str) -> SceneInfo | None:
         room_id = self._resolve_room_id(room_name)

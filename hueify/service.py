@@ -11,7 +11,7 @@ from hueify.http import HttpClient
 from hueify.light import LightCache, LightNamespace
 from hueify.light.models import LightInfo
 from hueify.room import RoomCache, RoomNamespace
-from hueify.scenes import SceneCache, SceneNamespace
+from hueify.scenes import SceneCache
 from hueify.scenes.models import SceneInfo
 from hueify.sse import EventBus, ServerSentEventStream
 from hueify.zone import ZoneCache, ZoneNamespace
@@ -38,19 +38,22 @@ class Hueify:
 
         self._light_cache = LightCache(self._event_bus)
         self._grouped_light_cache = GroupedLightCache(self._event_bus)
-        self._room_cache = RoomCache(self._event_bus)
-        self._zone_cache = ZoneCache(self._event_bus)
+        self._room_cache = RoomCache()
+        self._zone_cache = ZoneCache()
         self._scene_cache = SceneCache(self._event_bus)
 
         self.lights = LightNamespace(self._light_cache, self._http_client)
         self.rooms = RoomNamespace(
-            self._room_cache, self._grouped_light_cache, self._http_client
+            self._room_cache,
+            self._grouped_light_cache,
+            self._http_client,
+            self._scene_cache,
         )
         self.zones = ZoneNamespace(
-            self._zone_cache, self._grouped_light_cache, self._http_client
-        )
-        self.scenes = SceneNamespace(
-            self._scene_cache, self._room_cache, self._zone_cache, self._http_client
+            self._zone_cache,
+            self._grouped_light_cache,
+            self._http_client,
+            self._scene_cache,
         )
         logger.info("Hueify initialized successfully")
 
@@ -91,12 +94,12 @@ class Hueify:
 
     async def _populate_caches(self) -> None:
         lights, rooms, zones, scenes, grouped_lights = await asyncio.gather(
-            self._http_client.get_resources(endpoint="light", resource_type=LightInfo),
-            self._http_client.get_resources(endpoint="room", resource_type=GroupInfo),
-            self._http_client.get_resources(endpoint="zone", resource_type=GroupInfo),
-            self._http_client.get_resources(endpoint="scene", resource_type=SceneInfo),
+            self._http_client.get_resources(endpoint="/light", resource_type=LightInfo),
+            self._http_client.get_resources(endpoint="/room", resource_type=GroupInfo),
+            self._http_client.get_resources(endpoint="/zone", resource_type=GroupInfo),
+            self._http_client.get_resources(endpoint="/scene", resource_type=SceneInfo),
             self._http_client.get_resources(
-                endpoint="grouped_light", resource_type=GroupedLightInfo
+                endpoint="/grouped_light", resource_type=GroupedLightInfo
             ),
         )
         await asyncio.gather(

@@ -1,8 +1,7 @@
 import logging
 
-from hueify.cache.lookup.base import NamedEntityLookupCache
 from hueify.groups.models import GroupInfo
-from hueify.sse.bus import EventBus
+from hueify.shared.lookup import NamedEntityLookupCache
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +14,6 @@ class ZoneCache(NamedEntityLookupCache[GroupInfo]):
     the static zone metadata and service references populated at startup via REST.
     """
 
-    def __init__(self, event_bus: EventBus) -> None:
+    def __init__(self) -> None:
         super().__init__()
         logger.debug("ZoneCache initialised")
