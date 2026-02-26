@@ -34,7 +34,16 @@ class HueifyMCP(FastMCP):
             ctx_param = inspect.Parameter(
                 "ctx", inspect.Parameter.KEYWORD_ONLY, annotation=Context
             )
-            wrapper.__signature__ = sig.replace(parameters=[*params, ctx_param])
+            new_sig = sig.replace(parameters=[*params, ctx_param])
+            wrapper.__signature__ = new_sig
+
+            wrapper.__annotations__ = {
+                p.name: p.annotation
+                for p in new_sig.parameters.values()
+                if p.annotation is not inspect.Parameter.empty
+            }
+            if sig.return_annotation is not inspect.Parameter.empty:
+                wrapper.__annotations__["return"] = sig.return_annotation
 
             return self.tool(**tool_kwargs)(wrapper)
 
