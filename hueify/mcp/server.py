@@ -46,17 +46,14 @@ async def decrease_light_brightness(
 
 
 @mcp_server.light_tool()
-async def set_light_color_temperature(
-    light_name: str, percentage: float, lights: LightNamespace
-) -> ActionResult:
-    light = lights.from_name(light_name)
-    return await light.set_color_temperature(percentage)
-
-
-@mcp_server.light_tool()
 async def get_light_brightness(light_name: str, lights: LightNamespace) -> float:
     light = lights.from_name(light_name)
     return light.brightness_percentage
+
+
+@mcp_server.light_tool()
+async def list_lights(lights: LightNamespace) -> list[str]:
+    return lights.names
 
 
 # ===== Rooms =====
@@ -99,14 +96,6 @@ async def decrease_room_brightness(
 
 
 @mcp_server.room_tool()
-async def set_room_color_temperature(
-    room_name: str, percentage: float, rooms: RoomNamespace
-) -> ActionResult:
-    room = rooms.from_name(room_name)
-    return await room.set_color_temperature(percentage)
-
-
-@mcp_server.room_tool()
 async def get_room_brightness(room_name: str, rooms: RoomNamespace) -> float:
     room = rooms.from_name(room_name)
     return room.brightness_percentage
@@ -135,6 +124,11 @@ async def get_active_scene_in_room(room_name: str, rooms: RoomNamespace) -> str:
 async def list_scenes_in_room(room_name: str, rooms: RoomNamespace) -> list[str]:
     room = rooms.from_name(room_name)
     return room.scene_names
+
+
+@mcp_server.room_tool()
+async def list_rooms(rooms: RoomNamespace) -> list[str]:
+    return rooms.names
 
 
 # ===== Zones =====
@@ -177,14 +171,6 @@ async def decrease_zone_brightness(
 
 
 @mcp_server.zone_tool()
-async def set_zone_color_temperature(
-    zone_name: str, percentage: float, zones: ZoneNamespace
-) -> ActionResult:
-    zone = zones.from_name(zone_name)
-    return await zone.set_color_temperature(percentage)
-
-
-@mcp_server.zone_tool()
 async def get_zone_brightness(zone_name: str, zones: ZoneNamespace) -> float:
     zone = zones.from_name(zone_name)
     return zone.brightness_percentage
@@ -213,6 +199,11 @@ async def get_active_scene_in_zone(zone_name: str, zones: ZoneNamespace) -> str:
 async def list_scenes_in_zone(zone_name: str, zones: ZoneNamespace) -> list[str]:
     zone = zones.from_name(zone_name)
     return zone.scene_names
+
+
+@mcp_server.zone_tool()
+async def list_zones(zones: ZoneNamespace) -> list[str]:
+    return zones.names
 
 
 if __name__ == "__main__":

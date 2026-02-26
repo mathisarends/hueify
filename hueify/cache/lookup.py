@@ -33,7 +33,8 @@ class EntityLookupCache(Generic[T]):
             return
 
         try:
-            updated_resource = cached_resource.model_copy(update=event_data, deep=True)
+            merged = {**cached_resource.model_dump(), **event_data}
+            updated_resource = cached_resource.model_validate(merged)
             self._id_to_model[resource_id] = updated_resource
             logger.debug(f"Updated cached resource with ID {resource_id}")
         except Exception as e:
