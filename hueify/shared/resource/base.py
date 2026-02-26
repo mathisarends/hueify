@@ -5,6 +5,7 @@ from uuid import UUID
 
 from hueify.cache.lookup import EntityLookupCache
 from hueify.http import HttpClient
+from hueify.shared.decorators import timed
 from hueify.shared.resource.models import (
     ActionResult,
     ColorTemperatureState,
@@ -66,15 +67,11 @@ class Resource(ABC, Generic[TLightInfo]):
     def id(self) -> UUID:
         return self._id
 
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        pass
-
     @abstractmethod
     def _get_resource_endpoint(self) -> str:
         pass
 
+    @timed()
     async def turn_on(self) -> ActionResult:
         if self.is_on:
             return ActionResult(message="Already on")
@@ -82,13 +79,14 @@ class Resource(ABC, Generic[TLightInfo]):
         await self._update_remote_state(self._create_on_state())
         return ActionResult(message="Turned on successfully")
 
-    @abstractmethod
     async def _update_remote_state(self, state: ControllableLightUpdate) -> None:
-        pass
+        endpoint = self._get_resource_endpoint()
+        await self._client.put(f"{endpoint}/{self.id}", data=state)
 
     def _create_on_state(self) -> ControllableLightUpdate:
         return ControllableLightUpdate(on=LightOnState(on=True))
 
+    @timed()
     async def turn_off(self) -> ActionResult:
         if not self.is_on:
             return ActionResult(message="Already off")
@@ -99,6 +97,7 @@ class Resource(ABC, Generic[TLightInfo]):
     def _create_off_state(self) -> ControllableLightUpdate:
         return ControllableLightUpdate(on=LightOnState(on=False))
 
+    @timed()
     async def set_brightness(self, percentage: float | int) -> ActionResult:
         percentage_int = self._normalize_percentage(percentage)
         clamped = max(self._MIN_BRIGHTNESS, min(self._MAX_BRIGHTNESS, percentage_int))
@@ -115,6 +114,7 @@ class Resource(ABC, Generic[TLightInfo]):
         await self._update_remote_state(self._create_brightness_state(clamped))
         return ActionResult(message=message, clamped=was_clamped, final_value=clamped)
 
+    @timed()
     async def increase_brightness(self, percentage: float | int) -> ActionResult:
         percentage_int = self._normalize_percentage(percentage)
         target = int(self.brightness_percentage + percentage_int)
@@ -130,6 +130,7 @@ class Resource(ABC, Generic[TLightInfo]):
         await self._update_remote_state(self._create_brightness_state(clamped))
         return ActionResult(message=message, clamped=was_clamped, final_value=clamped)
 
+    @timed()
     async def decrease_brightness(self, percentage: float | int) -> ActionResult:
         percentage_int = self._normalize_percentage(percentage)
         target = int(self.brightness_percentage - percentage_int)
@@ -155,6 +156,7 @@ class Resource(ABC, Generic[TLightInfo]):
             return int(percentage * 100)
         return int(percentage)
 
+    @timed()
     async def set_color_temperature(self, percentage: float | int) -> ActionResult:
         percentage_int = self._normalize_percentage(percentage)
         clamped = max(self._MIN_TEMPERATURE, min(self._MAX_TEMPERATURE, percentage_int))

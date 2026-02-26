@@ -13,9 +13,6 @@ class ResourceLookup(ABC, Generic[T]):
         self._client = client or HttpClient()
 
     async def get_all_entities(self) -> list[T]:
-        return await self._fetch_all_entities()
-
-    async def _fetch_all_entities(self) -> list[T]:
         endpoint = self._get_endpoint()
         model_type = self.get_model_type()
         return await self._client.get_resources(endpoint, model_type)

@@ -15,6 +15,7 @@ from hueify.grouped_lights import (
 from hueify.http import HttpClient
 from hueify.light import LightCache, LightNamespace
 from hueify.scenes import SceneCache
+from hueify.shared.decorators import timed
 from hueify.sse import EventBus, ServerSentEventStream
 
 logger = logging.getLogger(__name__)
@@ -86,12 +87,17 @@ class Hueify:
     ) -> None:
         await self.close()
 
+    @timed()
     async def connect(self) -> None:
         logger.info("Connecting to Hue Bridge")
         self._stream_task = asyncio.create_task(self._event_stream.connect())
         logger.debug("Event stream connection task created")
 
         await self._populate_caches()
+        logger.info("Caches populated successfully")
+
+    async def _populate_caches(self) -> None:
+        await asyncio.gather(*[c.populate(self._http_client) for c in self._caches])
         logger.info("Caches populated successfully")
 
     async def close(self) -> None:
@@ -105,10 +111,6 @@ class Hueify:
 
         await self._http_client.close()
         self._clear_caches()
-
-    async def _populate_caches(self) -> None:
-        await asyncio.gather(*[c.populate(self._http_client) for c in self._caches])
-        logger.info("Caches populated successfully")
 
     def _clear_caches(self) -> None:
         for c in self._caches:

@@ -1,8 +1,7 @@
+from hueify import ActionResult
+from hueify.grouped_lights import RoomNamespace, ZoneNamespace
 from hueify.light import LightNamespace
 from hueify.mcp.app import HueifyMCP, lifespan
-from hueify.room import RoomNamespace
-from hueify.shared.resource import ActionResult
-from hueify.zone import ZoneNamespace
 
 mcp_server = HueifyMCP("Hueify MCP Server", lifespan=lifespan)
 

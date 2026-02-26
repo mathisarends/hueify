@@ -1,5 +1,3 @@
-from pydantic import BaseModel
-
 from hueify.cache.lookup import EntityLookupCache
 from hueify.exceptions import ResourceNotFoundException
 from hueify.grouped_lights.models import GroupedLightInfo, GroupInfo
@@ -7,6 +5,7 @@ from hueify.http import HttpClient
 from hueify.scenes.cache import SceneCache
 from hueify.scenes.schemas import SceneInfo
 from hueify.scenes.service import Scene
+from hueify.shared.decorators import timed
 from hueify.shared.fuzzy import find_all_matches_sorted
 from hueify.shared.resource import Resource
 from hueify.shared.resource.models import ActionResult
@@ -32,11 +31,7 @@ class GroupedLights(Resource[GroupedLightInfo]):
         return self._light_info.name
 
     def _get_resource_endpoint(self) -> str:
-        return "grouped_light"
-
-    async def _update_remote_state(self, state: BaseModel) -> None:
-        endpoint = self._get_resource_endpoint()
-        await self._client.put(f"{endpoint}/{self.id}", data=state)
+        return "/grouped_light"
 
     @property
     def scene_names(self) -> list[str]:
@@ -48,6 +43,7 @@ class GroupedLights(Resource[GroupedLightInfo]):
     def get_active_scene(self) -> SceneInfo | None:
         return next((s for s in self._list_scenes() if s.is_active), None)
 
+    @timed()
     async def activate_scene(self, scene_name: str) -> ActionResult:
         scenes = self._list_scenes()
         scene_info = self._resolve_scene(scene_name, scenes)
