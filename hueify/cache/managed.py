@@ -3,6 +3,9 @@ from abc import ABC, abstractmethod
 from hueify.http import HttpClient
 
 
-class PopulatableCache(ABC):
+class ManagedCache(ABC):
     @abstractmethod
     async def populate(self, http_client: HttpClient) -> None: ...
+
+    @abstractmethod
+    def clear(self) -> None: ...

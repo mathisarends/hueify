@@ -1,6 +1,6 @@
 import logging
 
-from hueify.cache import PopulatableCache
+from hueify.cache import ManagedCache
 from hueify.cache.lookup import NamedEntityLookupCache
 from hueify.http import HttpClient
 from hueify.scenes.schemas import SceneInfo
@@ -10,7 +10,7 @@ from hueify.sse.views import SceneEvent
 logger = logging.getLogger(__name__)
 
 
-class SceneCache(NamedEntityLookupCache[SceneInfo], PopulatableCache):
+class SceneCache(NamedEntityLookupCache[SceneInfo], ManagedCache):
     def __init__(self, event_bus: EventBus) -> None:
         super().__init__()
         event_bus.subscribe(SceneEvent, self._on_scene_event)
@@ -20,7 +20,7 @@ class SceneCache(NamedEntityLookupCache[SceneInfo], PopulatableCache):
         scenes = await http_client.get_resources(
             endpoint="/scene", resource_type=SceneInfo
         )
-        await self.store_all(scenes)
+        self.store_all(scenes)
 
     async def _on_scene_event(self, event: SceneEvent) -> None:
         self.update_from_event(

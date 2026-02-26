@@ -1,6 +1,6 @@
 import logging
 
-from hueify.cache import PopulatableCache
+from hueify.cache import ManagedCache
 from hueify.cache.lookup import NamedEntityLookupCache
 from hueify.grouped_lights.models import GroupInfo
 from hueify.http import HttpClient
@@ -8,7 +8,7 @@ from hueify.http import HttpClient
 logger = logging.getLogger(__name__)
 
 
-class RoomCache(NamedEntityLookupCache[GroupInfo], PopulatableCache):
+class RoomCache(NamedEntityLookupCache[GroupInfo], ManagedCache):
     """Cache for room resources.
 
     Rooms don't emit SSE events themselves — their live state (on/off, brightness)
@@ -25,4 +25,4 @@ class RoomCache(NamedEntityLookupCache[GroupInfo], PopulatableCache):
         rooms = await http_client.get_resources(
             endpoint="/room", resource_type=GroupInfo
         )
-        await self.store_all(rooms)
+        self.store_all(rooms)

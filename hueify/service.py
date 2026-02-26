@@ -3,17 +3,18 @@ import logging
 from types import TracebackType
 from typing import Self
 
-from hueify.cache import PopulatableCache
+from hueify.cache import ManagedCache
 from hueify.credentials import HueBridgeCredentials
-from hueify.grouped_lights.cache import GroupedLightCache
-from hueify.grouped_lights.rooms.cache import RoomCache
-from hueify.grouped_lights.rooms.namespace import RoomNamespace
-from hueify.grouped_lights.zones.cache import ZoneCache
-from hueify.grouped_lights.zones.namespace import ZoneNamespace
+from hueify.grouped_lights import (
+    GroupedLightCache,
+    RoomCache,
+    RoomNamespace,
+    ZoneCache,
+    ZoneNamespace,
+)
 from hueify.http import HttpClient
-from hueify.light import LightNamespace
-from hueify.light.cache import LightCache
-from hueify.scenes.cache import SceneCache
+from hueify.light import LightCache, LightNamespace
+from hueify.scenes import SceneCache
 from hueify.sse import EventBus, ServerSentEventStream
 
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ class Hueify:
         self._zone_cache = ZoneCache()
         self._scene_cache = SceneCache(self._event_bus)
 
-        self._caches: list[PopulatableCache] = [
+        self._caches: list[ManagedCache] = [
             self._light_cache,
             self._grouped_light_cache,
             self._room_cache,
@@ -97,12 +98,13 @@ class Hueify:
             logger.debug("Event stream task cancelled")
 
         await self._http_client.close()
-        await self._clear_caches()
+        self._clear_caches()
 
     async def _populate_caches(self) -> None:
         await asyncio.gather(*[c.populate(self._http_client) for c in self._caches])
         logger.info("Caches populated successfully")
 
-    async def _clear_caches(self) -> None:
-        await asyncio.gather(*[c.clear() for c in self._caches])
+    def _clear_caches(self) -> None:
+        for c in self._caches:
+            c.clear()
         logger.info("All caches cleared")

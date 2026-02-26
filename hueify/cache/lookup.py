@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import Generic, TypeVar
 from uuid import UUID
@@ -13,7 +12,6 @@ logger = logging.getLogger(__name__)
 class EntityLookupCache(Generic[T]):
     def __init__(self) -> None:
         self._id_to_model: dict[UUID, T] = {}
-        self._lock = asyncio.Lock()
 
     def get_all(self) -> list[T]:
         return list(self._id_to_model.values())
@@ -21,11 +19,10 @@ class EntityLookupCache(Generic[T]):
     def get_by_id(self, entity_id: UUID) -> T | None:
         return self._id_to_model.get(entity_id)
 
-    async def store_all(self, entities: list[T]) -> None:
-        async with self._lock:
-            self._id_to_model.clear()
-            for entity in entities:
-                self._store_single(entity)
+    def store_all(self, entities: list[T]) -> None:
+        self._id_to_model.clear()
+        for entity in entities:
+            self._store_single(entity)
 
     def _store_single(self, entity: T) -> None:
         self._id_to_model[entity.id] = entity
@@ -45,9 +42,8 @@ class EntityLookupCache(Generic[T]):
                 exc_info=True,
             )
 
-    async def clear(self) -> None:
-        async with self._lock:
-            self._id_to_model.clear()
+    def clear(self) -> None:
+        self._id_to_model.clear()
 
 
 class NamedEntityLookupCache(EntityLookupCache[T]):
@@ -79,7 +75,6 @@ class NamedEntityLookupCache(EntityLookupCache[T]):
             entity_name = cached_resource.metadata.name.lower()
             self._name_to_model[entity_name] = cached_resource
 
-    async def clear(self) -> None:
-        await super().clear()
-        async with self._lock:
-            self._name_to_model.clear()
+    def clear(self) -> None:
+        super().clear()
+        self._name_to_model.clear()

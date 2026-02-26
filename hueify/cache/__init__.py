@@ -1,8 +1,8 @@
 from .lookup import EntityLookupCache, NamedEntityLookupCache
-from .port import PopulatableCache
+from .managed import ManagedCache
 
 __all__ = [
     "EntityLookupCache",
+    "ManagedCache",
     "NamedEntityLookupCache",
-    "PopulatableCache",
 ]

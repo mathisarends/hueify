@@ -1,6 +1,6 @@
 import logging
 
-from hueify.cache import PopulatableCache
+from hueify.cache import ManagedCache
 from hueify.cache.lookup import NamedEntityLookupCache
 from hueify.http import HttpClient
 from hueify.light.models import LightInfo
@@ -10,7 +10,7 @@ from hueify.sse.views import LightEvent
 logger = logging.getLogger(__name__)
 
 
-class LightCache(NamedEntityLookupCache[LightInfo], PopulatableCache):
+class LightCache(NamedEntityLookupCache[LightInfo], ManagedCache):
     def __init__(self, event_bus: EventBus) -> None:
         super().__init__()
         event_bus.subscribe(LightEvent, self._on_light_event)
@@ -20,7 +20,7 @@ class LightCache(NamedEntityLookupCache[LightInfo], PopulatableCache):
         lights = await http_client.get_resources(
             endpoint="/light", resource_type=LightInfo
         )
-        await self.store_all(lights)
+        self.store_all(lights)
 
     async def _on_light_event(self, event: LightEvent) -> None:
         self.update_from_event(
