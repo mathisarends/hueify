@@ -30,7 +30,7 @@ class EventBus:
         logger.debug(f"Dispatching {event_type.__name__} to {len(handlers)} handler(s)")
 
         if not handlers:
-            logger.warning(f"No handlers registered for {event_type.__name__}")
+            logger.debug(f"No handlers registered for {event_type.__name__}")
             return event
 
         results = await asyncio.gather(
