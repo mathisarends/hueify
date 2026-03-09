@@ -1,7 +1,7 @@
 from .cache import LightCache
-from .models import LightInfo
 from .namespace import LightNamespace
 from .service import Light
+from .views import LightInfo
 
 __all__ = [
     "Light",

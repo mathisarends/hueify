@@ -3,7 +3,7 @@ import logging
 from hueify.cache import ManagedCache
 from hueify.cache.lookup import NamedEntityLookupCache
 from hueify.http import HttpClient
-from hueify.light.models import LightInfo
+from hueify.light.views import LightInfo
 from hueify.sse.bus import EventBus
 from hueify.sse.views import LightEvent
 

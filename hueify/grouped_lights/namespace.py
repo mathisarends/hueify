@@ -3,8 +3,8 @@ import logging
 from hueify.cache.lookup import NamedEntityLookupCache
 from hueify.exceptions import ResourceNotFoundException
 from hueify.grouped_lights.cache import GroupedLightCache
-from hueify.grouped_lights.models import GroupInfo
 from hueify.grouped_lights.service import GroupedLights
+from hueify.grouped_lights.views import GroupInfo
 from hueify.http import HttpClient
 from hueify.scenes.cache import SceneCache
 from hueify.shared.resource import ActionResult

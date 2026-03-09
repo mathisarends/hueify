@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 import pytest
 
 from hueify.shared.resource import Resource
-from hueify.shared.resource.models import (
+from hueify.shared.resource.views import (
     ColorTemperatureState,
     DimmingState,
     LightOnState,

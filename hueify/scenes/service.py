@@ -9,7 +9,7 @@ from hueify.scenes.schemas import (
     SceneRecall,
     SceneStatusValue,
 )
-from hueify.shared.resource.models import ActionResult
+from hueify.shared.resource.views import ActionResult
 
 logger = logging.getLogger(__name__)
 

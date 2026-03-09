@@ -2,7 +2,7 @@ import logging
 
 from hueify.cache import ManagedCache
 from hueify.cache.lookup import NamedEntityLookupCache
-from hueify.grouped_lights.models import GroupInfo
+from hueify.grouped_lights.views import GroupInfo
 from hueify.http import HttpClient
 
 logger = logging.getLogger(__name__)

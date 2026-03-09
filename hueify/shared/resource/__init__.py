@@ -1,6 +1,6 @@
 from .base import Resource
 from .lookup import NamedResourceLookup, ResourceLookup
-from .models import (
+from .views import (
     ActionResult,
     ColorTemperatureState,
     LightOnState,

@@ -1,7 +1,7 @@
 from .cache import GroupedLightCache
-from .models import GroupedLightInfo
 from .rooms import RoomCache, RoomNamespace
 from .service import GroupedLights
+from .views import GroupedLightInfo
 from .zones import ZoneCache, ZoneNamespace
 
 __all__ = [
