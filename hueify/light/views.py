@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, TypeAdapter
 
-from hueify.shared.resource.models import (
+from hueify.shared.resource.views import (
     ControllableLight,
     ResourceReference,
     ResourceType,

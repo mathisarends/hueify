@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from hueify.shared.resource.models import (
+from hueify.shared.resource.views import (
     ControllableLight,
     ResourceReference,
     ResourceType,

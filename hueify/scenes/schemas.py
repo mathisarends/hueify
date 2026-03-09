@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, TypeAdapter
 
-from hueify.shared.resource.models import ResourceReference, ResourceType
+from hueify.shared.resource.views import ResourceReference, ResourceType
 
 
 class SceneStatusValue(StrEnum):

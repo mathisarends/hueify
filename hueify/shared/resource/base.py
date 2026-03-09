@@ -6,7 +6,7 @@ from uuid import UUID
 from hueify.cache.lookup import EntityLookupCache
 from hueify.http import HttpClient
 from hueify.shared.decorators import timed
-from hueify.shared.resource.models import (
+from hueify.shared.resource.views import (
     ActionResult,
     ColorTemperatureState,
     ControllableLightUpdate,

@@ -3,7 +3,7 @@ from typing import Generic, TypeVar
 
 from hueify.http import HttpClient
 from hueify.shared.fuzzy import find_all_matches_sorted
-from hueify.shared.resource.models import ResourceInfo
+from hueify.shared.resource.views import ResourceInfo
 
 T = TypeVar("T", bound=ResourceInfo)
 

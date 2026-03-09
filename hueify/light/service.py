@@ -1,4 +1,4 @@
-from hueify.light.models import (
+from hueify.light.views import (
     LightInfo,
 )
 from hueify.shared.resource import Resource
