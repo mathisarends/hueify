@@ -8,6 +8,7 @@ from hueify.grouped_lights.views import GroupInfo
 from hueify.http import HttpClient
 from hueify.scenes.cache import SceneCache
 from hueify.shared.resource import ActionResult
+from hueify.shared.resource.colors import Color
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +89,14 @@ class GroupNamespace:
     ) -> ActionResult:
         group = self.from_name(name)
         return await group.set_color_temperature(percentage)
+
+    async def set_color(self, name: str, r: int, g: int, b: int) -> ActionResult:
+        group = self.from_name(name)
+        return await group.set_color(r, g, b)
+
+    async def set_named_color(self, name: str, color: Color) -> ActionResult:
+        group = self.from_name(name)
+        return await group.set_named_color(color)
 
     def get_brightness(self, name: str) -> float:
         group = self.from_name(name)
