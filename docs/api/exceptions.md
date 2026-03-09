@@ -1,0 +1,3 @@
+# Exceptions
+
+::: hueify.ResourceNotFoundException

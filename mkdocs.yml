@@ -1,0 +1,78 @@
+site_name: Hueify
+site_description: Async Python client for the Philips Hue API with real-time event streaming
+site_url: https://github.com/your-org/hueify
+repo_url: https://github.com/your-org/hueify
+repo_name: hueify
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: amber
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: amber
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - toc.integrate
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: false
+            show_bases: false
+            show_root_heading: true
+            show_root_full_path: false
+            show_inheritance_diagram: false
+            members_order: source
+            separate_signature: true
+            show_signature_annotations: true
+            unwrap_annotated: true
+            extensions:
+              - griffe_pydantic
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - User Guide:
+      - Lights: guide/lights.md
+      - Rooms & Zones: guide/rooms-zones.md
+      - Events: guide/events.md
+  - API Reference:
+      - Hueify: api/hueify.md
+      - Lights: api/lights.md
+      - Rooms & Zones: api/rooms-zones.md
+      - Events: api/events.md
+      - Exceptions: api/exceptions.md
