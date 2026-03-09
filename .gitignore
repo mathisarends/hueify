@@ -84,3 +84,5 @@ desktop.ini
 .env
 
 .ruff_cache/
+
+site/

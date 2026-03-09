@@ -5,6 +5,7 @@ from hueify.http import HttpClient
 from hueify.light.cache import LightCache
 from hueify.light.service import Light
 from hueify.shared.resource import ActionResult
+from hueify.shared.resource.colors import Color
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,14 @@ class LightNamespace:
     ) -> ActionResult:
         light = self.from_name(name)
         return await light.set_color_temperature(color_temperature_percentage)
+
+    async def set_color(self, name: str, r: int, g: int, b: int) -> ActionResult:
+        light = self.from_name(name)
+        return await light.set_color(r, g, b)
+
+    async def set_named_color(self, name: str, color: Color) -> ActionResult:
+        light = self.from_name(name)
+        return await light.set_named_color(color)
 
     def get_brightness(self, name: str) -> float:
         light = self.from_name(name)
