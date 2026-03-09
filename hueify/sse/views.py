@@ -335,6 +335,8 @@ class GeofenceClientData(BaseModel):
 
 
 class ButtonEvent(BaseModel):
+    """Fired when a Hue button is pressed or released."""
+
     type: Literal[ResourceType.BUTTON] = ResourceType.BUTTON
     id: UUID
     id_v1: str | None = None
@@ -343,6 +345,8 @@ class ButtonEvent(BaseModel):
 
 
 class BellButtonEvent(BaseModel):
+    """Fired when a Hue doorbell button is pressed."""
+
     type: Literal[ResourceType.BELL_BUTTON] = ResourceType.BELL_BUTTON
     id: UUID
     id_v1: str | None = None
@@ -351,6 +355,8 @@ class BellButtonEvent(BaseModel):
 
 
 class RelativeRotaryEvent(BaseModel):
+    """Fired when a Hue rotary dial is turned."""
+
     type: Literal[ResourceType.RELATIVE_ROTARY] = ResourceType.RELATIVE_ROTARY
     id: UUID
     id_v1: str | None = None
@@ -359,6 +365,8 @@ class RelativeRotaryEvent(BaseModel):
 
 
 class LightEvent(BaseModel):
+    """Fired when an individual light changes state (on/off, brightness, colour, effects)."""
+
     type: Literal[ResourceType.LIGHT] = ResourceType.LIGHT
     id: UUID
     id_v1: str | None = None
@@ -378,6 +386,8 @@ class LightEvent(BaseModel):
 
 
 class GroupedLightEvent(BaseModel):
+    """Fired when a grouped-light resource (room or zone) changes state."""
+
     type: Literal[ResourceType.GROUPED_LIGHT] = ResourceType.GROUPED_LIGHT
     id: UUID
     id_v1: str | None = None
@@ -391,6 +401,8 @@ class GroupedLightEvent(BaseModel):
 
 
 class MotionEvent(BaseModel):
+    """Fired when a Hue motion sensor detects or loses motion."""
+
     type: Literal[ResourceType.MOTION] = ResourceType.MOTION
     id: UUID
     id_v1: str | None = None
@@ -399,6 +411,8 @@ class MotionEvent(BaseModel):
 
 
 class CameraMotionEvent(BaseModel):
+    """Fired when a Hue camera detects or loses motion."""
+
     type: Literal[ResourceType.CAMERA_MOTION] = ResourceType.CAMERA_MOTION
     id: UUID
     id_v1: str | None = None
@@ -407,6 +421,8 @@ class CameraMotionEvent(BaseModel):
 
 
 class TemperatureEvent(BaseModel):
+    """Fired when a temperature sensor reading changes."""
+
     type: Literal[ResourceType.TEMPERATURE] = ResourceType.TEMPERATURE
     id: UUID
     id_v1: str | None = None
@@ -415,6 +431,8 @@ class TemperatureEvent(BaseModel):
 
 
 class LightLevelEvent(BaseModel):
+    """Fired when an ambient light level sensor reading changes."""
+
     type: Literal[ResourceType.LIGHT_LEVEL] = ResourceType.LIGHT_LEVEL
     id: UUID
     id_v1: str | None = None
@@ -423,6 +441,8 @@ class LightLevelEvent(BaseModel):
 
 
 class ContactEvent(BaseModel):
+    """Fired when a contact sensor state changes (contact / no contact)."""
+
     type: Literal[ResourceType.CONTACT] = ResourceType.CONTACT
     id: UUID
     id_v1: str | None = None
@@ -431,6 +451,8 @@ class ContactEvent(BaseModel):
 
 
 class TamperEvent(BaseModel):
+    """Fired when a tamper sensor detects physical interference with a device."""
+
     type: Literal[ResourceType.TAMPER] = ResourceType.TAMPER
     id: UUID
     id_v1: str | None = None
@@ -439,6 +461,8 @@ class TamperEvent(BaseModel):
 
 
 class SceneEvent(BaseModel):
+    """Fired when a scene is activated or its status changes."""
+
     type: Literal[ResourceType.SCENE] = ResourceType.SCENE
     id: UUID
     id_v1: str | None = None
@@ -446,6 +470,8 @@ class SceneEvent(BaseModel):
 
 
 class SmartSceneEvent(BaseModel):
+    """Fired when an adaptive (smart) scene state changes."""
+
     type: Literal[ResourceType.SMART_SCENE] = ResourceType.SMART_SCENE
     id: UUID
     id_v1: str | None = None
@@ -453,6 +479,8 @@ class SmartSceneEvent(BaseModel):
 
 
 class DevicePowerEvent(BaseModel):
+    """Fired when a device battery level or charging state changes."""
+
     type: Literal[ResourceType.DEVICE_POWER] = ResourceType.DEVICE_POWER
     id: UUID
     id_v1: str | None = None
@@ -461,6 +489,8 @@ class DevicePowerEvent(BaseModel):
 
 
 class DeviceEvent(BaseModel):
+    """Fired when device metadata or product information is updated."""
+
     type: Literal[ResourceType.DEVICE] = ResourceType.DEVICE
     id: UUID
     id_v1: str | None = None
@@ -470,6 +500,8 @@ class DeviceEvent(BaseModel):
 
 
 class ZigbeeConnectivityEvent(BaseModel):
+    """Fired when a device's Zigbee connectivity status changes."""
+
     type: Literal[ResourceType.ZIGBEE_CONNECTIVITY] = ResourceType.ZIGBEE_CONNECTIVITY
     id: UUID
     id_v1: str | None = None
@@ -479,6 +511,8 @@ class ZigbeeConnectivityEvent(BaseModel):
 
 
 class ZgpConnectivityEvent(BaseModel):
+    """Fired when a Zigbee Green Power device connectivity status changes."""
+
     type: Literal[ResourceType.ZGP_CONNECTIVITY] = ResourceType.ZGP_CONNECTIVITY
     id: UUID
     id_v1: str | None = None
@@ -488,6 +522,8 @@ class ZgpConnectivityEvent(BaseModel):
 
 
 class WifiConnectivityEvent(BaseModel):
+    """Fired when the bridge's Wi-Fi connectivity status changes."""
+
     type: Literal[ResourceType.WIFI_CONNECTIVITY] = ResourceType.WIFI_CONNECTIVITY
     id: UUID
     id_v1: str | None = None
@@ -496,6 +532,8 @@ class WifiConnectivityEvent(BaseModel):
 
 
 class GroupedMotionEvent(BaseModel):
+    """Fired when aggregated motion state changes across a group of motion sensors."""
+
     type: Literal[ResourceType.GROUPED_MOTION] = ResourceType.GROUPED_MOTION
     id: UUID
     id_v1: str | None = None
@@ -504,6 +542,8 @@ class GroupedMotionEvent(BaseModel):
 
 
 class GroupedLightLevelEvent(BaseModel):
+    """Fired when aggregated ambient light level changes across a group of sensors."""
+
     type: Literal[ResourceType.GROUPED_LIGHT_LEVEL] = ResourceType.GROUPED_LIGHT_LEVEL
     id: UUID
     id_v1: str | None = None
@@ -512,6 +552,8 @@ class GroupedLightLevelEvent(BaseModel):
 
 
 class EntertainmentConfigurationEvent(BaseModel):
+    """Fired when an entertainment (Hue Sync) configuration session starts or stops."""
+
     type: Literal[ResourceType.ENTERTAINMENT_CONFIGURATION] = (
         ResourceType.ENTERTAINMENT_CONFIGURATION
     )

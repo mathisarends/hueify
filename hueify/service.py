@@ -81,23 +81,35 @@ class Hueify:
             self._scene_cache,
         ]
 
-        self.lights = LightNamespace(self._light_cache, self._http_client)
-        """Namespace for individual light control. See :class:`~hueify.light.LightNamespace`."""
-        self.rooms = RoomNamespace(
+        self._lights = LightNamespace(self._light_cache, self._http_client)
+        self._rooms = RoomNamespace(
             room_cache=self._room_cache,
             grouped_light_cache=self._grouped_light_cache,
             http_client=self._http_client,
             scene_cache=self._scene_cache,
         )
-        """Namespace for room-level grouped-light and scene control. See :class:`~hueify.grouped_lights.RoomNamespace`."""
-        self.zones = ZoneNamespace(
+        self._zones = ZoneNamespace(
             zone_cache=self._zone_cache,
             grouped_light_cache=self._grouped_light_cache,
             http_client=self._http_client,
             scene_cache=self._scene_cache,
         )
-        """Namespace for zone-level grouped-light and scene control. See :class:`~hueify.grouped_lights.ZoneNamespace`."""
         logger.info("Hueify initialized successfully")
+
+    @property
+    def zones(self) -> ZoneNamespace:
+        """Namespace for zone-level grouped-light and scene control. See :class:`~hueify.grouped_lights.ZoneNamespace`."""
+        return self._zones
+
+    @property
+    def rooms(self) -> RoomNamespace:
+        """Namespace for room-level grouped-light and scene control. See :class:`~hueify.grouped_lights.RoomNamespace`."""
+        return self._rooms
+
+    @property
+    def lights(self) -> LightNamespace:
+        """Namespace for individual light control. See :class:`~hueify.light.LightNamespace`."""
+        return self._lights
 
     def _resolve_credentials(
         self,
@@ -162,6 +174,12 @@ class Hueify:
         logger.info("All caches cleared")
 
     def off[T: BaseModel](self, event_type: type[T], handler: EventHandler[T]) -> None:
+        """Unsubscribe a previously registered event handler.
+
+        Args:
+            event_type: The Pydantic event model class to stop listening for.
+            handler: The exact handler callable that was passed to :meth:`on`.
+        """
         self._event_bus.unsubscribe(event_type, handler)
 
     @overload
@@ -183,6 +201,34 @@ class Hueify:
         event_type: type[T],
         handler: EventHandler[T] | None = None,
     ) -> EventHandler[T] | Callable[[EventHandler[T]], EventHandler[T]]:
+        """Subscribe to a Hue Bridge SSE event type.
+
+        Can be called directly with a handler or used as a decorator:
+
+        ```python
+        # Direct call
+        async def my_handler(event: LightEvent) -> None:
+            print(event)
+
+        hue.on(LightEvent, my_handler)
+
+        # Decorator
+        @hue.on(LightEvent)
+        async def my_handler(event: LightEvent) -> None:
+            print(event)
+        ```
+
+        Args:
+            event_type: A Pydantic event model class from
+                :mod:`hueify.sse.views`, e.g. ``LightEvent``,
+                ``GroupedLightEvent``, ``SceneEvent``.
+            handler: An async callable ``(event: T) -> None``. When omitted
+                the method returns a decorator.
+
+        Returns:
+            The handler unchanged (direct call) or a decorator that returns
+            the handler (decorator usage).
+        """
         if handler is not None:
             self._event_bus.subscribe(event_type, handler)
             return handler
