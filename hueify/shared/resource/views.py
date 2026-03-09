@@ -79,6 +79,15 @@ class ColorTemperatureState(BaseModel):
     mirek_valid: bool | None = None
 
 
+class ColorXY(BaseModel):
+    x: float = Field(ge=0.0, le=1.0)
+    y: float = Field(ge=0.0, le=1.0)
+
+
+class ColorXYState(BaseModel):
+    xy: ColorXY
+
+
 class ResourceMetadata(BaseModel):
     name: str
 
@@ -101,12 +110,14 @@ class ControllableLight(BaseModel):
     on: LightOnState
     dimming: DimmingState | None
     color_temperature: ColorTemperatureState | None
+    color: ColorXYState | None = None
 
 
 class ControllableLightUpdate(BaseModel):
     on: LightOnState | None = None
     dimming: DimmingState | None = None
     color_temperature: ColorTemperatureState | None = None
+    color: ColorXYState | None = None
 
 
 TLightInfo = TypeVar("TLightInfo", bound=ControllableLight)

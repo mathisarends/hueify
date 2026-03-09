@@ -6,9 +6,12 @@ from uuid import UUID
 from hueify.cache.lookup import EntityLookupCache
 from hueify.http import HttpClient
 from hueify.shared.decorators import timed
+from hueify.shared.resource.colors import Color, resolve_color
 from hueify.shared.resource.views import (
     ActionResult,
     ColorTemperatureState,
+    ColorXY,
+    ColorXYState,
     ControllableLightUpdate,
     DimmingState,
     LightOnState,
@@ -251,3 +254,62 @@ class Resource(ABC, Generic[TLightInfo]):
             on=LightOnState(on=True),
             color_temperature=ColorTemperatureState(mirek=mirek),
         )
+
+    @timed()
+    async def set_color(self, r: int, g: int, b: int) -> ActionResult:
+        """Set the colour using sRGB values.
+
+        The RGB triplet is converted to CIE xy chromaticity coordinates using
+        the Hue wide-gamut D65 colour matrix with proper sRGB gamma correction.
+
+        Args:
+            r: Red channel in ``[0, 255]``.
+            g: Green channel in ``[0, 255]``.
+            b: Blue channel in ``[0, 255]``.
+
+        Returns:
+            :class:`~hueify.shared.resource.ActionResult` confirming the applied colour.
+        """
+        x, y = self._rgb_to_xy(r, g, b)
+        await self._update_remote_state(self._create_color_state(x, y))
+        return ActionResult(message=f"Color set to rgb({r}, {g}, {b})")
+
+    @staticmethod
+    def _rgb_to_xy(r: int, g: int, b: int) -> tuple[float, float]:
+        def gamma(v: float) -> float:
+            v /= 255
+            return ((v + 0.055) / 1.055) ** 2.4 if v > 0.04045 else v / 12.92
+
+        r_, g_, b_ = gamma(r), gamma(g), gamma(b)
+
+        X = r_ * 0.664511 + g_ * 0.154324 + b_ * 0.162028
+        Y = r_ * 0.283881 + g_ * 0.668433 + b_ * 0.047685
+        Z = r_ * 0.000088 + g_ * 0.072310 + b_ * 0.986039
+
+        total = X + Y + Z
+        if total == 0:
+            return 0.0, 0.0
+        return round(X / total, 4), round(Y / total, 4)
+
+    def _create_color_state(self, x: float, y: float) -> ControllableLightUpdate:
+        return ControllableLightUpdate(
+            on=LightOnState(on=True),
+            color=ColorXYState(xy=ColorXY(x=x, y=y)),
+        )
+
+    @timed()
+    async def set_named_color(self, color: Color) -> ActionResult:
+        """Set the colour using a predefined :class:`~hueify.shared.resource.Color` constant.
+
+        Resolves the named colour to an RGB triplet and delegates to
+        :meth:`set_color`.
+
+        Args:
+            color: One of the named colours from :class:`~hueify.shared.resource.Color`,
+                e.g. ``Color.WARM_WHITE`` or ``Color.OCEAN``.
+
+        Returns:
+            :class:`~hueify.shared.resource.ActionResult` confirming the applied colour.
+        """
+        r, g, b = resolve_color(color)
+        return await self.set_color(r, g, b)

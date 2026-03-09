@@ -1,8 +1,11 @@
 from .base import Resource
+from .colors import Color, resolve_color
 from .lookup import NamedResourceLookup, ResourceLookup
 from .views import (
     ActionResult,
     ColorTemperatureState,
+    ColorXY,
+    ColorXYState,
     LightOnState,
     ResourceInfo,
     ResourceMetadata,
@@ -12,7 +15,10 @@ from .views import (
 
 __all__ = [
     "ActionResult",
+    "Color",
     "ColorTemperatureState",
+    "ColorXY",
+    "ColorXYState",
     "LightOnState",
     "NamedResourceLookup",
     "Resource",
@@ -21,4 +27,5 @@ __all__ = [
     "ResourceMetadata",
     "ResourceReference",
     "ResourceType",
+    "resolve_color",
 ]

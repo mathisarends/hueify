@@ -5,6 +5,7 @@ from hueify.http import HttpClient
 from hueify.light.cache import LightCache
 from hueify.light.service import Light
 from hueify.shared.resource import ActionResult
+from hueify.shared.resource.colors import Color
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +112,28 @@ class LightNamespace:
         """
         light = self.from_name(name)
         return await light.set_color_temperature(color_temperature_percentage)
+
+    async def set_color(self, name: str, r: int, g: int, b: int) -> ActionResult:
+        """Set the colour of the named light using sRGB values.
+
+        Args:
+            name: Light name.
+            r: Red channel in ``[0, 255]``.
+            g: Green channel in ``[0, 255]``.
+            b: Blue channel in ``[0, 255]``.
+        """
+        light = self.from_name(name)
+        return await light.set_color(r, g, b)
+
+    async def set_named_color(self, name: str, color: Color) -> ActionResult:
+        """Set the colour of the named light to a predefined :class:`~hueify.shared.resource.Color`.
+
+        Args:
+            name: Light name.
+            color: Named colour constant, e.g. ``Color.WARM_WHITE``.
+        """
+        light = self.from_name(name)
+        return await light.set_named_color(color)
 
     def get_brightness(self, name: str) -> float:
         """Return the current brightness of the named light as a percentage."""

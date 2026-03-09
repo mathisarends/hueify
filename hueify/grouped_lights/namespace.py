@@ -8,6 +8,7 @@ from hueify.grouped_lights.views import GroupInfo
 from hueify.http import HttpClient
 from hueify.scenes.cache import SceneCache
 from hueify.shared.resource import ActionResult
+from hueify.shared.resource.colors import Color
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +133,28 @@ class GroupNamespace:
         """
         group = self.from_name(name)
         return await group.set_color_temperature(percentage)
+
+    async def set_color(self, name: str, r: int, g: int, b: int) -> ActionResult:
+        """Set the colour of all lights in the named group using sRGB values.
+
+        Args:
+            name: Group name.
+            r: Red channel in ``[0, 255]``.
+            g: Green channel in ``[0, 255]``.
+            b: Blue channel in ``[0, 255]``.
+        """
+        group = self.from_name(name)
+        return await group.set_color(r, g, b)
+
+    async def set_named_color(self, name: str, color: Color) -> ActionResult:
+        """Set the colour of all lights in the named group to a predefined :class:`~hueify.shared.resource.Color`.
+
+        Args:
+            name: Group name.
+            color: Named colour constant, e.g. ``Color.WARM_WHITE``.
+        """
+        group = self.from_name(name)
+        return await group.set_named_color(color)
 
     def get_brightness(self, name: str) -> float:
         """Return the current brightness of the named group as a percentage."""
