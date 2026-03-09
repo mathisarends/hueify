@@ -13,6 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 class GroupNamespace:
+    """Base namespace for room- and zone-level grouped-light control.
+
+    Subclassed by :class:`~hueify.grouped_lights.RoomNamespace` and
+    :class:`~hueify.grouped_lights.ZoneNamespace`, which are exposed as
+    :attr:`Hueify.rooms <hueify.service.Hueify.rooms>` and
+    :attr:`Hueify.zones <hueify.service.Hueify.zones>` respectively.
+    """
+
     def __init__(
         self,
         group_cache: NamedEntityLookupCache[GroupInfo],
@@ -29,9 +37,19 @@ class GroupNamespace:
 
     @property
     def names(self) -> list[str]:
+        """Names of all groups currently known to the bridge."""
         return [g.metadata.name for g in self._group_cache.get_all()]
 
     def from_name(self, name: str) -> GroupedLights:
+        """Look up a group by name and return a :class:`~hueify.grouped_lights.GroupedLights` handle.
+
+        Args:
+            name: Exact group name as configured in the Hue app.
+
+        Raises:
+            :class:`~hueify.exceptions.ResourceNotFoundException`: When no
+                matching group is found.
+        """
         group_info = self._group_cache.get_by_name(name)
         if group_info is None:
             available = [g.metadata.name for g in self._group_cache.get_all()]
@@ -60,43 +78,81 @@ class GroupNamespace:
         )
 
     async def turn_on(self, name: str) -> ActionResult:
+        """Turn all lights in the named group on."""
         group = self.from_name(name)
         return await group.turn_on()
 
     async def turn_off(self, name: str) -> ActionResult:
+        """Turn all lights in the named group off."""
         group = self.from_name(name)
         return await group.turn_off()
 
     async def set_brightness(self, name: str, percentage: float | int) -> ActionResult:
+        """Set the absolute brightness for all lights in the named group.
+
+        Args:
+            name: Group name.
+            percentage: Target brightness in ``[0, 100]``.
+        """
         group = self.from_name(name)
         return await group.set_brightness(percentage)
 
     async def increase_brightness(
         self, name: str, percentage: float | int
     ) -> ActionResult:
+        """Increase brightness of the named group by a relative amount.
+
+        Args:
+            name: Group name.
+            percentage: Percentage points to add.
+        """
         group = self.from_name(name)
         return await group.increase_brightness(percentage)
 
     async def decrease_brightness(
         self, name: str, percentage: float | int
     ) -> ActionResult:
+        """Decrease brightness of the named group by a relative amount.
+
+        Args:
+            name: Group name.
+            percentage: Percentage points to subtract.
+        """
         group = self.from_name(name)
         return await group.decrease_brightness(percentage)
 
     async def set_color_temperature(
         self, name: str, percentage: float | int
     ) -> ActionResult:
+        """Set the colour temperature for all lights in the named group.
+
+        Args:
+            name: Group name.
+            percentage: ``0`` = warmest white, ``100`` = coolest.
+        """
         group = self.from_name(name)
         return await group.set_color_temperature(percentage)
 
     def get_brightness(self, name: str) -> float:
+        """Return the current brightness of the named group as a percentage."""
         group = self.from_name(name)
         return group.brightness_percentage
 
     def scene_names(self, name: str) -> list[str]:
+        """Return the names of all scenes available for the named group."""
         group = self.from_name(name)
         return group.scene_names
 
     async def activate_scene(self, name: str, scene_name: str) -> ActionResult:
+        """Activate a scene for the named group.
+
+        Args:
+            name: Group name.
+            scene_name: Scene name (case-insensitive).
+
+        Raises:
+            :class:`~hueify.exceptions.ResourceNotFoundException`: When the
+                scene is not found for this group.
+        """
         group = self.from_name(name)
         return await group.activate_scene(scene_name)

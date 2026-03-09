@@ -22,11 +22,37 @@ logger = logging.getLogger(__name__)
 
 
 class Hueify:
+    """Async client for the Philips Hue local API.
+
+    Wraps the Hue Bridge REST API and SSE event stream behind three
+    high-level namespaces: :attr:`lights`, :attr:`rooms`, and :attr:`zones`.
+    All resource state is kept in in-memory caches that are populated on
+    :meth:`connect` and kept live via server-sent events.
+
+    Prefer using the class as an async context manager so that
+    :meth:`connect` and :meth:`close` are called automatically:
+
+    ```python
+    async with Hueify() as hue:
+        await hue.lights.turn_on("Desk")
+    ```
+
+    Credentials are read from the ``HUE_BRIDGE_IP`` and ``HUE_APP_KEY``
+    environment variables when ``bridge_ip`` / ``app_key`` are omitted.
+    """
+
     def __init__(
         self,
         bridge_ip: str | None = None,
         app_key: str | None = None,
     ) -> None:
+        """
+        Args:
+            bridge_ip: IP address of the Hue Bridge. Falls back to the
+                ``HUE_BRIDGE_IP`` environment variable when ``None``.
+            app_key: Hue application key. Falls back to the ``HUE_APP_KEY``
+                environment variable when ``None``.
+        """
         logger.debug(f"Initializing Hueify with bridge_ip={bridge_ip}")
         self._credentials = self._resolve_credentials(bridge_ip, app_key)
 
@@ -52,18 +78,21 @@ class Hueify:
         ]
 
         self.lights = LightNamespace(self._light_cache, self._http_client)
+        """Namespace for individual light control. See :class:`~hueify.light.LightNamespace`."""
         self.rooms = RoomNamespace(
             room_cache=self._room_cache,
             grouped_light_cache=self._grouped_light_cache,
             http_client=self._http_client,
             scene_cache=self._scene_cache,
         )
+        """Namespace for room-level grouped-light and scene control. See :class:`~hueify.grouped_lights.RoomNamespace`."""
         self.zones = ZoneNamespace(
             zone_cache=self._zone_cache,
             grouped_light_cache=self._grouped_light_cache,
             http_client=self._http_client,
             scene_cache=self._scene_cache,
         )
+        """Namespace for zone-level grouped-light and scene control. See :class:`~hueify.grouped_lights.ZoneNamespace`."""
         logger.info("Hueify initialized successfully")
 
     def _resolve_credentials(
@@ -89,6 +118,12 @@ class Hueify:
 
     @timed()
     async def connect(self) -> None:
+        """Connect to the Hue Bridge and populate all in-memory caches.
+
+        Opens the SSE event stream so that resource state stays live after
+        the initial snapshot. Call :meth:`close` (or use the context manager)
+        to clean up.
+        """
         logger.info("Connecting to Hue Bridge")
         self._stream_task = asyncio.create_task(self._event_stream.connect())
         logger.debug("Event stream connection task created")
@@ -101,6 +136,11 @@ class Hueify:
         logger.info("Caches populated successfully")
 
     async def close(self) -> None:
+        """Disconnect from the Hue Bridge and release all resources.
+
+        Cancels the SSE stream task, closes the HTTP session, and clears
+        the in-memory caches.
+        """
         logger.info("Disconnecting from Hue Bridge")
         self._event_stream.disconnect()
         logger.debug("Event stream disconnected")

@@ -6,6 +6,18 @@ from hueify.scenes.cache import SceneCache
 
 
 class ZoneNamespace(GroupNamespace):
+    """Namespace for zone-level grouped-light and scene control.
+
+    Accessible as :attr:`Hueify.zones <hueify.service.Hueify.zones>`.
+    Inherits all control methods from
+    :class:`~hueify.grouped_lights.GroupNamespace`.
+
+    ```python
+    async with Hueify() as hue:
+        await hue.zones.set_brightness("Upstairs", 40)
+    ```
+    """
+
     def __init__(
         self,
         zone_cache: ZoneCache,
