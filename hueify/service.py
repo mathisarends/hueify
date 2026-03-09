@@ -1,7 +1,10 @@
 import asyncio
 import logging
+from collections.abc import Callable
 from types import TracebackType
-from typing import Self
+from typing import Self, overload
+
+from pydantic import BaseModel
 
 from hueify.cache import ManagedCache
 from hueify.credentials import HueBridgeCredentials
@@ -17,6 +20,7 @@ from hueify.light import LightCache, LightNamespace
 from hueify.scenes import SceneCache
 from hueify.shared.decorators import timed
 from hueify.sse import EventBus, ServerSentEventStream
+from hueify.sse.bus import EventHandler
 
 logger = logging.getLogger(__name__)
 
@@ -116,3 +120,35 @@ class Hueify:
         for c in self._caches:
             c.clear()
         logger.info("All caches cleared")
+
+    def off[T: BaseModel](self, event_type: type[T], handler: EventHandler[T]) -> None:
+        self._event_bus.unsubscribe(event_type, handler)
+
+    @overload
+    def on[T: BaseModel](
+        self,
+        event_type: type[T],
+        handler: EventHandler[T],
+    ) -> EventHandler[T]: ...
+
+    @overload
+    def on[T: BaseModel](
+        self,
+        event_type: type[T],
+        handler: None = None,
+    ) -> Callable[[EventHandler[T]], EventHandler[T]]: ...
+
+    def on[T: BaseModel](
+        self,
+        event_type: type[T],
+        handler: EventHandler[T] | None = None,
+    ) -> EventHandler[T] | Callable[[EventHandler[T]], EventHandler[T]]:
+        if handler is not None:
+            self._event_bus.subscribe(event_type, handler)
+            return handler
+
+        def decorator(fn: EventHandler[T]) -> EventHandler[T]:
+            self._event_bus.subscribe(event_type, fn)
+            return fn
+
+        return decorator
