@@ -12,6 +12,34 @@
 pip install hueify
 ```
 
+## Onboarding
+
+If you don't have a bridge IP or app key yet, the `hueify setup` wizard handles everything for you. Requires the `cli` extra:
+
+```bash
+pip install hueify[cli]
+hueify setup
+```
+
+The wizard auto-discovers the bridge on your network, prompts you to press the **link button**, and prints the two environment variables to export:
+
+```
+Hue Bridge Setup
+
+Found bridge at 192.168.1.10
+
+Press the link button on your Hue Bridge, then hit Enter.
+
+Setup complete!
+
+Add these to your environment:
+
+  HUE_BRIDGE_IP=192.168.1.10
+  HUE_APP_KEY=abc123...
+```
+
+---
+
 ## Configuration
 
 Hueify reads credentials from environment variables by default:
