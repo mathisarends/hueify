@@ -70,9 +70,3 @@ nav:
       - Lights: guide/lights.md
       - Rooms & Zones: guide/rooms-zones.md
       - Events: guide/events.md
-  - API Reference:
-      - Hueify: api/hueify.md
-      - Lights: api/lights.md
-      - Rooms & Zones: api/rooms-zones.md
-      - Events: api/events.md
-      - Exceptions: api/exceptions.md

@@ -1,3 +1,0 @@
-# Hueify
-
-::: hueify.Hueify
