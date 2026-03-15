@@ -14,6 +14,8 @@ async def main() -> None:
         @hue.on(LightEvent)
         async def on_light(event: LightEvent) -> None:
             print(f"[light] {event.id} → on={event.on}, brightness={event.dimming}")
+            light = hue.lights.from_id(event.id)
+            print("light", light)
 
         @hue.on(GroupedLightEvent)
         async def on_grouped_light(event: GroupedLightEvent) -> None:

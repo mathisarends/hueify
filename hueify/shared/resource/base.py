@@ -89,6 +89,18 @@ class Resource(ABC, Generic[TLightInfo]):
         """Unique resource ID assigned by the Hue Bridge."""
         return self._id
 
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}("
+            f"name={self.name!r}, "
+            f"id={self._id}, "
+            f"on={self.is_on}, "
+            f"brightness={self.brightness_percentage:.1f}%)"
+        )
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
     @abstractmethod
     def _get_resource_endpoint(self) -> str:
         pass
