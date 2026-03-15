@@ -206,14 +206,6 @@ class GroupNamespace:
         group = self.from_name(name)
         return group.scene_names
 
-    @property
-    def all_scene_names(self) -> list[str]:
-        """Return a sorted, deduplicated list of every scene name across all groups."""
-        seen: set[str] = set()
-        for name in self.names:
-            seen.update(self.scene_names(name))
-        return sorted(seen)
-
     async def activate_scene(self, name: str, scene_name: str) -> ActionResult:
         """Activate a scene for the named group.
 

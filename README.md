@@ -156,6 +156,24 @@ async with Hueify() as hue:
 
 ---
 
+## Scenes
+
+`hue.scenes` provides bridge-wide access to all scenes, independent of rooms or zones:
+
+```python
+async with Hueify() as hue:
+    print(hue.scenes.names)
+
+    await hue.scenes.activate("Relax")
+
+    scene = hue.scenes.from_name("Relax")
+    print(scene.name, scene.id)
+```
+
+To list or activate scenes scoped to a specific room or zone, use `hue.rooms.scene_names()` and `hue.rooms.activate_scene()` instead.
+
+---
+
 ## Error handling
 
 All not-found errors raise `ResourceNotFoundException` with the resource type, the lookup name, and a list of fuzzy-matched suggestions:
