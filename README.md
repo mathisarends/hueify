@@ -12,6 +12,67 @@ pip install hueify
 
 ---
 
+## CLI
+
+Hueify ships a command-line interface for controlling lights, rooms, and zones directly from your terminal. Requires the `cli` extra:
+
+```bash
+pip install hueify[cli]
+```
+
+### Onboarding
+
+Run the interactive setup wizard to auto-discover your bridge and register an app key:
+
+```bash
+hueify setup
+```
+
+The wizard will:
+
+1. Scan your network for a Hue Bridge
+2. Prompt you to press the **link button** on the bridge
+3. Register an app key and print the environment variables to set
+
+```
+Hue Bridge Setup
+
+Found bridge at 192.168.1.10
+
+Press the link button on your Hue Bridge, then hit Enter.
+
+Setup complete!
+
+Add these to your environment:
+
+  HUE_BRIDGE_IP=192.168.1.10
+  HUE_APP_KEY=abc123...
+```
+
+Export those values (or add them to your shell profile / `.env`) and you're ready to use the CLI and Python API without any further configuration.
+
+### CLI commands
+
+```bash
+hueify lights list
+hueify lights on "Desk lamp"
+hueify lights off "Desk lamp"
+hueify lights brightness "Desk lamp" 75
+hueify lights temperature "Desk lamp" 30
+
+hueify rooms list
+hueify rooms on "Living Room"
+hueify rooms brightness "Living Room" 40
+hueify rooms activate-scene "Living Room" "Relax"
+
+hueify zones list
+hueify zones on "Downstairs"
+```
+
+Pass `--bridge-ip` and `--app-key` as flags to override the environment variables for a single invocation.
+
+---
+
 ## Usage
 
 All interaction goes through the `Hueify` async context manager. It connects to the bridge, populates the cache from the REST API, and subscribes to SSE events so state is always current without polling.

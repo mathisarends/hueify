@@ -23,6 +23,7 @@ from hueify.cli.app import (
     state,
     zones_app,
 )
+from hueify.cli.setup import setup_command
 from hueify.exceptions import HueifyException, ResourceNotFoundException
 
 
@@ -492,6 +493,12 @@ def zones_activate_scene(
         print_result(result)
 
     _run(_with_hueify(_cmd))
+
+
+@app.command("setup")
+def setup() -> None:
+    """Interactive onboarding: discover bridge and register an app key."""
+    setup_command()
 
 
 def main() -> None:
