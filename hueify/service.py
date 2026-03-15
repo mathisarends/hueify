@@ -18,6 +18,7 @@ from hueify.grouped_lights import (
 from hueify.http import HttpClient
 from hueify.light import LightCache, LightNamespace
 from hueify.scenes import SceneCache
+from hueify.scenes.namespace import SceneNamespace
 from hueify.shared.decorators import timed
 from hueify.sse import EventBus, ServerSentEventStream
 from hueify.sse.bus import EventHandler
@@ -81,7 +82,12 @@ class Hueify:
             self._scene_cache,
         ]
 
-        self._lights = LightNamespace(self._light_cache, self._http_client)
+        self._lights = LightNamespace(
+            light_cache=self._light_cache, http_client=self._http_client
+        )
+        self._scenes = SceneNamespace(
+            scene_cache=self._scene_cache, http_client=self._http_client
+        )
         self._rooms = RoomNamespace(
             room_cache=self._room_cache,
             grouped_light_cache=self._grouped_light_cache,
@@ -95,6 +101,11 @@ class Hueify:
             scene_cache=self._scene_cache,
         )
         logger.info("Hueify initialized successfully")
+
+    @property
+    def scenes(self) -> SceneNamespace:
+        """Namespace for bridge-wide scene lookup and activation. See :class:`~hueify.scenes.SceneNamespace`."""
+        return self._scenes
 
     @property
     def zones(self) -> ZoneNamespace:
