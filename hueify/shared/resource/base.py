@@ -22,6 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 class Resource(ABC, Generic[TLightInfo]):
+    """Abstract base class shared by :class:`~hueify.light.Light` and
+    :class:`~hueify.grouped_lights.GroupedLights`.
+
+    Provides turn-on/off, brightness, and colour-temperature control with
+    automatic value clamping and cache-backed state reads.
+    """
+
     _MIN_BRIGHTNESS = 0
     _MAX_BRIGHTNESS = 100
     _MIN_TEMPERATURE = 0
@@ -50,14 +57,25 @@ class Resource(ABC, Generic[TLightInfo]):
 
     @property
     def is_on(self) -> bool:
+        """``True`` when the resource is currently switched on."""
         return self._light_info.on.on
 
     @property
     def brightness_percentage(self) -> float:
+        """Current brightness level in the range ``[0, 100]``.
+
+        Returns ``0.0`` when the resource reports no dimming state.
+        """
         return self._light_info.dimming.brightness if self._light_info.dimming else 0.0
 
     @property
     def color_temperature_percentage(self) -> int | None:
+        """Current colour temperature expressed as a percentage of the supported range.
+
+        ``0`` corresponds to the warmest white the bulb supports; ``100`` to
+        the coolest. Returns ``None`` when the resource does not support colour
+        temperature.
+        """
         if not self._light_info.color_temperature:
             return None
 
@@ -68,7 +86,20 @@ class Resource(ABC, Generic[TLightInfo]):
 
     @property
     def id(self) -> UUID:
+        """Unique resource ID assigned by the Hue Bridge."""
         return self._id
+
+    def __repr__(self) -> str:
+        return (
+            f"{self.__class__.__name__}("
+            f"name={self.name!r}, "
+            f"id={self._id}, "
+            f"on={self.is_on}, "
+            f"brightness={self.brightness_percentage:.1f}%)"
+        )
+
+    def __str__(self) -> str:
+        return self.__repr__()
 
     @abstractmethod
     def _get_resource_endpoint(self) -> str:
@@ -76,6 +107,11 @@ class Resource(ABC, Generic[TLightInfo]):
 
     @timed()
     async def turn_on(self) -> ActionResult:
+        """Turn the resource on.
+
+        Returns an :class:`~hueify.shared.resource.ActionResult` describing
+        the outcome. No-ops (and still succeeds) when already on.
+        """
         if self.is_on:
             return ActionResult(message="Already on")
 
@@ -91,6 +127,11 @@ class Resource(ABC, Generic[TLightInfo]):
 
     @timed()
     async def turn_off(self) -> ActionResult:
+        """Turn the resource off.
+
+        Returns an :class:`~hueify.shared.resource.ActionResult` describing
+        the outcome. No-ops (and still succeeds) when already off.
+        """
         if not self.is_on:
             return ActionResult(message="Already off")
 
@@ -102,6 +143,17 @@ class Resource(ABC, Generic[TLightInfo]):
 
     @timed()
     async def set_brightness(self, percentage: float | int) -> ActionResult:
+        """Set brightness to an absolute level.
+
+        Args:
+            percentage: Target brightness in ``[0, 100]``. A float in
+                ``(0, 1]`` is treated as a fraction and multiplied by 100.
+                Values outside the valid range are clamped.
+
+        Returns:
+            :class:`~hueify.shared.resource.ActionResult` with
+            ``clamped=True`` when the value was adjusted.
+        """
         percentage_int = self._normalize_percentage(percentage)
         clamped = max(self._MIN_BRIGHTNESS, min(self._MAX_BRIGHTNESS, percentage_int))
         was_clamped = clamped != percentage_int
@@ -119,6 +171,16 @@ class Resource(ABC, Generic[TLightInfo]):
 
     @timed()
     async def increase_brightness(self, percentage: float | int) -> ActionResult:
+        """Increase brightness relative to the current level.
+
+        Args:
+            percentage: Amount to add in percentage points. The result is
+                clamped to ``[0, 100]``.
+
+        Returns:
+            :class:`~hueify.shared.resource.ActionResult` with
+            ``clamped=True`` when the ceiling was hit.
+        """
         percentage_int = self._normalize_percentage(percentage)
         target = int(self.brightness_percentage + percentage_int)
         clamped = max(self._MIN_BRIGHTNESS, min(self._MAX_BRIGHTNESS, target))
@@ -135,6 +197,16 @@ class Resource(ABC, Generic[TLightInfo]):
 
     @timed()
     async def decrease_brightness(self, percentage: float | int) -> ActionResult:
+        """Decrease brightness relative to the current level.
+
+        Args:
+            percentage: Amount to subtract in percentage points. The result
+                is clamped to ``[0, 100]``.
+
+        Returns:
+            :class:`~hueify.shared.resource.ActionResult` with
+            ``clamped=True`` when the floor was hit.
+        """
         percentage_int = self._normalize_percentage(percentage)
         target = int(self.brightness_percentage - percentage_int)
         clamped = max(self._MIN_BRIGHTNESS, min(self._MAX_BRIGHTNESS, target))
@@ -161,6 +233,16 @@ class Resource(ABC, Generic[TLightInfo]):
 
     @timed()
     async def set_color_temperature(self, percentage: float | int) -> ActionResult:
+        """Set the colour temperature as a percentage of the bulb's supported range.
+
+        Args:
+            percentage: ``0`` = warmest white, ``100`` = coolest white.
+                Clamped to ``[0, 100]`` before conversion.
+
+        Returns:
+            :class:`~hueify.shared.resource.ActionResult` with
+            ``clamped=True`` when the value was adjusted.
+        """
         percentage_int = self._normalize_percentage(percentage)
         clamped = max(self._MIN_TEMPERATURE, min(self._MAX_TEMPERATURE, percentage_int))
         was_clamped = clamped != percentage_int
@@ -187,6 +269,19 @@ class Resource(ABC, Generic[TLightInfo]):
 
     @timed()
     async def set_color(self, r: int, g: int, b: int) -> ActionResult:
+        """Set the colour using sRGB values.
+
+        The RGB triplet is converted to CIE xy chromaticity coordinates using
+        the Hue wide-gamut D65 colour matrix with proper sRGB gamma correction.
+
+        Args:
+            r: Red channel in ``[0, 255]``.
+            g: Green channel in ``[0, 255]``.
+            b: Blue channel in ``[0, 255]``.
+
+        Returns:
+            :class:`~hueify.shared.resource.ActionResult` confirming the applied colour.
+        """
         x, y = self._rgb_to_xy(r, g, b)
         await self._update_remote_state(self._create_color_state(x, y))
         return ActionResult(message=f"Color set to rgb({r}, {g}, {b})")
@@ -216,5 +311,17 @@ class Resource(ABC, Generic[TLightInfo]):
 
     @timed()
     async def set_named_color(self, color: Color) -> ActionResult:
+        """Set the colour using a predefined :class:`~hueify.shared.resource.Color` constant.
+
+        Resolves the named colour to an RGB triplet and delegates to
+        :meth:`set_color`.
+
+        Args:
+            color: One of the named colours from :class:`~hueify.shared.resource.Color`,
+                e.g. ``Color.WARM_WHITE`` or ``Color.OCEAN``.
+
+        Returns:
+            :class:`~hueify.shared.resource.ActionResult` confirming the applied colour.
+        """
         r, g, b = resolve_color(color)
         return await self.set_color(r, g, b)

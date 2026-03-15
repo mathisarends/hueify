@@ -108,9 +108,29 @@ async with Hueify() as hue:
 
 ---
 
-## Live sync
+## Real-time events via Server-Sent Events
 
-Hueify subscribes to the Hue bridge's serversent event stream inside `__aenter__`. State changes made outside your script (e.g. via the Hue app or a physical switch) are applied to the cache automatically  no polling required.
+Hueify subscribes to the Hue Bridge's SSE stream inside `__aenter__`. State
+changes made outside your script — via the Hue app, a physical switch, or
+another client — are applied to the cache automatically. No polling required.
+
+You can also react to changes directly by subscribing to typed event classes:
+
+```python
+from hueify.sse.views import LightEvent
+
+async with Hueify() as hue:
+    @hue.on(LightEvent)
+    async def on_light(event: LightEvent) -> None:
+        light = hue.lights.from_id(event.id)
+        print(light)  # Light(name='Desk', id=..., on=True, brightness=75.0%)
+
+    await asyncio.Event().wait()
+```
+
+Supported event types include `LightEvent`, `GroupedLightEvent`, `SceneEvent`,
+`MotionEvent`, `ButtonEvent`, `TemperatureEvent`, and more — see the
+[Events guide](docs/guide/events.md) for the full list.
 
 ---
 

@@ -6,6 +6,19 @@ from hueify.scenes.cache import SceneCache
 
 
 class RoomNamespace(GroupNamespace):
+    """Namespace for room-level grouped-light and scene control.
+
+    Accessible as :attr:`Hueify.rooms <hueify.service.Hueify.rooms>`.
+    Inherits all control methods from
+    :class:`~hueify.grouped_lights.GroupNamespace`.
+
+    ```python
+    async with Hueify() as hue:
+        await hue.rooms.turn_on("Living Room")
+        await hue.rooms.activate_scene("Living Room", "Relax")
+    ```
+    """
+
     def __init__(
         self,
         room_cache: RoomCache,

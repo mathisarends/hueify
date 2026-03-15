@@ -12,6 +12,19 @@ from hueify.shared.resource.views import ActionResult
 
 
 class GroupedLights(Resource[GroupedLightInfo]):
+    """Represents a Hue grouped-light resource (room or zone).
+
+    Inherits all brightness and colour-temperature control from
+    :class:`~hueify.shared.resource.Resource` and adds scene management.
+
+    Obtain an instance from a namespace rather than constructing directly:
+
+    ```python
+    room = hue.rooms.from_name("Living Room")
+    await room.activate_scene("Relax")
+    ```
+    """
+
     def __init__(
         self,
         light_info: GroupedLightInfo,
@@ -26,6 +39,7 @@ class GroupedLights(Resource[GroupedLightInfo]):
 
     @property
     def name(self) -> str:
+        """Display name of the group (room or zone name when available)."""
         if self._group_info is not None:
             return self._group_info.name
         return self._light_info.name
@@ -35,16 +49,31 @@ class GroupedLights(Resource[GroupedLightInfo]):
 
     @property
     def scene_names(self) -> list[str]:
+        """Names of all scenes assigned to this group."""
         return [s.name for s in self._list_scenes()]
 
     def list_scenes(self) -> list[SceneInfo]:
+        """Return full :class:`~hueify.scenes.SceneInfo` objects for this group."""
         return self._list_scenes()
 
     def get_active_scene(self) -> SceneInfo | None:
+        """Return the currently active scene, or ``None`` if no scene is active."""
         return next((s for s in self._list_scenes() if s.is_active), None)
 
     @timed()
     async def activate_scene(self, scene_name: str) -> ActionResult:
+        """Activate a scene by name.
+
+        Matching is case-insensitive. If the exact name is not found,
+        a fuzzy suggestion is included in the raised exception.
+
+        Args:
+            scene_name: Name of the scene to activate.
+
+        Raises:
+            :class:`~hueify.exceptions.ResourceNotFoundException`: When the
+                scene is not found for this group.
+        """
         scenes = self._list_scenes()
         scene_info = self._resolve_scene(scene_name, scenes)
         scene = Scene(scene_info=scene_info, client=self._client)

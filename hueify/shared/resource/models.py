@@ -6,18 +6,14 @@ from pydantic import BaseModel, Field
 
 
 class ResourceType(StrEnum):
-    # Lighting
     LIGHT = "light"
     GROUPED_LIGHT = "grouped_light"
-    # Rooms & Zones
     ROOM = "room"
     ZONE = "zone"
     BRIDGE_HOME = "bridge_home"
-    # Scenes
     SCENE = "scene"
     SMART_SCENE = "smart_scene"
     PUBLIC_IMAGE = "public_image"
-    # Sensors
     MOTION = "motion"
     CAMERA_MOTION = "camera_motion"
     TEMPERATURE = "temperature"
@@ -27,34 +23,27 @@ class ResourceType(StrEnum):
     RELATIVE_ROTARY = "relative_rotary"
     CONTACT = "contact"
     TAMPER = "tamper"
-    # Grouped sensors
     GROUPED_MOTION = "grouped_motion"
     GROUPED_LIGHT_LEVEL = "grouped_light_level"
-    # Devices
     DEVICE = "device"
     DEVICE_POWER = "device_power"
     DEVICE_SOFTWARE_UPDATE = "device_software_update"
     BRIDGE = "bridge"
     SERVICE_GROUP = "service_group"
-    # Connectivity
     ZIGBEE_CONNECTIVITY = "zigbee_connectivity"
     ZGP_CONNECTIVITY = "zgp_connectivity"
     WIFI_CONNECTIVITY = "wifi_connectivity"
     ZIGBEE_DEVICE_DISCOVERY = "zigbee_device_discovery"
-    # Entertainment
     ENTERTAINMENT = "entertainment"
     ENTERTAINMENT_CONFIGURATION = "entertainment_configuration"
     SPEAKER = "speaker"
-    # Automation
     BEHAVIOR_SCRIPT = "behavior_script"
     BEHAVIOR_INSTANCE = "behavior_instance"
     GEOFENCE_CLIENT = "geofence_client"
     GEOLOCATION = "geolocation"
-    # Smart Home
     HOMEKIT = "homekit"
     MATTER = "matter"
     MATTER_FABRIC = "matter_fabric"
-    # Motion areas (newer firmware)
     CONVENIENCE_AREA_MOTION = "convenience_area_motion"
     SECURITY_AREA_MOTION = "security_area_motion"
     MOTION_AREA_CANDIDATE = "motion_area_candidate"
@@ -79,15 +68,6 @@ class ColorTemperatureState(BaseModel):
     mirek_valid: bool | None = None
 
 
-class ColorXY(BaseModel):
-    x: float = Field(ge=0.0, le=1.0)
-    y: float = Field(ge=0.0, le=1.0)
-
-
-class ColorXYState(BaseModel):
-    xy: ColorXY | None = None
-
-
 class ResourceMetadata(BaseModel):
     name: str
 
@@ -99,6 +79,17 @@ class ResourceInfo(BaseModel):
 
 
 class ActionResult(BaseModel):
+    """Outcome returned by every command method on lights, rooms, and zones.
+
+    Attributes:
+        message: Human-readable description of what happened.
+        success: ``True`` when the command completed without errors.
+        clamped: ``True`` when an input value was silently clamped to its
+            valid range (e.g. brightness > 100 → 100).
+        final_value: The effective value that was actually applied, present
+            only when the command accepted a numeric parameter.
+    """
+
     message: str
     success: bool = True
     clamped: bool = False
@@ -110,14 +101,12 @@ class ControllableLight(BaseModel):
     on: LightOnState
     dimming: DimmingState | None
     color_temperature: ColorTemperatureState | None
-    color: ColorXYState | None = None
 
 
 class ControllableLightUpdate(BaseModel):
     on: LightOnState | None = None
     dimming: DimmingState | None = None
     color_temperature: ColorTemperatureState | None = None
-    color: ColorXYState | None = None
 
 
 TLightInfo = TypeVar("TLightInfo", bound=ControllableLight)
