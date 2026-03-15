@@ -1,4 +1,5 @@
 import logging
+from uuid import UUID
 
 from hueify.cache.lookup import NamedEntityLookupCache
 from hueify.exceptions import ResourceNotFoundException
@@ -68,6 +69,45 @@ class GroupNamespace:
         if grouped_light_info is None:
             raise ValueError(
                 f"GroupedLight {grouped_light_id} not in cache for group '{name}'"
+            )
+
+        return GroupedLights(
+            light_info=grouped_light_info,
+            client=self._http_client,
+            group_info=group_info,
+            scene_cache=self._scene_cache,
+            cache=self._grouped_light_cache,
+        )
+
+    def from_id(self, group_id: UUID) -> GroupedLights:
+        """Look up a group by Hue resource ID and return a :class:`~hueify.grouped_lights.GroupedLights` handle.
+
+        Args:
+            group_id: Hue room/zone resource ID.
+
+        Raises:
+            :class:`~hueify.exceptions.ResourceNotFoundException`: When no
+                matching group is found.
+        """
+        group_info = self._group_cache.get_by_id(group_id)
+        if group_info is None:
+            available = [g.metadata.name for g in self._group_cache.get_all()]
+            raise ResourceNotFoundException(
+                resource_type=self._resource_type,
+                lookup_name=str(group_id),
+                suggested_names=available,
+            )
+
+        grouped_light_id = group_info.get_grouped_light_reference_if_exists()
+        if grouped_light_id is None:
+            raise ValueError(
+                f"Group with ID '{group_id}' has no grouped_light service reference"
+            )
+
+        grouped_light_info = self._grouped_light_cache.get_by_id(grouped_light_id)
+        if grouped_light_info is None:
+            raise ValueError(
+                f"GroupedLight {grouped_light_id} not in cache for group ID '{group_id}'"
             )
 
         return GroupedLights(

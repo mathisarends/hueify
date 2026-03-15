@@ -24,5 +24,10 @@ class Light(Resource[LightInfo]):
     ```
     """
 
+    @property
+    def name(self) -> str:
+        """Display name of the light as configured in the Hue app."""
+        return self._light_info.metadata.name
+
     def _get_resource_endpoint(self) -> str:
         return "/light"

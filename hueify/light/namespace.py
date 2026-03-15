@@ -1,4 +1,5 @@
 import logging
+from uuid import UUID
 
 from hueify.exceptions import ResourceNotFoundException
 from hueify.http import HttpClient
@@ -49,6 +50,28 @@ class LightNamespace:
             raise ResourceNotFoundException(
                 resource_type="light",
                 lookup_name=name,
+                suggested_names=available,
+            )
+        return Light(
+            light_info=cached_info, client=self._http_client, cache=self._light_cache
+        )
+
+    def from_id(self, light_id: UUID) -> Light:
+        """Look up a light by Hue resource ID and return a :class:`~hueify.light.Light` handle.
+
+        Args:
+            light_id: Hue light resource ID.
+
+        Raises:
+            :class:`~hueify.exceptions.ResourceNotFoundException`: When no
+                light with that ID exists in the cache.
+        """
+        cached_info = self._light_cache.get_by_id(light_id)
+        if cached_info is None:
+            available = [light.metadata.name for light in self._light_cache.get_all()]
+            raise ResourceNotFoundException(
+                resource_type="light",
+                lookup_name=str(light_id),
                 suggested_names=available,
             )
         return Light(
