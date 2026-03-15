@@ -1,5 +1,9 @@
 ﻿# Hueify
 
+[![PyPI](https://img.shields.io/pypi/v/hueify)](https://pypi.org/project/hueify/)
+[![Python](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
+[![Docs](https://img.shields.io/badge/docs-mathisarends.github.io-blue)](https://mathisarends.github.io/hueify/)
+
 Hueify is an async-first Python library for Philips Hue. It lets you control lights, rooms, zones and scenes using the same names you see in the Hue app, with state kept fresh via serversent events. It also ships an MCP server for LLM tools.
 
 ```bash
@@ -10,7 +14,7 @@ pip install hueify
 
 ## Usage
 
-All interaction goes through the `Hueify` async context manager. It connects to the bridge, populates the cache from the REST API, and subscribes to SSE events  so state is always current without polling.
+All interaction goes through the `Hueify` async context manager. It connects to the bridge, populates the cache from the REST API, and subscribes to SSE events so state is always current without polling.
 
 ```python
 import asyncio
