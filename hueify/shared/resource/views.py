@@ -85,7 +85,7 @@ class ColorXY(BaseModel):
 
 
 class ColorXYState(BaseModel):
-    xy: ColorXY
+    xy: ColorXY | None = None
 
 
 class ResourceMetadata(BaseModel):

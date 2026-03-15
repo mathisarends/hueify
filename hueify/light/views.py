@@ -85,9 +85,9 @@ class ColorXY(BaseModel):
 
 
 class ColorGamut(BaseModel):
-    red: ColorXY
-    green: ColorXY
-    blue: ColorXY
+    red: ColorXY | None = None
+    green: ColorXY | None = None
+    blue: ColorXY | None = None
 
 
 class GamutType(StrEnum):
@@ -98,7 +98,7 @@ class GamutType(StrEnum):
 
 
 class ColorState(BaseModel):
-    xy: ColorXY
+    xy: ColorXY | None = None
     gamut: ColorGamut | None = None
     gamut_type: GamutType | None = None
 
