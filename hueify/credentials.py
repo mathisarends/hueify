@@ -1,3 +1,5 @@
+import re
+
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -51,13 +53,9 @@ class HueBridgeCredentials(BaseSettings):
     @classmethod
     def validate_app_key(cls, value: str) -> str:
         if len(value) < _MIN_APP_KEY_LENGTH:
+            raise ValueError(...)
+        if not re.fullmatch(r"[a-zA-Z0-9\-]+", value):
             raise ValueError(
-                f"Hue App Key must be at least {_MIN_APP_KEY_LENGTH} characters, got {len(value)}"
+                "Hue App Key darf nur Buchstaben, Ziffern und Bindestriche enthalten"
             )
-
-        if not value.isalnum():
-            raise ValueError(
-                "Hue App Key must be alphanumeric (letters and numbers only)"
-            )
-
         return value

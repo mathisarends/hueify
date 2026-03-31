@@ -7,11 +7,11 @@ class DiscoveredBridge(BaseModel):
     internalipaddress: str
 
 
-async def discover_bridge() -> DiscoveredBridge:
+async def discover_bridges() -> list[DiscoveredBridge]:
     async with httpx.AsyncClient() as client:
         response = await client.get("https://discovery.meethue.com/")
         response.raise_for_status()
         bridges = response.json()
         if not bridges:
             raise RuntimeError("No Hue Bridge found on the network.")
-        return DiscoveredBridge(**bridges[0])
+        return [DiscoveredBridge(**b) for b in bridges]

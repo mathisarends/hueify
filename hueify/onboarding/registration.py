@@ -13,7 +13,7 @@ _TIMEOUT_SECONDS = 60
 
 
 async def register_app_key(bridge_ip: str, device_type: str = "hueify#cli") -> str:
-    url = f"http://{bridge_ip}/api"
+    url = f"https://{bridge_ip}/api"
     payload = {"devicetype": device_type, "generateclientkey": True}
 
     async with httpx.AsyncClient(verify=False) as client:
