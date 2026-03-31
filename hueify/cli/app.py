@@ -69,17 +69,10 @@ def configure(
         envvar="HUE_APP_KEY",
         help="Hue application key. Reads [bold]HUE_APP_KEY[/bold] env var if not set.",
     ),
-    verbose: bool = typer.Option(
-        False, "--verbose", "-v", help="Enable verbose logging output."
-    ),
 ) -> None:
     """[bold cyan]Hueify[/bold cyan] — Control your Philips Hue lights from the command line."""
     state.bridge_ip = bridge_ip
     state.app_key = app_key
-    if verbose:
-        from hueify._logging import configure_logging
-
-        configure_logging("DEBUG")
 
 
 def print_result(result: ActionResult) -> None:

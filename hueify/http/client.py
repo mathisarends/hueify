@@ -23,7 +23,7 @@ class HttpClient:
             "hue-application-key": credentials.hue_app_key,
             "Content-Type": "application/json",
         }
-        self._client = httpx.AsyncClient(timeout=timeout, verify=verify_ssl)
+        self._client = httpx.AsyncClient(timeout=timeout, verify=verify_ssl, http2=True)
 
     async def __aenter__(self):
         return self

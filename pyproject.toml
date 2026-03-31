@@ -5,7 +5,7 @@ description = "Async Python client for the Philips Hue API with real-time event 
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "httpx>=0.28.1",
+    "httpx[http2]>=0.28.1",
     "httpx-sse>=0.4.3",
     "pydantic>=2.12.4",
     "pydantic-settings>=2.12.0",

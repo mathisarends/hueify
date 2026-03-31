@@ -13,7 +13,7 @@ type _AsyncDecorator = Callable[[_AsyncFunc], _AsyncFunc]
 
 def timed(
     additional_text: str = "",
-    min_duration_to_log: float = 0.25,
+    min_duration_to_log: float = 0.1,
 ) -> _AsyncDecorator:
     def decorator(func: _AsyncFunc) -> _AsyncFunc:
         logger = logging.getLogger(func.__module__)
