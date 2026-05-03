@@ -1,11 +1,9 @@
 import asyncio
 
-from hueify import Hueify, configure_logging
+from hueify import Hueify
 
 
 async def main() -> None:
-    configure_logging("INFO")
-
     async with Hueify() as hue:
         print("Lights:", hue.lights.names)
         print("Rooms:", hue.rooms.names)

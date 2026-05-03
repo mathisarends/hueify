@@ -4,6 +4,7 @@ from collections.abc import Callable
 from types import TracebackType
 from typing import Self, overload
 
+import httpx
 from pydantic import BaseModel
 
 from hueify.cache import ManagedCache
@@ -17,6 +18,7 @@ from hueify.grouped_lights import (
 )
 from hueify.http import HttpClient
 from hueify.light import LightCache, LightNamespace
+from hueify.onboarding.discovery import discover_bridges
 from hueify.scenes import SceneCache
 from hueify.scenes.namespace import SceneNamespace
 from hueify.shared.decorators import timed
@@ -155,12 +157,44 @@ class Hueify:
         self._stream_task = asyncio.create_task(self._event_stream.connect())
         logger.debug("Event stream connection task created")
 
-        await self._populate_caches()
+        try:
+            await self._populate_caches()
+        except httpx.ConnectTimeout:
+            await self._reconnect_after_discovery()
+
         logger.info("Caches populated successfully")
 
     async def _populate_caches(self) -> None:
         await asyncio.gather(*[c.populate(self._http_client) for c in self._caches])
         logger.info("Caches populated successfully")
+
+    async def _reconnect_after_discovery(self) -> None:
+        logger.warning(
+            "Connection to Hue Bridge at %s timed out — starting automatic bridge discovery.",
+            self._credentials.hue_bridge_ip,
+        )
+
+        if self._stream_task and not self._stream_task.done():
+            self._stream_task.cancel()
+
+        bridges = await discover_bridges()
+        discovered_ip = bridges[0].internalipaddress
+        logger.warning(
+            "Discovered Hue Bridge at %s — reconnecting.",
+            discovered_ip,
+        )
+
+        await self._http_client.close()
+        self._credentials = HueBridgeCredentials(
+            hue_bridge_ip=discovered_ip,
+            hue_app_key=self._credentials.hue_app_key,
+        )
+        self._http_client = HttpClient(self._credentials)
+        self._event_stream = ServerSentEventStream(
+            credentials=self._credentials, event_bus=self._event_bus
+        )
+        self._stream_task = asyncio.create_task(self._event_stream.connect())
+        await self._populate_caches()
 
     async def close(self) -> None:
         """Disconnect from the Hue Bridge and release all resources.
