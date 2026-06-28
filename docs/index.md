@@ -33,8 +33,9 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-Credentials are read from the `HUE_BRIDGE_IP` and `HUE_APP_KEY` environment
-variables, or passed directly:
+Credentials are read from the config file created by `hueify setup`.
+Environment variables (`HUE_BRIDGE_IP`, `HUE_APP_KEY`) and explicit arguments
+override the saved config:
 
 ```python
 async with Hueify(bridge_ip="192.168.1.10", app_key="my-app-key") as hue:

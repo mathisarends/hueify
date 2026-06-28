@@ -32,7 +32,7 @@ The wizard will:
 
 1. Scan your network for a Hue Bridge
 2. Prompt you to press the **link button** on the bridge
-3. Register an app key and print the environment variables to set
+3. Register an app key and save it in your user config file
 
 ```
 Hue Bridge Setup
@@ -43,13 +43,10 @@ Press the link button on your Hue Bridge, then hit Enter.
 
 Setup complete!
 
-Add these to your environment:
-
-  HUE_BRIDGE_IP=192.168.1.10
-  HUE_APP_KEY=abc123...
+Credentials saved to C:\Users\you\AppData\Roaming\hueify\config.toml
 ```
 
-Export those values (or add them to your shell profile / `.env`) and you're ready to use the CLI and Python API without any further configuration.
+After setup, the CLI and Python API can read those credentials automatically. You can still use `HUE_BRIDGE_IP` / `HUE_APP_KEY` or CLI flags to override the saved config.
 
 ### CLI commands
 
@@ -69,7 +66,7 @@ hueify zones list
 hueify zones on "Downstairs"
 ```
 
-Pass `--bridge-ip` and `--app-key` as flags to override the environment variables for a single invocation.
+Pass `--bridge-ip` and `--app-key` as flags to override the saved config or environment variables for a single invocation.
 
 ---
 
@@ -91,7 +88,7 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-Credentials are read from the environment by default (`HUE_BRIDGE_IP`, `HUE_APP_KEY`). You can also pass them explicitly:
+Credentials are read from CLI setup config by default. Environment variables (`HUE_BRIDGE_IP`, `HUE_APP_KEY`) and explicit constructor arguments override that config:
 
 ```python
 async with Hueify(bridge_ip="192.168.1.10", app_key="your-app-key") as hue:

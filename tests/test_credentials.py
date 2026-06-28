@@ -1,10 +1,13 @@
 import pytest
 from pydantic import ValidationError
 
-from hueify.credentials import HueBridgeCredentials
+from hueify import Hueify
+from hueify.credentials import HueBridgeCredentials, save_credentials_config
 
 VALID_IP = "192.168.1.1"
 VALID_APP_KEY = "a" * 20
+CONFIG_IP = "192.168.1.10"
+CONFIG_APP_KEY = "b" * 20
 
 
 class TestHueBridgeIpValidation:
@@ -79,3 +82,61 @@ class TestHueAppKeyValidation:
     def test_invalid_app_key_with_spaces(self):
         with pytest.raises(ValidationError, match="alphanumeric"):
             self._make("a" * 19 + " ")
+
+
+class TestCredentialsConfig:
+    def test_reads_credentials_from_config_file(self, tmp_path, monkeypatch):
+        config_path = tmp_path / "config.toml"
+        config_path.write_text(
+            f'hue_bridge_ip = "{CONFIG_IP}"\nhue_app_key = "{CONFIG_APP_KEY}"\n',
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("HUEIFY_CONFIG_FILE", str(config_path))
+        monkeypatch.delenv("HUE_BRIDGE_IP", raising=False)
+        monkeypatch.delenv("HUE_APP_KEY", raising=False)
+
+        credentials = HueBridgeCredentials(_env_file=None)
+
+        assert credentials.hue_bridge_ip == CONFIG_IP
+        assert credentials.hue_app_key == CONFIG_APP_KEY
+
+    def test_environment_overrides_config_file(self, tmp_path, monkeypatch):
+        config_path = tmp_path / "config.toml"
+        config_path.write_text(
+            f'hue_bridge_ip = "{CONFIG_IP}"\nhue_app_key = "{CONFIG_APP_KEY}"\n',
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("HUEIFY_CONFIG_FILE", str(config_path))
+        monkeypatch.setenv("HUE_BRIDGE_IP", VALID_IP)
+        monkeypatch.setenv("HUE_APP_KEY", VALID_APP_KEY)
+
+        credentials = HueBridgeCredentials(_env_file=None)
+
+        assert credentials.hue_bridge_ip == VALID_IP
+        assert credentials.hue_app_key == VALID_APP_KEY
+
+    def test_save_credentials_config_writes_readable_config(
+        self, tmp_path, monkeypatch
+    ):
+        config_path = tmp_path / "hueify" / "config.toml"
+        monkeypatch.setenv("HUEIFY_CONFIG_FILE", str(config_path))
+        monkeypatch.delenv("HUE_BRIDGE_IP", raising=False)
+        monkeypatch.delenv("HUE_APP_KEY", raising=False)
+
+        written_path = save_credentials_config(CONFIG_IP, CONFIG_APP_KEY)
+        credentials = HueBridgeCredentials(_env_file=None)
+
+        assert written_path == config_path
+        assert credentials.hue_bridge_ip == CONFIG_IP
+        assert credentials.hue_app_key == CONFIG_APP_KEY
+
+    def test_hueify_combines_partial_explicit_credentials_with_settings(
+        self, monkeypatch
+    ):
+        monkeypatch.setenv("HUE_BRIDGE_IP", VALID_IP)
+        monkeypatch.setenv("HUE_APP_KEY", VALID_APP_KEY)
+
+        hue = Hueify(bridge_ip=CONFIG_IP)
+
+        assert hue._credentials.hue_bridge_ip == CONFIG_IP
+        assert hue._credentials.hue_app_key == VALID_APP_KEY

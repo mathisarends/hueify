@@ -7,6 +7,7 @@ except ImportError as e:
         "CLI support requires 'typer[all]'. Install with: pip install hueify[cli]"
     ) from e
 
+from hueify.credentials import save_credentials_config
 from hueify.onboarding.discovery import DiscoveredBridge, discover_bridges
 from hueify.onboarding.registration import register_app_key
 
@@ -45,10 +46,16 @@ async def _run_setup() -> None:
     with console.status("Registering app key..."):
         app_key = await register_app_key(bridge.internalipaddress)
 
+    config_path = save_credentials_config(bridge.internalipaddress, app_key)
+
     console.print("\n[bold green]Setup complete![/bold green]")
-    console.print("\nAdd these to your environment:\n")
-    console.print(f"  HUE_BRIDGE_IP=[cyan]{bridge.internalipaddress}[/cyan]")
-    console.print(f"  HUE_APP_KEY=[cyan]{app_key}[/cyan]")
+    console.print(f"\nCredentials saved to [cyan]{config_path}[/cyan]")
+    console.print(
+        "\nYou can now run commands like [bold]hueify lights list[/bold] without setting environment variables."
+    )
+    console.print(
+        "\nUse [bold]--bridge-ip[/bold]/[bold]--app-key[/bold] or the [bold]HUE_BRIDGE_IP[/bold]/[bold]HUE_APP_KEY[/bold] environment variables to override this file."
+    )
 
 
 def setup_command() -> None:

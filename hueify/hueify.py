@@ -129,8 +129,13 @@ class Hueify:
         bridge_ip: str | None,
         app_key: str | None,
     ) -> HueBridgeCredentials:
-        if bridge_ip is not None and app_key is not None:
-            return HueBridgeCredentials(hue_bridge_ip=bridge_ip, hue_app_key=app_key)
+        credential_overrides = {}
+        if bridge_ip is not None:
+            credential_overrides["hue_bridge_ip"] = bridge_ip
+        if app_key is not None:
+            credential_overrides["hue_app_key"] = app_key
+        if credential_overrides:
+            return HueBridgeCredentials(**credential_overrides)
         return HueBridgeCredentials()
 
     async def __aenter__(self) -> Self:

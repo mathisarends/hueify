@@ -21,7 +21,7 @@ pip install hueify[cli]
 hueify setup
 ```
 
-The wizard auto-discovers the bridge on your network, prompts you to press the **link button**, and prints the two environment variables to export:
+The wizard auto-discovers the bridge on your network, prompts you to press the **link button**, and saves the bridge credentials in your user config file:
 
 ```
 Hue Bridge Setup
@@ -32,24 +32,22 @@ Press the link button on your Hue Bridge, then hit Enter.
 
 Setup complete!
 
-Add these to your environment:
-
-  HUE_BRIDGE_IP=192.168.1.10
-  HUE_APP_KEY=abc123...
+Credentials saved to C:\Users\you\AppData\Roaming\hueify\config.toml
 ```
 
 ---
 
 ## Configuration
 
-Hueify reads credentials from environment variables by default:
+Hueify reads credentials from the config file created by `hueify setup`.
+Environment variables override the saved config:
 
 ```bash
 export HUE_BRIDGE_IP=192.168.1.10
 export HUE_APP_KEY=your-app-key
 ```
 
-Or pass them directly when constructing [`Hueify`][hueify.Hueify]:
+Or pass them directly when constructing [`Hueify`][hueify.Hueify]. Explicit arguments override both environment variables and the saved config:
 
 ```python
 hue = Hueify(bridge_ip="192.168.1.10", app_key="your-app-key")

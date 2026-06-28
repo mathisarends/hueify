@@ -61,13 +61,13 @@ def configure(
         None,
         "--bridge-ip",
         envvar="HUE_BRIDGE_IP",
-        help="Hue Bridge IP address. Reads [bold]HUE_BRIDGE_IP[/bold] env var if not set.",
+        help="Hue Bridge IP address. Overrides [bold]HUE_BRIDGE_IP[/bold] env var and saved config.",
     ),
     app_key: str | None = typer.Option(
         None,
         "--app-key",
         envvar="HUE_APP_KEY",
-        help="Hue application key. Reads [bold]HUE_APP_KEY[/bold] env var if not set.",
+        help="Hue application key. Overrides [bold]HUE_APP_KEY[/bold] env var and saved config.",
     ),
 ) -> None:
     """[bold cyan]Hueify[/bold cyan] — Control your Philips Hue lights from the command line."""
