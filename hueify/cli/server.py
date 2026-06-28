@@ -1,6 +1,8 @@
 import asyncio
 from collections.abc import Awaitable, Callable
 
+from pydantic import ValidationError
+
 try:
     import typer
 except ImportError as e:
@@ -24,7 +26,17 @@ from hueify.cli.app import (
     zones_app,
 )
 from hueify.cli.setup import setup_command
+from hueify.credentials import get_credentials_config_path
 from hueify.exceptions import HueifyException, ResourceNotFoundException
+
+
+def _is_missing_credentials_error(exc: ValidationError) -> bool:
+    missing_fields = {
+        str(error["loc"][0])
+        for error in exc.errors()
+        if error["type"] == "missing" and error["loc"]
+    }
+    return bool({"HUE_BRIDGE_IP", "HUE_APP_KEY"} & missing_fields)
 
 
 def _run(coro: Awaitable) -> None:
@@ -35,6 +47,22 @@ def _run(coro: Awaitable) -> None:
         raise typer.Exit(1) from exc
     except HueifyException as exc:
         err_console.print(f"[red]Error:[/red] {exc}")
+        raise typer.Exit(1) from exc
+    except ValidationError as exc:
+        if _is_missing_credentials_error(exc):
+            err_console.print("[red]Missing Hue credentials.[/red]")
+            err_console.print(
+                "Run [bold]hueify setup[/bold] to discover your bridge and save an app key."
+            )
+            err_console.print(
+                "Or pass [bold]--bridge-ip[/bold] and [bold]--app-key[/bold], "
+                "or set [bold]HUE_BRIDGE_IP[/bold] and [bold]HUE_APP_KEY[/bold]."
+            )
+            err_console.print(
+                f"[dim]Setup config path: {get_credentials_config_path()}[/dim]"
+            )
+        else:
+            err_console.print(f"[red]Invalid Hue credentials:[/red] {exc}")
         raise typer.Exit(1) from exc
     except KeyboardInterrupt:
         err_console.print("\n[dim]Interrupted.[/dim]")
