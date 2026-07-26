@@ -76,10 +76,11 @@ class Resource(ABC, Generic[TLightInfo]):
         the coolest. Returns ``None`` when the resource does not support colour
         temperature.
         """
-        if not self._light_info.color_temperature:
+        color_temperature = self._light_info.color_temperature
+        if color_temperature is None or color_temperature.mirek is None:
             return None
 
-        mirek = self._light_info.color_temperature.mirek
+        mirek = color_temperature.mirek
         return int(
             ((mirek - self._MIREK_MIN) / (self._MIREK_MAX - self._MIREK_MIN)) * 100
         )

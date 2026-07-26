@@ -74,6 +74,17 @@ class TestProperties:
         resource, _ = make_resource(mirek=None)
         assert resource.color_temperature_percentage is None
 
+    def test_color_temperature_percentage_returns_none_when_mirek_is_none(
+        self,
+    ) -> None:
+        resource, _ = make_resource()
+        resource._fallback_info.color_temperature = ColorTemperatureState(
+            mirek=None,
+            mirek_valid=False,
+        )
+
+        assert resource.color_temperature_percentage is None
+
     def test_id_returns_light_info_id(self) -> None:
         light_id = uuid4()
         client = AsyncMock()
