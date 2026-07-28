@@ -87,3 +87,6 @@ desktop.ini
 
 
 site/
+
+# Claude Code
+.claude/
