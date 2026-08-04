@@ -8,7 +8,7 @@ send it yourself. It is the same request the commands produce internally.
 import asyncio
 
 from hueify import Hueify, LightUpdate
-from hueify.models import DimmingState, EffectsState, OnState
+from hueify.models import DimmingState, EffectsState, OnState, SignalingState
 
 # adjust to names that exist in your setup
 LIGHT_NAME = "Desk"
@@ -36,9 +36,13 @@ async def main() -> None:
             light.id, LightUpdate(effects=EffectsState(effect="no_effect"))
         )
 
-        # apply() sends a raw LightUpdate to a room's grouped light
+        # signaling has no command of its own either; apply() sends the raw
+        # LightUpdate straight to the room's grouped light
         office = await hue.rooms.find_by_name(ROOM_NAME)
-        await hue.rooms.apply(office.id, LightUpdate(on=OnState(on=False)))
+        await hue.rooms.apply(
+            office.id,
+            LightUpdate(signaling=SignalingState(signal="on_off", duration=5000)),
+        )
 
         # the grouped light also carries the aggregated state of the room
         grouped = await hue.rooms.grouped_light(office.id)

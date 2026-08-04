@@ -17,16 +17,16 @@ ZONE_NAME = "Desk area"
 
 async def main() -> None:
     async with Hueify() as hue:
-        print("Rooms:", [room.metadata.name for room in (await hue.rooms.list()).data])
-        print("Zones:", [zone.metadata.name for zone in (await hue.zones.list()).data])
+        print("Rooms:", [room.name for room in (await hue.rooms.list()).data])
+        print("Zones:", [zone.name for zone in (await hue.zones.list()).data])
 
         office = await hue.rooms.find_by_name(ROOM_NAME)
 
         for light in await hue.rooms.lights(office.id):
-            print(f"  light: {light.metadata.name} (on={light.on.on})")
+            print(f"  light: {light.name} (on={light.is_on})")
 
         for scene in await hue.rooms.scenes(office.id):
-            print(f"  scene: {scene.metadata.name}")
+            print(f"  scene: {scene.name}")
 
         await hue.rooms.turn_on(office.id, brightness=70, transition=1)
         print(f"{ROOM_NAME} is on:", await hue.rooms.is_on(office.id))

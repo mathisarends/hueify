@@ -19,13 +19,12 @@ LIGHT_NAME = "Desk"
 async def main() -> None:
     async with Hueify() as hue:
         light = await hue.lights.find_by_name(LIGHT_NAME)
-        before = light.dimming.brightness if light.dimming else None
-        print(f"[before] brightness: {before}%")
+        print(f"[before] brightness: {light.brightness}%")
 
         @hue.on(ResourceType.LIGHT)
         async def on_light_event(event: LightEvent) -> None:
-            if event.id == light.id and event.dimming is not None:
-                print(f"[event]  brightness: {event.dimming.brightness}%")
+            if event.id == light.id and event.brightness is not None:
+                print(f"[event]  brightness: {event.brightness}%")
 
         await hue.start_events()
         await asyncio.sleep(2)  # give the SSE connection time to establish
@@ -35,8 +34,7 @@ async def main() -> None:
         await asyncio.sleep(3)
 
         light = await hue.lights.get_one(light.id)
-        after = light.dimming.brightness if light.dimming else None
-        print(f"[after]  brightness: {after}%")
+        print(f"[after]  brightness: {light.brightness}%")
 
 
 if __name__ == "__main__":

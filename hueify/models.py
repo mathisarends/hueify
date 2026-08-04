@@ -84,6 +84,10 @@ class NamedResource(HueModel):
     id: UUID
     metadata: NamedMetadata
 
+    @property
+    def name(self) -> str:
+        return self.metadata.name
+
 
 class OnState(HueModel):
     on: bool
@@ -255,7 +259,36 @@ class LightMetadata(NamedMetadata):
     archetype: LightArchetype | str | None = None
 
 
-class Light(NamedResource):
+class LightStateMixin:
+    """Flattened accessors for resources whose state lives in optional sub-models.
+
+    Mixed into pydantic models alongside BaseModel; declares no fields of its
+    own, so it never conflicts with the fields it reads off ``self``.
+    """
+
+    on: OnState | None
+    dimming: DimmingState | None
+    color_temperature: ColorTemperatureState | None
+    color: ColorState | None
+
+    @property
+    def is_on(self) -> bool | None:
+        return self.on.on if self.on else None
+
+    @property
+    def brightness(self) -> float | None:
+        return self.dimming.brightness if self.dimming else None
+
+    @property
+    def mirek(self) -> int | None:
+        return self.color_temperature.mirek if self.color_temperature else None
+
+    @property
+    def xy(self) -> ColorXY | None:
+        return self.color.xy if self.color else None
+
+
+class Light(NamedResource, LightStateMixin):
     type: Literal[ResourceType.LIGHT] = ResourceType.LIGHT
     id_v1: str | None = None
     owner: ResourceReference
@@ -273,7 +306,7 @@ class Light(NamedResource):
     mode: str | None = None
 
 
-class LightUpdate(HueModel):
+class LightUpdate(HueModel, LightStateMixin):
     on: OnState | None = None
     dimming: DimmingState | None = None
     dimming_delta: DimmingDelta | None = None
@@ -353,7 +386,7 @@ class GroupUpdate(HueModel):
     children: list[ResourceReference] | None = None
 
 
-class GroupedLight(HueModel):
+class GroupedLight(HueModel, LightStateMixin):
     """Aggregated light service a room or zone is controlled through."""
 
     id: UUID

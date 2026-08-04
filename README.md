@@ -11,7 +11,18 @@ underneath it.
 pip install hueify
 ```
 
-## Onboarding
+- [Setup](#setup)
+- [Quickstart](#quickstart)
+- [Commands](#commands)
+  - [Colors](#colors)
+  - [Transitions](#transitions)
+- [Finding resources](#finding-resources)
+- [Reading state](#reading-state)
+- [Rooms, zones and scenes](#rooms-zones-and-scenes)
+- [Event stream](#event-stream)
+- [Errors and rough edges](#errors-and-rough-edges)
+
+## Setup
 
 A bridge IP and an application key are needed. `hueify setup` discovers the
 bridge, waits for the link button and prints both:
@@ -68,6 +79,9 @@ async def main() -> None:
 
 asyncio.run(main())
 ```
+
+`Hueify` owns one HTTP client. Use it as an async context manager or call
+`await hue.close()` yourself; entering it does not talk to the bridge yet.
 
 ## Commands
 
@@ -138,36 +152,21 @@ await hue.lights.set_brightness(desk.id, 100, transition=timedelta(seconds=10))
 await hue.rooms.turn_off(office.id, transition=3)
 ```
 
-## Rooms, zones and scenes
-
-A room groups devices, a zone groups light services, and scenes belong to either.
-Both namespaces resolve that hierarchy:
-
-```python
-office = await hue.rooms.find_by_name("Office")
-
-for light in await hue.rooms.lights(office.id):
-    print(light.metadata.name, light.on.on)
-
-for scene in await hue.rooms.scenes(office.id):
-    print(scene.metadata.name)
-
-await hue.scenes.activate(scene.id, brightness=40, transition=2)
-await hue.scenes.activate(scene.id, dynamic=True)
-```
-
-`hue.rooms.grouped_light(id)` returns the aggregated state of a group, and
-`hue.rooms.apply(id, LightUpdate(...))` sends a raw update to it.
-
 ## Finding resources
 
-Every namespace resolves the name shown in the Hue app, and unwraps single
-resources for you:
+IDs are the lookup keys, names are what you see in the Hue app. Every namespace
+resolves both, and unwraps single resources for you:
 
 ```python
-light = await hue.lights.find_by_name("Desk")  # by name, raises ResourceNotFoundError
-light = await hue.lights.get_one(light.id)  # by ID, the resource itself
+light = await hue.lights.find_by_name("Desk")       # ignores case and surrounding space
+light = await hue.lights.find_by_name("desklamp")   # close enough also matches
+light = await hue.lights.get_one(light.id)          # by ID, the resource itself
 ```
+
+`find_by_name` takes an exact match first and otherwise falls back to the closest
+name above a similarity cutoff. If nothing is close enough it raises
+`ResourceNotFoundError` listing the names it did find, which is usually enough to
+spot the typo.
 
 The envelope-returning reads stay available for callers that want the errors
 alongside the data:
@@ -179,28 +178,56 @@ response = await hue.lights.get(light.id)
 print(response.errors, response.data)
 ```
 
+## Reading state
+
+Resources come back as Pydantic models mirroring the CLIP v2 JSON. State lives in
+optional sub-models there, so lights and grouped lights carry flat accessors next
+to the raw fields:
+
+```python
+light = await hue.lights.get_one(desk.id)
+
+light.name          # metadata.name
+light.is_on         # bool | None
+light.brightness    # float | None, percent
+light.mirek         # int | None
+light.xy            # ColorXY | None
+light.on.on         # the underlying field is still right there
+```
+
 All Hue models use Pydantic with `extra="allow"`. Known fields are statically
 typed, while fields introduced by newer bridge firmware are retained. Convert a
 response back to complete JSON with `response.model_dump(mode="json")`.
 
-## Raw updates
+Reads are snapshots. Nothing is cached and nothing is polled in the background, so
+a later read returns whatever the bridge reports then. To follow changes as they
+happen, use the event stream.
 
-The commands cover on/off, brightness, color and color temperature. For everything
-else, build the request model and send it - it is the same call the commands make
-internally:
+## Rooms, zones and scenes
+
+A room groups devices, a zone groups light services, and scenes belong to either.
+Both namespaces resolve that hierarchy:
 
 ```python
-from hueify import LightUpdate
-from hueify.models import EffectsState
+office = await hue.rooms.find_by_name("Office")
 
-await hue.lights.update(light.id, LightUpdate(effects=EffectsState(effect="candle")))
+for light in await hue.rooms.lights(office.id):
+    print(light.name, light.is_on)
+
+for scene in await hue.rooms.scenes(office.id):
+    print(scene.name)
+
+await hue.scenes.activate(scene.id, brightness=40, transition=2)
+await hue.scenes.activate(scene.id, dynamic=True)
 ```
 
-Rooms, zones and scenes expose their native create, update and delete operations,
-and `hue.scenes.recall(id, SceneRecallRequest(...))` remains available next to
-`activate`.
+`hue.rooms.grouped_light(id)` returns the aggregated state of a group, and
+`hue.rooms.apply(id, LightUpdate(...))` sends a raw update to it. Rooms, zones and
+scenes also expose their native create, update and delete operations, and
+`hue.scenes.recall(id, SceneRecallRequest(...))` remains available next to
+`activate` for the full recall payload.
 
-## Optional event stream
+## Event stream
 
 Entering `Hueify` does not connect to the SSE stream. Register handlers with the
 `@hue.on(...)` decorator, then start the stream explicitly:
@@ -209,30 +236,51 @@ Entering `Hueify` does not connect to the SSE stream. Register handlers with the
 import asyncio
 
 from hueify import Hueify
-from hueify.models import LightEvent, ResourceType
+from hueify.models import HueEvent, LightEvent, ResourceType
 
 
 async with Hueify() as hue:
     @hue.on(ResourceType.LIGHT)
     async def on_light(event: LightEvent) -> None:
-        print(event.id, event.on, event.dimming)
+        print(event.id, event.is_on, event.brightness)
+
+    @hue.on("*")
+    async def on_any(event: HueEvent) -> None:
+        print(event.type, event.id)
 
     await hue.start_events()
     await asyncio.Event().wait()
 ```
 
+Events arrive as `LightEvent`, `RoomEvent`, `ZoneEvent` and `SceneEvent` - the
+matching update model plus an ID, so a `LightEvent` reads like a light, including
+the flat accessors. Anything else arrives as the base `HueEvent`. A `"*"` handler
+receives every event, in addition to the type-specific ones.
+
 `hue.off(resource_type, handler)` removes a handler, `hue.stop_events()` ends the
 stream and `hue.events_connected` reports whether it is running. Leaving the
 context manager closes a started stream along with the HTTP client.
 
-## Design
+## Errors and rough edges
 
-- Commands are convenience over the CLIP v2 payloads, never a second state model.
-- Hue resource IDs are the lookup keys; names are resolved against the bridge.
-- There are no light, grouped-light, room, zone or scene caches.
-- Resource reads are snapshots; a later read gets current bridge state.
-- Pydantic models mirror Hue resource JSON and retain additional fields.
-- The event connection is opt-in and independent of REST access.
+Worth knowing before building on this:
+
+- **A successful response can still carry errors.** Writes return
+  `HueApiResponse[ResourceIdentifier]`, and the bridge reports per-resource
+  problems in `response.errors` instead of failing the request. The commands do
+  not inspect that field, so check it when a write silently does nothing.
+- **Transport errors are httpx errors.** Hueify calls `raise_for_status()`: a 4xx
+  or 5xx surfaces as `httpx.HTTPStatusError`, a timeout as
+  `httpx.TimeoutException`. Only `HueifyError` and its subclasses
+  (`ResourceNotFoundError`, `MissingCredentialsError`) come from hueify itself.
+- **TLS verification is off.** Hue bridges use a self-signed certificate, so the
+  HTTP client and the event stream both connect with `verify=False`.
+- **The event stream does not reconnect.** If it drops, the error is logged and
+  `hue.events_connected` turns `False`; restarting is your call. Exceptions raised
+  by handlers are logged and never take the stream down.
+- **The bridge rate-limits.** Roughly 10 light commands per second, fewer for
+  groups. Hueify neither throttles nor retries - use the room and zone commands
+  instead of looping over their lights.
 
 ## Examples
 

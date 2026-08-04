@@ -9,7 +9,7 @@ LIGHT_NAME = "Desk"
 async def main() -> None:
     async with Hueify() as hue:
         for light in (await hue.lights.list()).data:
-            print(f"{light.metadata.name}: on={light.on.on}")
+            print(f"{light.name}: on={light.is_on}")
 
         desk = await hue.lights.find_by_name(LIGHT_NAME)
 

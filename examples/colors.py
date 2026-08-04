@@ -28,9 +28,8 @@ async def main() -> None:
 
         # and read back the current color as something you can print
         current = await hue.lights.get_one(light.id)
-        if current.color and current.color.xy:
-            brightness = current.dimming.brightness if current.dimming else 100
-            print("current color:", xy_to_hex(current.color.xy, brightness))
+        if current.xy:
+            print("current color:", xy_to_hex(current.xy, current.brightness or 100))
 
         await hue.lights.turn_off(light.id)
 
