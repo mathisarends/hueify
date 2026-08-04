@@ -2,9 +2,8 @@
 
 [![PyPI](https://img.shields.io/pypi/v/hueify)](https://pypi.org/project/hueify/)
 [![Python](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
-[![Docs](https://img.shields.io/badge/docs-mathisarends.github.io-blue)](https://mathisarends.github.io/hueify/)
 
-Hueify is an async-first Python library for Philips Hue. It lets you control lights, rooms, zones and scenes using the same names you see in the Hue app, with state kept fresh via serversent events. It also ships an MCP server for LLM tools.
+Hueify is an async-first Python library for Philips Hue. It lets you control lights, rooms, zones and scenes using the same names you see in the Hue app, with state kept fresh via serversent events.
 
 ```bash
 pip install hueify
@@ -12,23 +11,17 @@ pip install hueify
 
 ---
 
-## CLI
+## Onboarding
 
-Hueify ships a command-line interface for controlling lights, rooms, and zones directly from your terminal. Requires the `cli` extra:
+`hueify.onboarding.setup()` is an interactive wizard that discovers your bridge and registers an app key, no extra install required:
 
-```bash
-pip install hueify[cli]
+```python
+from hueify.onboarding import setup
+
+setup()
 ```
 
-### Onboarding
-
-Run the interactive setup wizard to auto-discover your bridge and register an app key:
-
-```bash
-hueify setup
-```
-
-The wizard will:
+It will:
 
 1. Scan your network for a Hue Bridge
 2. Prompt you to press the **link button** on the bridge
@@ -46,27 +39,7 @@ Setup complete!
 Credentials saved to C:\Users\you\AppData\Roaming\hueify\config.toml
 ```
 
-After setup, the CLI and Python API can read those credentials automatically. You can still use `HUE_BRIDGE_IP` / `HUE_APP_KEY` or CLI flags to override the saved config.
-
-### CLI commands
-
-```bash
-hueify lights list
-hueify lights on "Desk lamp"
-hueify lights off "Desk lamp"
-hueify lights brightness "Desk lamp" 75
-hueify lights temperature "Desk lamp" 30
-
-hueify rooms list
-hueify rooms on "Living Room"
-hueify rooms brightness "Living Room" 40
-hueify rooms activate-scene "Living Room" "Relax"
-
-hueify zones list
-hueify zones on "Downstairs"
-```
-
-Pass `--bridge-ip` and `--app-key` as flags to override the saved config or environment variables for a single invocation.
+After setup, the Python API reads those credentials automatically. You can still use `HUE_BRIDGE_IP` / `HUE_APP_KEY` to override the saved config.
 
 ---
 
@@ -88,7 +61,7 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-Credentials are read from CLI setup config by default. Environment variables (`HUE_BRIDGE_IP`, `HUE_APP_KEY`) and explicit constructor arguments override that config:
+Credentials are read from the onboarding config by default. Environment variables (`HUE_BRIDGE_IP`, `HUE_APP_KEY`) and explicit constructor arguments override that config:
 
 ```python
 async with Hueify(bridge_ip="192.168.1.10", app_key="your-app-key") as hue:
@@ -210,18 +183,6 @@ async with Hueify() as hue:
 
 Supported event types include `LightEvent`, `GroupedLightEvent`, `SceneEvent`,
 `MotionEvent`, `ButtonEvent`, `TemperatureEvent`, and more.
-
----
-
-## MCP server
-
-Hueify includes a Model Context Protocol server that exposes lights, rooms, and zones to compatible LLM tools. Requires the `mcp` extra:
-
-```bash
-pip install hueify[mcp]
-```
-
-The server uses the same `Hueify` context manager internally. Integration with a specific MCP host is not covered here.
 
 ---
 
