@@ -1,17 +1,14 @@
 import json
 import logging
+from typing import Any
 
 import httpx
 from httpx_sse import ServerSentEvent, aconnect_sse
-from pydantic import TypeAdapter
 
 from hueify.credentials import HueBridgeCredentials
 from hueify.sse.bus import EventBus
-from hueify.sse.views import HueEvent, UnknownEvent
 
 logger = logging.getLogger(__name__)
-
-_event_adapter = TypeAdapter(HueEvent | UnknownEvent)
 
 
 class ServerSentEventStream:
@@ -53,12 +50,12 @@ class ServerSentEventStream:
 
     async def _handle_sse(self, sse: ServerSentEvent) -> None:
         try:
-            containers: list[dict] = json.loads(sse.data)
+            containers: list[dict[str, Any]] = json.loads(sse.data)
 
             for container in containers:
                 for raw_event in container.get("data", []):
-                    event = _event_adapter.validate_python(raw_event)
-                    await self._event_bus.dispatch(event)
+                    if isinstance(raw_event, dict):
+                        await self._event_bus.dispatch(raw_event)
 
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse SSE payload: {e}")

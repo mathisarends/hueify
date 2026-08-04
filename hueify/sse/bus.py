@@ -1,49 +1,43 @@
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
+from typing import Any
 
-from pydantic import BaseModel
-
-type EventHandler[T: BaseModel] = Callable[[T], Awaitable[None]]
+type JsonObject = dict[str, Any]
+type EventHandler = Callable[[JsonObject], Awaitable[None]]
 
 logger = logging.getLogger(__name__)
 
 
 class EventBus:
     def __init__(self) -> None:
-        self._handlers: dict[type[BaseModel], list[EventHandler]] = {}
+        self._handlers: dict[str, list[EventHandler]] = {}
 
-    def subscribe[T: BaseModel](
-        self, event_type: type[T], handler: EventHandler[T]
-    ) -> None:
-        self._handlers.setdefault(event_type, []).append(handler)
-        logger.debug(f"Subscribed to {event_type.__name__}")
+    def subscribe(self, resource_type: str, handler: EventHandler) -> EventHandler:
+        """Subscribe to a Hue resource type, or ``*`` for every event."""
+        self._handlers.setdefault(resource_type, []).append(handler)
+        return handler
 
-    def unsubscribe[T: BaseModel](
-        self, event_type: type[T], handler: EventHandler[T]
-    ) -> None:
-        if event_type in self._handlers and handler in self._handlers[event_type]:
-            self._handlers[event_type].remove(handler)
+    def unsubscribe(self, resource_type: str, handler: EventHandler) -> None:
+        handlers = self._handlers.get(resource_type, [])
+        if handler in handlers:
+            handlers.remove(handler)
 
-    async def dispatch[T: BaseModel](self, event: T) -> T:
-        event_type = type(event)
-        handlers = self._handlers.get(event_type, [])
-        logger.debug(f"Dispatching {event_type.__name__} to {len(handlers)} handler(s)")
-
-        if not handlers:
-            logger.debug(f"No handlers registered for {event_type.__name__}")
+    async def dispatch(self, event: JsonObject) -> JsonObject:
+        resource_type = event.get("type")
+        if not isinstance(resource_type, str):
+            logger.warning("Ignoring Hue event without a string 'type': %r", event)
             return event
 
+        handlers = [
+            *self._handlers.get(resource_type, []),
+            *self._handlers.get("*", []),
+        ]
         results = await asyncio.gather(
-            *[handler(event) for handler in handlers],
+            *(handler(event) for handler in handlers),
             return_exceptions=True,
         )
-
         for result in results:
             if isinstance(result, Exception):
-                logger.error(
-                    f"Handler failed for {event_type.__name__}: {result}",
-                    exc_info=result,
-                )
-
+                logger.error("Handler failed for %s: %s", resource_type, result)
         return event

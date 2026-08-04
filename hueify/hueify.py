@@ -1,98 +1,78 @@
-import asyncio
-import logging
-from collections.abc import Callable
 from types import TracebackType
-from typing import Self, overload
+from typing import Self
 
-import httpx
-from pydantic import BaseModel
-
-from hueify.cache import ManagedCache
 from hueify.credentials import HueBridgeCredentials
-from hueify.grouped_lights import (
-    GroupedLightCache,
-    RoomCache,
-    RoomNamespace,
-    ZoneCache,
-    ZoneNamespace,
-)
 from hueify.http import HttpClient
-from hueify.light import LightCache, LightNamespace
-from hueify.onboarding.discovery import discover_bridges
-from hueify.scenes import SceneCache
-from hueify.scenes.namespace import SceneNamespace
-from hueify.shared.decorators import timed
-from hueify.sse import EventBus, ServerSentEventStream
-from hueify.sse.bus import EventHandler
+from hueify.resources import ResourceNamespace
+from hueify.sse import EventStream
 
-logger = logging.getLogger(__name__)
+# Python-facing plural name -> Hue CLIP v2 resource endpoint.
+_RESOURCE_NAMES = {
+    "behavior_instances": "behavior_instance",
+    "behavior_scripts": "behavior_script",
+    "bridges": "bridge",
+    "bridge_homes": "bridge_home",
+    "buttons": "button",
+    "camera_motions": "camera_motion",
+    "contacts": "contact",
+    "devices": "device",
+    "device_powers": "device_power",
+    "device_software_updates": "device_software_update",
+    "entertainments": "entertainment",
+    "entertainment_configurations": "entertainment_configuration",
+    "geofence_clients": "geofence_client",
+    "geolocations": "geolocation",
+    "grouped_lights": "grouped_light",
+    "grouped_light_levels": "grouped_light_level",
+    "grouped_motions": "grouped_motion",
+    "homekits": "homekit",
+    "lights": "light",
+    "light_levels": "light_level",
+    "matters": "matter",
+    "matter_fabrics": "matter_fabric",
+    "motions": "motion",
+    "public_images": "public_image",
+    "relative_rotaries": "relative_rotary",
+    "rooms": "room",
+    "scenes": "scene",
+    "service_groups": "service_group",
+    "smart_scenes": "smart_scene",
+    "speakers": "speaker",
+    "tampers": "tamper",
+    "temperatures": "temperature",
+    "wifi_connectivities": "wifi_connectivity",
+    "zigbee_connectivities": "zigbee_connectivity",
+    "zigbee_device_discoveries": "zigbee_device_discovery",
+    "zgp_connectivities": "zgp_connectivity",
+    "zones": "zone",
+}
 
 
 class Hueify:
+    """Lazy, JSON-first client for the Philips Hue CLIP v2 API."""
+
     def __init__(
         self,
         bridge_ip: str | None = None,
         app_key: str | None = None,
     ) -> None:
-        logger.debug(f"Initializing Hueify with bridge_ip={bridge_ip}")
         self._credentials = self._resolve_credentials(bridge_ip, app_key)
-
         self._http_client = HttpClient(self._credentials)
-        self._event_bus = EventBus()
-        self._event_stream = ServerSentEventStream(
-            credentials=self._credentials, event_bus=self._event_bus
-        )
-        self._stream_task: asyncio.Task | None = None
+        self._resource_namespaces: dict[str, ResourceNamespace] = {}
 
-        self._light_cache = LightCache(self._event_bus)
-        self._grouped_light_cache = GroupedLightCache(self._event_bus)
-        self._room_cache = RoomCache()
-        self._zone_cache = ZoneCache()
-        self._scene_cache = SceneCache(self._event_bus)
+        for attribute, resource_type in _RESOURCE_NAMES.items():
+            setattr(self, attribute, self.resource(resource_type))
 
-        self._caches: list[ManagedCache] = [
-            self._light_cache,
-            self._grouped_light_cache,
-            self._room_cache,
-            self._zone_cache,
-            self._scene_cache,
-        ]
+        # Constructing or entering Hueify does not open a stream connection.
+        self.events = EventStream(self._credentials)
 
-        self._lights = LightNamespace(
-            light_cache=self._light_cache, http_client=self._http_client
-        )
-        self._scenes = SceneNamespace(
-            scene_cache=self._scene_cache, http_client=self._http_client
-        )
-        self._rooms = RoomNamespace(
-            room_cache=self._room_cache,
-            grouped_light_cache=self._grouped_light_cache,
-            http_client=self._http_client,
-            scene_cache=self._scene_cache,
-        )
-        self._zones = ZoneNamespace(
-            zone_cache=self._zone_cache,
-            grouped_light_cache=self._grouped_light_cache,
-            http_client=self._http_client,
-            scene_cache=self._scene_cache,
-        )
-        logger.info("Hueify initialized successfully")
-
-    @property
-    def scenes(self) -> SceneNamespace:
-        return self._scenes
-
-    @property
-    def zones(self) -> ZoneNamespace:
-        return self._zones
-
-    @property
-    def rooms(self) -> RoomNamespace:
-        return self._rooms
-
-    @property
-    def lights(self) -> LightNamespace:
-        return self._lights
+    def resource(self, resource_type: str) -> ResourceNamespace:
+        """Return a namespace for any current or future Hue resource type."""
+        namespace = self._resource_namespaces.get(resource_type)
+        if namespace is None:
+            namespace = ResourceNamespace(resource_type, self._http_client)
+            self._resource_namespaces[resource_type] = namespace
+        return namespace
 
     def _resolve_credentials(
         self,
@@ -104,12 +84,9 @@ class Hueify:
             credential_overrides["hue_bridge_ip"] = bridge_ip
         if app_key is not None:
             credential_overrides["hue_app_key"] = app_key
-        if credential_overrides:
-            return HueBridgeCredentials(**credential_overrides)
-        return HueBridgeCredentials()
+        return HueBridgeCredentials(**credential_overrides)
 
     async def __aenter__(self) -> Self:
-        await self.connect()
         return self
 
     async def __aexit__(
@@ -120,96 +97,6 @@ class Hueify:
     ) -> None:
         await self.close()
 
-    @timed()
-    async def connect(self) -> None:
-        logger.info("Connecting to Hue Bridge")
-        self._stream_task = asyncio.create_task(self._event_stream.connect())
-        logger.debug("Event stream connection task created")
-
-        try:
-            await self._populate_caches()
-        except httpx.ConnectTimeout:
-            await self._reconnect_after_discovery()
-
-        logger.info("Caches populated successfully")
-
-    async def _populate_caches(self) -> None:
-        await asyncio.gather(*[c.populate(self._http_client) for c in self._caches])
-        logger.info("Caches populated successfully")
-
-    async def _reconnect_after_discovery(self) -> None:
-        logger.warning(
-            "Connection to Hue Bridge at %s timed out — starting automatic bridge discovery.",
-            self._credentials.hue_bridge_ip,
-        )
-
-        if self._stream_task and not self._stream_task.done():
-            self._stream_task.cancel()
-
-        bridges = await discover_bridges()
-        discovered_ip = bridges[0].internalipaddress
-        logger.warning(
-            "Discovered Hue Bridge at %s — reconnecting.",
-            discovered_ip,
-        )
-
-        await self._http_client.close()
-        self._credentials = HueBridgeCredentials(
-            hue_bridge_ip=discovered_ip,
-            hue_app_key=self._credentials.hue_app_key,
-        )
-        self._http_client = HttpClient(self._credentials)
-        self._event_stream = ServerSentEventStream(
-            credentials=self._credentials, event_bus=self._event_bus
-        )
-        self._stream_task = asyncio.create_task(self._event_stream.connect())
-        await self._populate_caches()
-
     async def close(self) -> None:
-        logger.info("Disconnecting from Hue Bridge")
-        self._event_stream.disconnect()
-        logger.debug("Event stream disconnected")
-
-        if self._stream_task and not self._stream_task.done():
-            self._stream_task.cancel()
-            logger.debug("Event stream task cancelled")
-
+        await self.events.close()
         await self._http_client.close()
-        self._clear_caches()
-
-    def _clear_caches(self) -> None:
-        for c in self._caches:
-            c.clear()
-        logger.info("All caches cleared")
-
-    def off[T: BaseModel](self, event_type: type[T], handler: EventHandler[T]) -> None:
-        self._event_bus.unsubscribe(event_type, handler)
-
-    @overload
-    def on[T: BaseModel](
-        self,
-        event_type: type[T],
-        handler: EventHandler[T],
-    ) -> EventHandler[T]: ...
-
-    @overload
-    def on[T: BaseModel](
-        self,
-        event_type: type[T],
-        handler: None = None,
-    ) -> Callable[[EventHandler[T]], EventHandler[T]]: ...
-
-    def on[T: BaseModel](
-        self,
-        event_type: type[T],
-        handler: EventHandler[T] | None = None,
-    ) -> EventHandler[T] | Callable[[EventHandler[T]], EventHandler[T]]:
-        if handler is not None:
-            self._event_bus.subscribe(event_type, handler)
-            return handler
-
-        def decorator(fn: EventHandler[T]) -> EventHandler[T]:
-            self._event_bus.subscribe(event_type, fn)
-            return fn
-
-        return decorator

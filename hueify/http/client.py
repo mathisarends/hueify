@@ -1,12 +1,10 @@
-from typing import TypeVar
+from collections.abc import Mapping
+from typing import Any
 
 import httpx
-from pydantic import BaseModel, TypeAdapter
 
 from hueify.credentials import HueBridgeCredentials
-from hueify.http.schemas import ApiResponse, HueApiResponse
-
-T = TypeVar("T", bound=BaseModel)
+from hueify.http.schemas import ApiResponse
 
 
 class HttpClient:
@@ -39,43 +37,30 @@ class HttpClient:
         response.raise_for_status()
         return response.json()
 
-    async def get_resources(self, endpoint: str, resource_type: type[T]) -> list[T]:
-        response = await self._client.get(
+    async def post(self, endpoint: str, data: Mapping[str, Any]) -> ApiResponse:
+        response = await self._client.post(
             f"{self._base_url}/{self._normalize_endpoint(endpoint)}",
             headers=self._headers,
+            json=dict(data),
         )
         response.raise_for_status()
+        return response.json()
 
-        adapter = TypeAdapter(HueApiResponse[resource_type])
-        api_response = adapter.validate_python(response.json())
-        return api_response.data
-
-    async def get_resource(self, endpoint: str, resource_type: type[T]) -> T:
-        response = await self._client.get(
-            f"{self._base_url}/{self._normalize_endpoint(endpoint)}",
-            headers=self._headers,
-        )
-        response.raise_for_status()
-
-        adapter = TypeAdapter(HueApiResponse[resource_type])
-        api_response = adapter.validate_python(response.json())
-        return api_response.get_single_resource()
-
-    async def put(
-        self, endpoint: str, data: BaseModel, resource_type: type[T] | None = None
-    ) -> ApiResponse | T:
+    async def put(self, endpoint: str, data: Mapping[str, Any]) -> ApiResponse:
         response = await self._client.put(
             f"{self._base_url}/{self._normalize_endpoint(endpoint)}",
             headers=self._headers,
-            json=data.model_dump(mode="json", exclude_none=True),
+            json=dict(data),
         )
         response.raise_for_status()
+        return response.json()
 
-        if resource_type is not None:
-            adapter = TypeAdapter(HueApiResponse[resource_type])
-            api_response = adapter.validate_python(response.json())
-            return api_response.get_single_resource()
-
+    async def delete(self, endpoint: str) -> ApiResponse:
+        response = await self._client.delete(
+            f"{self._base_url}/{self._normalize_endpoint(endpoint)}",
+            headers=self._headers,
+        )
+        response.raise_for_status()
         return response.json()
 
     async def close(self) -> None:
