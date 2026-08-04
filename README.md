@@ -209,8 +209,7 @@ async with Hueify() as hue:
 ```
 
 Supported event types include `LightEvent`, `GroupedLightEvent`, `SceneEvent`,
-`MotionEvent`, `ButtonEvent`, `TemperatureEvent`, and more — see the
-[Events guide](docs/guide/events.md) for the full list.
+`MotionEvent`, `ButtonEvent`, `TemperatureEvent`, and more.
 
 ---
 
