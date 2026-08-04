@@ -2,7 +2,11 @@ import pytest
 from pydantic import ValidationError
 
 from hueify import Hueify
-from hueify.credentials import HueBridgeCredentials, save_credentials_config
+from hueify.credentials import (
+    HueBridgeCredentials,
+    get_credentials_config_path,
+    save_credentials_config,
+)
 
 VALID_IP = "192.168.1.1"
 VALID_APP_KEY = "a" * 20
@@ -140,3 +144,52 @@ class TestCredentialsConfig:
 
         assert hue._credentials.hue_bridge_ip == CONFIG_IP
         assert hue._credentials.hue_app_key == VALID_APP_KEY
+
+
+class _FakePath(str):
+    """Stand-in for pathlib.Path that avoids constructing a real PosixPath
+    on a Windows test runner, while still exercising the real branch logic
+    in get_credentials_config_path()."""
+
+    def __truediv__(self, other: str) -> "_FakePath":
+        return _FakePath(f"{self}/{other}")
+
+    @classmethod
+    def home(cls) -> "_FakePath":
+        return cls("/home/fakeuser")
+
+
+class TestConfigPathPlatforms:
+    def _clear_overrides(self, monkeypatch):
+        monkeypatch.delenv("HUEIFY_CONFIG_FILE", raising=False)
+        monkeypatch.setattr("hueify.credentials.Path", _FakePath)
+
+    def test_macos_uses_application_support(self, monkeypatch):
+        self._clear_overrides(monkeypatch)
+        monkeypatch.setattr("os.name", "posix")
+        monkeypatch.setattr("sys.platform", "darwin")
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+
+        path = get_credentials_config_path()
+
+        assert path == "/home/fakeuser/Library/Application Support/hueify/config.toml"
+
+    def test_linux_prefers_xdg_config_home_when_set(self, monkeypatch):
+        self._clear_overrides(monkeypatch)
+        monkeypatch.setattr("os.name", "posix")
+        monkeypatch.setattr("sys.platform", "linux")
+        monkeypatch.setenv("XDG_CONFIG_HOME", "/custom/xdg")
+
+        path = get_credentials_config_path()
+
+        assert path == "/custom/xdg/hueify/config.toml"
+
+    def test_linux_falls_back_to_dot_config_without_xdg(self, monkeypatch):
+        self._clear_overrides(monkeypatch)
+        monkeypatch.setattr("os.name", "posix")
+        monkeypatch.setattr("sys.platform", "linux")
+        monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+
+        path = get_credentials_config_path()
+
+        assert path == "/home/fakeuser/.config/hueify/config.toml"
