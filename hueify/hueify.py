@@ -2,7 +2,7 @@ from collections.abc import Callable
 from types import TracebackType
 from typing import Self, overload
 
-from hueify.credentials import HueBridgeCredentials
+from hueify.credentials import load_credentials
 from hueify.http import HttpClient
 from hueify.models import HueEvent
 from hueify.resources import (
@@ -15,39 +15,25 @@ from hueify.sse import EventHandler, EventResourceType, EventStream
 
 
 class Hueify:
-    """Typed, stateless client for the Philips Hue CLIP v2 API."""
+    """Typed, stateless client for the Philips Hue CLIP v2 API.
+
+    Credentials are read from the constructor arguments, the
+    ``HUE_BRIDGE_IP``/``HUE_APP_KEY`` environment variables and a ``.env``
+    file, in that order.
+    """
 
     def __init__(
         self,
         bridge_ip: str | None = None,
         app_key: str | None = None,
     ) -> None:
-        self._credentials = self._resolve_credentials(bridge_ip, app_key)
+        self._credentials = load_credentials(bridge_ip, app_key)
         self._http_client = HttpClient(self._credentials)
         self.lights = LightNamespace(self._http_client)
         self.rooms = RoomNamespace(self._http_client)
         self.zones = ZoneNamespace(self._http_client)
         self.scenes = SceneNamespace(self._http_client)
         self.events = EventStream(self._credentials)
-
-    def _resolve_credentials(
-        self,
-        bridge_ip: str | None,
-        app_key: str | None,
-    ) -> HueBridgeCredentials:
-        if bridge_ip is not None and app_key is not None:
-            return HueBridgeCredentials(
-                hue_bridge_ip=bridge_ip,
-                hue_app_key=app_key,
-            )
-
-        settings = HueBridgeCredentials()
-        if bridge_ip is None and app_key is None:
-            return settings
-        return HueBridgeCredentials(
-            hue_bridge_ip=bridge_ip or settings.hue_bridge_ip,
-            hue_app_key=app_key or settings.hue_app_key,
-        )
 
     async def __aenter__(self) -> Self:
         return self

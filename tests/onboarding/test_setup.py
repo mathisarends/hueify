@@ -2,11 +2,13 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from hueify.credentials import HueBridgeCredentials
 from hueify.onboarding.discovery import DiscoveredBridge
 from hueify.onboarding.setup import _run_setup, _select_bridge, setup
 
 BRIDGE_A = DiscoveredBridge(id="a1", internalipaddress="192.168.1.10")
 BRIDGE_B = DiscoveredBridge(id="b2", internalipaddress="192.168.1.20")
+APP_KEY = "the-app-key-that-is-long-enough"
 
 
 def test_select_bridge_auto_selects_the_only_bridge_without_prompting() -> None:
@@ -26,7 +28,7 @@ def test_select_bridge_reprompts_on_invalid_choices() -> None:
 
 
 @pytest.mark.asyncio
-async def test_run_setup_wires_discovery_registration_and_credential_saving() -> None:
+async def test_run_setup_returns_the_discovered_and_registered_credentials() -> None:
     with (
         patch(
             "hueify.onboarding.setup.discover_bridges",
@@ -36,25 +38,52 @@ async def test_run_setup_wires_discovery_registration_and_credential_saving() ->
         patch(
             "hueify.onboarding.setup.register_app_key",
             new_callable=AsyncMock,
-            return_value="the-app-key",
+            return_value=APP_KEY,
         ) as register,
-        patch(
-            "hueify.onboarding.setup.save_credentials_config",
-            return_value="/config/path",
-        ) as save,
         patch("builtins.input"),
     ):
-        await _run_setup()
+        credentials = await _run_setup()
 
     discover.assert_awaited_once()
     register.assert_awaited_once_with(BRIDGE_A.internalipaddress)
-    save.assert_called_once_with(BRIDGE_A.internalipaddress, "the-app-key")
+    assert credentials.hue_bridge_ip == BRIDGE_A.internalipaddress
+    assert credentials.hue_app_key == APP_KEY
 
 
-def test_setup_runs_run_setup_to_completion() -> None:
+@pytest.mark.asyncio
+async def test_run_setup_writes_nothing_and_prints_the_variables(capsys) -> None:
+    with (
+        patch(
+            "hueify.onboarding.setup.discover_bridges",
+            new_callable=AsyncMock,
+            return_value=[BRIDGE_A],
+        ),
+        patch(
+            "hueify.onboarding.setup.register_app_key",
+            new_callable=AsyncMock,
+            return_value=APP_KEY,
+        ),
+        patch("builtins.input"),
+        patch("pathlib.Path.write_text") as write_text,
+    ):
+        await _run_setup()
+
+    write_text.assert_not_called()
+    printed = capsys.readouterr().out
+    assert f"HUE_BRIDGE_IP={BRIDGE_A.internalipaddress}" in printed
+    assert f"HUE_APP_KEY={APP_KEY}" in printed
+
+
+def test_setup_runs_run_setup_to_completion_and_passes_the_result_through() -> None:
+    credentials = HueBridgeCredentials(
+        hue_bridge_ip=BRIDGE_A.internalipaddress, hue_app_key=APP_KEY
+    )
+
     with patch(
-        "hueify.onboarding.setup._run_setup", new_callable=AsyncMock
+        "hueify.onboarding.setup._run_setup",
+        new_callable=AsyncMock,
+        return_value=credentials,
     ) as run_setup:
-        setup()
+        assert setup() is credentials
 
     run_setup.assert_awaited_once()

@@ -1,6 +1,6 @@
 import asyncio
 
-from hueify.credentials import save_credentials_config
+from hueify.credentials import HueBridgeCredentials
 from hueify.onboarding.discovery import DiscoveredBridge, discover_bridges
 from hueify.onboarding.registration import register_app_key
 
@@ -21,7 +21,17 @@ def _select_bridge(bridges: list[DiscoveredBridge]) -> DiscoveredBridge:
         print("Invalid choice, try again.")
 
 
-async def _run_setup() -> None:
+def _print_credentials(credentials: HueBridgeCredentials) -> None:
+    print("\nSetup complete. Hueify reads these two values:\n")
+    print(f"  HUE_BRIDGE_IP={credentials.hue_bridge_ip}")
+    print(f"  HUE_APP_KEY={credentials.hue_app_key}")
+    print(
+        "\nSet them in your environment or write them to a .env file.\n"
+        "The app key controls your bridge - keep it out of version control."
+    )
+
+
+async def _run_setup() -> HueBridgeCredentials:
     print("Hue Bridge Setup\n")
 
     print("Searching for bridges on your network...")
@@ -35,15 +45,14 @@ async def _run_setup() -> None:
     print("Registering app key...")
     app_key = await register_app_key(bridge.internalipaddress)
 
-    config_path = save_credentials_config(bridge.internalipaddress, app_key)
-
-    print("\nSetup complete!")
-    print(f"\nCredentials saved to {config_path}")
-    print("\nYou can now use Hueify without setting environment variables.")
-    print(
-        "\nUse the HUE_BRIDGE_IP/HUE_APP_KEY environment variables to override this file."
+    credentials = HueBridgeCredentials(
+        hue_bridge_ip=bridge.internalipaddress,
+        hue_app_key=app_key,
     )
+    _print_credentials(credentials)
+    return credentials
 
 
-def setup() -> None:
-    asyncio.run(_run_setup())
+def setup() -> HueBridgeCredentials:
+    """Run the interactive onboarding and return the resulting credentials."""
+    return asyncio.run(_run_setup())

@@ -11,6 +11,9 @@ dependencies = [
     "pydantic-settings>=2.12.0",
 ]
 
+[project.scripts]
+hueify = "hueify.cli:main"
+
 [dependency-groups]
 dev = [
     "pytest>=8.4.1,<9",

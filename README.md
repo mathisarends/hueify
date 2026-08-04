@@ -13,17 +13,38 @@ pip install hueify
 
 ## Onboarding
 
-The interactive setup discovers the bridge, registers an application key and
-stores both values in the user configuration:
+A bridge IP and an application key are needed. `hueify setup` discovers the
+bridge, waits for the link button and prints both:
 
-```python
-from hueify.onboarding import setup
+```bash
+$ hueify setup
+...
+Setup complete. Hueify reads these two values:
 
-setup()
+  HUE_BRIDGE_IP=192.168.1.10
+  HUE_APP_KEY=Xf3k…
 ```
 
-`Hueify()` reads this configuration automatically. `HUE_BRIDGE_IP` and
-`HUE_APP_KEY`, or explicit constructor arguments, can override it.
+Put both into your environment or a `.env` file and `Hueify()` picks them up.
+The individual steps are available too, and return their result:
+
+```python
+from hueify.onboarding import discover_bridges, register_app_key, setup
+
+bridges = await discover_bridges()
+app_key = await register_app_key(bridges[0].internalipaddress)
+
+credentials = setup()  # the interactive flow, as HueBridgeCredentials
+```
+
+Constructor arguments win over the environment:
+
+```python
+hue = Hueify(bridge_ip="192.168.1.10", app_key="…")
+```
+
+Without any of these, `Hueify()` raises `MissingCredentialsError` and names
+what is missing.
 
 ## Quickstart
 

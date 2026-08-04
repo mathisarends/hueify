@@ -1,5 +1,5 @@
 from hueify.color import Color
-from hueify.errors import HueifyError, ResourceNotFoundError
+from hueify.errors import HueifyError, MissingCredentialsError, ResourceNotFoundError
 from hueify.hueify import Hueify
 from hueify.models import (
     GroupedLight,
@@ -36,6 +36,7 @@ __all__ = [
     "Light",
     "LightNamespace",
     "LightUpdate",
+    "MissingCredentialsError",
     "ResourceId",
     "ResourceNotFoundError",
     "Room",
