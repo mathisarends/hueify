@@ -2,13 +2,17 @@ from pydantic import TypeAdapter
 
 from hueify.http import HttpClient
 from hueify.models import (
+    DimmingState,
     HueApiResponse,
     ResourceIdentifier,
     Scene,
+    SceneAction,
+    SceneRecall,
     SceneRecallRequest,
     SceneUpdate,
 )
 from hueify.resources.base import ResourceId, ResourceNamespace
+from hueify.resources.controls import Transition, transition_to_milliseconds
 
 
 class SceneNamespace(ResourceNamespace[Scene]):
@@ -33,4 +37,33 @@ class SceneNamespace(ResourceNamespace[Scene]):
     ) -> HueApiResponse[ResourceIdentifier]:
         return await self._http_client.put(
             self._resource_path(scene_id), request or SceneRecallRequest()
+        )
+
+    async def activate(
+        self,
+        scene_id: ResourceId,
+        *,
+        brightness: float | None = None,
+        transition: Transition | None = None,
+        dynamic: bool = False,
+    ) -> HueApiResponse[ResourceIdentifier]:
+        return await self.recall(
+            scene_id,
+            SceneRecallRequest(
+                recall=SceneRecall(
+                    action=(
+                        SceneAction.DYNAMIC_PALETTE if dynamic else SceneAction.ACTIVE
+                    ),
+                    duration=(
+                        None
+                        if transition is None
+                        else transition_to_milliseconds(transition)
+                    ),
+                    dimming=(
+                        None
+                        if brightness is None
+                        else DimmingState(brightness=brightness)
+                    ),
+                )
+            ),
         )
