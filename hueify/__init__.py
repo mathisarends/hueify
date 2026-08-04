@@ -1,5 +1,8 @@
+from hueify.color import Color
+from hueify.errors import HueifyError, ResourceNotFoundError
 from hueify.hueify import Hueify
 from hueify.models import (
+    GroupedLight,
     GroupUpdate,
     HueApiError,
     HueApiResponse,
@@ -12,28 +15,36 @@ from hueify.models import (
     Zone,
 )
 from hueify.resources import (
+    GroupNamespace,
     LightNamespace,
     ResourceId,
     RoomNamespace,
     SceneNamespace,
+    Transition,
     ZoneNamespace,
 )
 
 __all__ = [
+    "Color",
+    "GroupNamespace",
     "GroupUpdate",
+    "GroupedLight",
     "HueApiError",
     "HueApiResponse",
     "Hueify",
+    "HueifyError",
     "Light",
     "LightNamespace",
     "LightUpdate",
     "ResourceId",
+    "ResourceNotFoundError",
     "Room",
     "RoomNamespace",
     "Scene",
     "SceneNamespace",
     "SceneRecallRequest",
     "SceneUpdate",
+    "Transition",
     "Zone",
     "ZoneNamespace",
 ]
