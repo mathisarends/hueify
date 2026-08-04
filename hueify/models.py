@@ -74,12 +74,34 @@ class HueApiResponse[T: BaseModel](HueModel):
     data: list[T] = Field(default_factory=list)
 
 
+class NamedMetadata(HueModel):
+    name: str
+
+
+class NamedResource(HueModel):
+    """Base for resources that carry a stable ID and a user-visible name."""
+
+    id: UUID
+    metadata: NamedMetadata
+
+
 class OnState(HueModel):
     on: bool
 
 
 class DimmingState(HueModel):
     brightness: float = Field(ge=0, le=100)
+
+
+class DimmingDeltaAction(StrEnum):
+    UP = "up"
+    DOWN = "down"
+    STOP = "stop"
+
+
+class DimmingDelta(HueModel):
+    action: DimmingDeltaAction
+    brightness_delta: float = Field(default=0, ge=0, le=100)
 
 
 class ColorTemperatureSchema(HueModel):
@@ -149,6 +171,7 @@ class DynamicsState(HueModel):
     status_values: list[str] | None = None
     speed: float | None = Field(default=None, ge=0, le=1)
     speed_valid: bool | None = None
+    duration: int | None = Field(default=None, ge=0)
 
 
 class AlertState(HueModel):
@@ -228,13 +251,11 @@ class LightArchetype(StrEnum):
     STRING_PERMANENT = "string_permanent"
 
 
-class LightMetadata(HueModel):
-    name: str
+class LightMetadata(NamedMetadata):
     archetype: LightArchetype | str | None = None
 
 
-class Light(HueModel):
-    id: UUID
+class Light(NamedResource):
     type: Literal[ResourceType.LIGHT] = ResourceType.LIGHT
     id_v1: str | None = None
     owner: ResourceReference
@@ -255,6 +276,7 @@ class Light(HueModel):
 class LightUpdate(HueModel):
     on: OnState | None = None
     dimming: DimmingState | None = None
+    dimming_delta: DimmingDelta | None = None
     color_temperature: ColorTemperatureState | None = None
     color: ColorState | None = None
     gradient: GradientState | None = None
@@ -308,13 +330,11 @@ class GroupArchetype(StrEnum):
     OTHER = "other"
 
 
-class GroupMetadata(HueModel):
-    name: str
+class GroupMetadata(NamedMetadata):
     archetype: GroupArchetype | str
 
 
-class Group(HueModel):
-    id: UUID
+class Group(NamedResource):
     metadata: GroupMetadata
     children: list[ResourceReference] = Field(default_factory=list)
     services: list[ResourceReference] = Field(default_factory=list)
@@ -331,6 +351,22 @@ class Zone(Group):
 class GroupUpdate(HueModel):
     metadata: GroupMetadata | None = None
     children: list[ResourceReference] | None = None
+
+
+class GroupedLight(HueModel):
+    """Aggregated light service a room or zone is controlled through."""
+
+    id: UUID
+    type: Literal[ResourceType.GROUPED_LIGHT] = ResourceType.GROUPED_LIGHT
+    id_v1: str | None = None
+    owner: ResourceReference | None = None
+    on: OnState | None = None
+    dimming: DimmingState | None = None
+    color_temperature: ColorTemperatureState | None = None
+    color: ColorState | None = None
+    dynamics: DynamicsState | None = None
+    alert: AlertState | None = None
+    signaling: SignalingState | None = None
 
 
 class SceneStatusValue(StrEnum):
@@ -361,7 +397,7 @@ class ImageResourceReference(HueModel):
     rtype: Literal[ResourceType.PUBLIC_IMAGE] = ResourceType.PUBLIC_IMAGE
 
 
-class SceneMetadata(HueModel):
+class SceneMetadata(NamedMetadata):
     name: str = Field(min_length=1, max_length=32)
     image: ImageResourceReference | None = None
     appdata: str | None = Field(default=None, min_length=1, max_length=16)
@@ -391,8 +427,7 @@ class ScenePalette(HueModel):
     effects_v2: list[EffectsPaletteEntry] = Field(default_factory=list)
 
 
-class Scene(HueModel):
-    id: UUID
+class Scene(NamedResource):
     type: Literal[ResourceType.SCENE] = ResourceType.SCENE
     metadata: SceneMetadata
     group: ResourceReference
