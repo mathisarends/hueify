@@ -165,6 +165,31 @@ class TestConnect:
         bus.dispatch.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_dispatches_events_received_while_still_connected(self) -> None:
+        stream, bus = make_stream()
+        sse = make_sse([{"data": [make_raw_event()]}])
+
+        async def fake_aiter_sse():
+            yield sse
+
+        mock_event_source = MagicMock()
+        mock_event_source.aiter_sse = fake_aiter_sse
+        mock_event_source.__aenter__ = AsyncMock(return_value=mock_event_source)
+        mock_event_source.__aexit__ = AsyncMock(return_value=False)
+
+        mock_client = MagicMock()
+        mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = AsyncMock(return_value=False)
+
+        with (
+            patch("hueify.sse.stream.httpx.AsyncClient", return_value=mock_client),
+            patch("hueify.sse.stream.aconnect_sse", return_value=mock_event_source),
+        ):
+            await stream.connect()
+
+        bus.dispatch.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_does_not_raise_on_connection_error(self) -> None:
         stream, _ = make_stream()
 

@@ -82,3 +82,38 @@ async def test_on_decorator_is_reexposed_on_hueify() -> None:
     await hue.close()
 
     assert received == [event]
+
+
+@pytest.mark.asyncio
+async def test_off_is_reexposed_on_hueify_and_stops_further_dispatches() -> None:
+    hue = Hueify(bridge_ip=VALID_IP, app_key=VALID_APP_KEY)
+    received: list[LightEvent] = []
+
+    async def on_light(event: LightEvent) -> None:
+        received.append(event)
+
+    hue.on(ResourceType.LIGHT, on_light)
+    hue.off(ResourceType.LIGHT, on_light)
+
+    event = LightEvent(
+        id="00000000-0000-0000-0000-000000000001",
+        type=ResourceType.LIGHT,
+    )
+    await hue.events._bus.dispatch(event)
+    await hue.close()
+
+    assert received == []
+
+
+@pytest.mark.asyncio
+async def test_without_explicit_credentials_falls_back_to_settings(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("HUE_BRIDGE_IP", VALID_IP)
+    monkeypatch.setenv("HUE_APP_KEY", VALID_APP_KEY)
+
+    hue = Hueify()
+
+    assert hue._credentials.hue_bridge_ip == VALID_IP
+    assert hue._credentials.hue_app_key == VALID_APP_KEY
+    await hue.close()
