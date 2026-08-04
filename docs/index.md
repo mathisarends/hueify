@@ -16,7 +16,7 @@ Optional extras:
 
 ```bash
 pip install "hueify[mcp]"   # MCP server support
-pip install "hueify[cli]"   # CLI support
+pip install "hueify[cli]"   # setup wizard
 ```
 
 ## Quick start
