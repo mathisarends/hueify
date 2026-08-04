@@ -185,6 +185,15 @@ async def test_kelvin_and_mirek_cannot_be_combined(lights: LightNamespace) -> No
 
 
 @pytest.mark.asyncio
+async def test_identify_sends_a_breathe_alert(
+    lights: LightNamespace, client: AsyncMock
+) -> None:
+    await lights.identify(LIGHT_ID)
+
+    assert sent_update(client) == {"alert": {"action": "breathe"}}
+
+
+@pytest.mark.asyncio
 async def test_negative_transitions_are_rejected(lights: LightNamespace) -> None:
     with pytest.raises(ValueError, match="cannot be negative"):
         await lights.turn_on(LIGHT_ID, transition=-1)

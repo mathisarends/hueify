@@ -7,6 +7,8 @@ from hueify.errors import ResourceNotFoundError
 from hueify.http import HttpClient
 from hueify.models import (
     GroupedLight,
+    GroupMetadata,
+    GroupUpdate,
     HueApiResponse,
     Light,
     LightUpdate,
@@ -177,3 +179,46 @@ async def test_groups_are_found_by_their_user_visible_name() -> None:
     room = await RoomNamespace(bridge()).find_by_name("office")
 
     assert room.id == ROOM_ID
+
+
+@pytest.mark.asyncio
+async def test_create_posts_to_the_group_collection_endpoint() -> None:
+    client = bridge()
+    update = GroupUpdate(metadata=GroupMetadata(name="Attic", archetype="attic"))
+
+    await RoomNamespace(client).create(update)
+
+    endpoint, data = client.post.await_args.args
+    assert endpoint == "room"
+    assert data is update
+
+
+@pytest.mark.asyncio
+async def test_update_puts_to_the_specific_group_endpoint() -> None:
+    client = bridge()
+    update = GroupUpdate(metadata=GroupMetadata(name="Attic", archetype="attic"))
+
+    await RoomNamespace(client).update(ROOM_ID, update)
+
+    endpoint, data = client.put.await_args.args
+    assert endpoint == f"room/{ROOM_ID}"
+    assert data is update
+
+
+@pytest.mark.asyncio
+async def test_delete_removes_the_specific_group_endpoint() -> None:
+    client = bridge()
+
+    await RoomNamespace(client).delete(ROOM_ID)
+
+    client.delete.assert_awaited_once_with(f"room/{ROOM_ID}")
+
+
+@pytest.mark.asyncio
+async def test_grouped_light_missing_from_the_bridge_reports_a_clear_error() -> None:
+    client = bridge(
+        **{f"grouped_light/{GROUPED_LIGHT_ID}": HueApiResponse[GroupedLight]()}
+    )
+
+    with pytest.raises(ResourceNotFoundError, match="No grouped light with ID"):
+        await RoomNamespace(client).grouped_light(ROOM_ID)

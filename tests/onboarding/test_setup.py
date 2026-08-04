@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from hueify.onboarding.discovery import DiscoveredBridge
-from hueify.onboarding.setup import _run_setup, _select_bridge
+from hueify.onboarding.setup import _run_setup, _select_bridge, setup
 
 BRIDGE_A = DiscoveredBridge(id="a1", internalipaddress="192.168.1.10")
 BRIDGE_B = DiscoveredBridge(id="b2", internalipaddress="192.168.1.20")
@@ -49,3 +49,12 @@ async def test_run_setup_wires_discovery_registration_and_credential_saving() ->
     discover.assert_awaited_once()
     register.assert_awaited_once_with(BRIDGE_A.internalipaddress)
     save.assert_called_once_with(BRIDGE_A.internalipaddress, "the-app-key")
+
+
+def test_setup_runs_run_setup_to_completion() -> None:
+    with patch(
+        "hueify.onboarding.setup._run_setup", new_callable=AsyncMock
+    ) as run_setup:
+        setup()
+
+    run_setup.assert_awaited_once()

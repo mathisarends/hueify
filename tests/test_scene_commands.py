@@ -4,7 +4,13 @@ from uuid import UUID
 import pytest
 
 from hueify.http import HttpClient
-from hueify.models import HueApiResponse, ResourceIdentifier, SceneRecallRequest
+from hueify.models import (
+    HueApiResponse,
+    ResourceIdentifier,
+    SceneMetadata,
+    SceneRecallRequest,
+    SceneUpdate,
+)
 from hueify.resources import SceneNamespace
 
 SCENE_ID = UUID("88888888-8888-8888-8888-888888888888")
@@ -51,3 +57,34 @@ async def test_activate_can_start_the_scene_as_a_dynamic_palette(
     await SceneNamespace(client).activate(SCENE_ID, dynamic=True)
 
     assert sent_recall(client) == {"recall": {"action": "dynamic_palette"}}
+
+
+@pytest.mark.asyncio
+async def test_create_posts_to_the_scene_collection_endpoint(
+    client: AsyncMock,
+) -> None:
+    update = SceneUpdate(metadata=SceneMetadata(name="Focus"))
+
+    await SceneNamespace(client).create(update)
+
+    endpoint, data = client.post.await_args.args
+    assert endpoint == "scene"
+    assert data is update
+
+
+@pytest.mark.asyncio
+async def test_update_puts_to_the_specific_scene_endpoint(client: AsyncMock) -> None:
+    update = SceneUpdate(metadata=SceneMetadata(name="Focus"))
+
+    await SceneNamespace(client).update(SCENE_ID, update)
+
+    endpoint, data = client.put.await_args.args
+    assert endpoint == f"scene/{SCENE_ID}"
+    assert data is update
+
+
+@pytest.mark.asyncio
+async def test_delete_removes_the_specific_scene_endpoint(client: AsyncMock) -> None:
+    await SceneNamespace(client).delete(SCENE_ID)
+
+    client.delete.assert_awaited_once_with(f"scene/{SCENE_ID}")
