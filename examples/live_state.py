@@ -4,7 +4,7 @@ Demonstrates reacting to bridge changes in real time via the event stream.
 Hueify is a stateless, JSON-first client: resources returned by list()/find()
 are snapshots that go stale the moment something changes. To learn about updates
 as they happen (including ones made by other apps or physical switches), subscribe
-to hue.events instead of re-polling the REST endpoints.
+to the event stream instead of re-polling the REST endpoints.
 """
 
 import asyncio
@@ -27,7 +27,7 @@ async def main() -> None:
             if event.id == light.id and event.dimming is not None:
                 print(f"[event]  brightness: {event.dimming.brightness}%")
 
-        await hue.events.connect()
+        await hue.start_events()
         await asyncio.sleep(2)  # give the SSE connection time to establish
 
         await hue.lights.set_brightness(light.id, 66)

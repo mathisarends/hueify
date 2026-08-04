@@ -192,7 +192,7 @@ and `hue.scenes.recall(id, SceneRecallRequest(...))` remains available next to
 ## Optional event stream
 
 Entering `Hueify` does not connect to the SSE stream. Register handlers with the
-re-exported `@hue.on(...)` decorator, then start the stream explicitly:
+`@hue.on(...)` decorator, then start the stream explicitly:
 
 ```python
 import asyncio
@@ -206,12 +206,13 @@ async with Hueify() as hue:
     async def on_light(event: LightEvent) -> None:
         print(event.id, event.on, event.dimming)
 
-    await hue.events.connect()
+    await hue.start_events()
     await asyncio.Event().wait()
 ```
 
-`hue.off(resource_type, handler)` removes a handler. The context manager closes
-an explicitly started stream and the HTTP client.
+`hue.off(resource_type, handler)` removes a handler, `hue.stop_events()` ends the
+stream and `hue.events_connected` reports whether it is running. Leaving the
+context manager closes a started stream along with the HTTP client.
 
 ## Design
 

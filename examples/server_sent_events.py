@@ -16,7 +16,7 @@ async def main() -> None:
         async def on_scene(event: SceneEvent) -> None:
             print(f"[scene] {event.id} -> {event.status}")
 
-        await hue.events.connect()
+        await hue.start_events()
         print("Listening for events - press Ctrl+C to stop.")
         await asyncio.Event().wait()
 

@@ -33,10 +33,20 @@ class Hueify:
         self.rooms = RoomNamespace(self._http_client)
         self.zones = ZoneNamespace(self._http_client)
         self.scenes = SceneNamespace(self._http_client)
-        self.events = EventStream(self._credentials)
+        self._events = EventStream(self._credentials)
 
     async def __aenter__(self) -> Self:
         return self
+
+    @property
+    def events_connected(self) -> bool:
+        return self._events.connected
+
+    async def start_events(self) -> None:
+        await self._events.connect()
+
+    async def stop_events(self) -> None:
+        await self._events.close()
 
     @overload
     def on[T: HueEvent](
@@ -53,12 +63,12 @@ class Hueify:
         resource_type: EventResourceType,
         handler: EventHandler[T] | None = None,
     ) -> EventHandler[T] | Callable[[EventHandler[T]], EventHandler[T]]:
-        return self.events.on(resource_type, handler)
+        return self._events.on(resource_type, handler)
 
     def off[T: HueEvent](
         self, resource_type: EventResourceType, handler: EventHandler[T]
     ) -> None:
-        self.events.off(resource_type, handler)
+        self._events.off(resource_type, handler)
 
     async def __aexit__(
         self,
@@ -69,5 +79,5 @@ class Hueify:
         await self.close()
 
     async def close(self) -> None:
-        await self.events.close()
+        await self._events.close()
         await self._http_client.close()
