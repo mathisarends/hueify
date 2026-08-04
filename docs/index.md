@@ -12,12 +12,6 @@ connect and kept live via server-sent events.
 pip install hueify
 ```
 
-Optional extras:
-
-```bash
-pip install "hueify[mcp]"   # MCP server support
-```
-
 ## Quick start
 
 ```python

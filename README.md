@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
 [![Docs](https://img.shields.io/badge/docs-mathisarends.github.io-blue)](https://mathisarends.github.io/hueify/)
 
-Hueify is an async-first Python library for Philips Hue. It lets you control lights, rooms, zones and scenes using the same names you see in the Hue app, with state kept fresh via serversent events. It also ships an MCP server for LLM tools.
+Hueify is an async-first Python library for Philips Hue. It lets you control lights, rooms, zones and scenes using the same names you see in the Hue app, with state kept fresh via serversent events.
 
 ```bash
 pip install hueify
@@ -185,18 +185,6 @@ async with Hueify() as hue:
 Supported event types include `LightEvent`, `GroupedLightEvent`, `SceneEvent`,
 `MotionEvent`, `ButtonEvent`, `TemperatureEvent`, and more — see the
 [Events guide](docs/guide/events.md) for the full list.
-
----
-
-## MCP server
-
-Hueify includes a Model Context Protocol server that exposes lights, rooms, and zones to compatible LLM tools. Requires the `mcp` extra:
-
-```bash
-pip install hueify[mcp]
-```
-
-The server uses the same `Hueify` context manager internally. Integration with a specific MCP host is not covered here.
 
 ---
 
