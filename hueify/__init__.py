@@ -1,10 +1,39 @@
-from .hueify import Hueify
-from .resources import JsonMapping, JsonObject, ResourceId, ResourceNamespace
+from hueify.hueify import Hueify
+from hueify.models import (
+    GroupUpdate,
+    HueApiError,
+    HueApiResponse,
+    Light,
+    LightUpdate,
+    Room,
+    Scene,
+    SceneRecallRequest,
+    SceneUpdate,
+    Zone,
+)
+from hueify.resources import (
+    LightNamespace,
+    ResourceId,
+    RoomNamespace,
+    SceneNamespace,
+    ZoneNamespace,
+)
 
 __all__ = [
+    "GroupUpdate",
+    "HueApiError",
+    "HueApiResponse",
     "Hueify",
-    "JsonMapping",
-    "JsonObject",
+    "Light",
+    "LightNamespace",
+    "LightUpdate",
     "ResourceId",
-    "ResourceNamespace",
+    "Room",
+    "RoomNamespace",
+    "Scene",
+    "SceneNamespace",
+    "SceneRecallRequest",
+    "SceneUpdate",
+    "Zone",
+    "ZoneNamespace",
 ]

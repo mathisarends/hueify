@@ -1,32 +1,45 @@
 """
-Demonstrates that Light and GroupedLights instances are live views on the cache.
+Demonstrates reacting to bridge changes in real time via the event stream.
 
-Once a Light or GroupedLights object is created via from_name(), its properties
-(brightness_percentage, is_on, etc.) always reflect the current state from the
-in-memory cache, which is kept up-to-date via SSE events from the Hue Bridge.
-No need to re-fetch or re-create the object to get fresh values.
+Hueify is a stateless, JSON-first client: resources returned by get_all()/get()
+are snapshots that go stale the moment something changes. To learn about updates
+as they happen (including ones made by other apps or physical switches), subscribe
+to hue.events instead of re-polling the REST endpoints.
 """
 
 import asyncio
 
-from hueify import Hueify
+from hueify import Hueify, LightUpdate
+from hueify.models import DimmingState, LightEvent, OnState, ResourceType
+
+# adjust with a valid light id for you
+LIGHT_ID = "ab859e4a-eb52-4984-90bb-9931386d9ef8"
 
 
 async def main() -> None:
     async with Hueify() as hue:
-        light = hue.lights.from_name("Desk lamp")
-        room = hue.rooms.from_name("Living room")
+        light = (await hue.lights.get(LIGHT_ID)).data[0]
+        before = light.dimming.brightness if light.dimming else None
+        print(f"[before] brightness: {before}%")
 
-        print(f"[before] light brightness: {light.brightness_percentage}%")
-        print(f"[before] room brightness:  {room.brightness_percentage}%")
+        @hue.on(ResourceType.LIGHT)
+        async def on_light_event(event: LightEvent) -> None:
+            if event.id == light.id and event.dimming is not None:
+                print(f"[event]  brightness: {event.dimming.brightness}%")
 
-        await hue.lights.set_brightness("Desk lamp", 20)
-        await hue.rooms.set_brightness("Living room", 80)
+        await hue.events.connect()
+        await asyncio.sleep(1)  # give the SSE connection time to establish
 
-        await asyncio.sleep(1)
+        await hue.lights.update(
+            LIGHT_ID,
+            LightUpdate(on=OnState(on=True), dimming=DimmingState(brightness=20)),
+        )
 
-        print(f"[after]  light brightness: {light.brightness_percentage}%")
-        print(f"[after]  room brightness:  {room.brightness_percentage}%")
+        await asyncio.sleep(2)
+
+        light = (await hue.lights.get(LIGHT_ID)).data[0]
+        after = light.dimming.brightness if light.dimming else None
+        print(f"[after]  brightness: {after}%")
 
 
 if __name__ == "__main__":

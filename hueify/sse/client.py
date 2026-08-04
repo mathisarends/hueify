@@ -1,13 +1,16 @@
 import asyncio
 import contextlib
+from collections.abc import Callable
+from typing import overload
 
 from hueify.credentials import HueBridgeCredentials
-from hueify.sse.bus import EventBus, EventHandler
+from hueify.models import HueEvent
+from hueify.sse.bus import EventBus, EventHandler, EventResourceType
 from hueify.sse.stream import ServerSentEventStream
 
 
 class EventStream:
-    """Explicitly connected stream that emits the bridge's original JSON."""
+    """Explicitly connected stream that emits typed Hue event models."""
 
     def __init__(self, credentials: HueBridgeCredentials) -> None:
         self._bus = EventBus()
@@ -18,11 +21,27 @@ class EventStream:
     def connected(self) -> bool:
         return self._task is not None and not self._task.done()
 
-    def subscribe(self, resource_type: str, handler: EventHandler) -> EventHandler:
-        return self._bus.subscribe(resource_type, handler)
+    @overload
+    def on[T: HueEvent](
+        self, resource_type: EventResourceType, handler: EventHandler[T]
+    ) -> EventHandler[T]: ...
 
-    def unsubscribe(self, resource_type: str, handler: EventHandler) -> None:
-        self._bus.unsubscribe(resource_type, handler)
+    @overload
+    def on[T: HueEvent](
+        self, resource_type: EventResourceType, handler: None = None
+    ) -> Callable[[EventHandler[T]], EventHandler[T]]: ...
+
+    def on[T: HueEvent](
+        self,
+        resource_type: EventResourceType,
+        handler: EventHandler[T] | None = None,
+    ) -> EventHandler[T] | Callable[[EventHandler[T]], EventHandler[T]]:
+        return self._bus.on(resource_type, handler)
+
+    def off[T: HueEvent](
+        self, resource_type: EventResourceType, handler: EventHandler[T]
+    ) -> None:
+        self._bus.off(resource_type, handler)
 
     async def connect(self) -> None:
         """Start listening in the background; calling twice is harmless."""

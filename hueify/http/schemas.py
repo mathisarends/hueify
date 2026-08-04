@@ -1,3 +1,3 @@
-from typing import Any
+from hueify.models import HueApiError, HueApiResponse
 
-type ApiResponse = dict[str, Any]
+__all__ = ["HueApiError", "HueApiResponse"]

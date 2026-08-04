@@ -6,9 +6,17 @@ import httpx
 from httpx_sse import ServerSentEvent, aconnect_sse
 
 from hueify.credentials import HueBridgeCredentials
+from hueify.models import HueEvent, LightEvent, RoomEvent, SceneEvent, ZoneEvent
 from hueify.sse.bus import EventBus
 
 logger = logging.getLogger(__name__)
+
+_EVENT_MODELS: dict[str, type[HueEvent]] = {
+    "light": LightEvent,
+    "room": RoomEvent,
+    "zone": ZoneEvent,
+    "scene": SceneEvent,
+}
 
 
 class ServerSentEventStream:
@@ -46,6 +54,7 @@ class ServerSentEventStream:
         except Exception as e:
             logger.error(f"Event stream error: {e}", exc_info=True)
         finally:
+            self._is_running = False
             logger.info("Disconnected from event stream")
 
     async def _handle_sse(self, sse: ServerSentEvent) -> None:
@@ -55,7 +64,9 @@ class ServerSentEventStream:
             for container in containers:
                 for raw_event in container.get("data", []):
                     if isinstance(raw_event, dict):
-                        await self._event_bus.dispatch(raw_event)
+                        event_model = _EVENT_MODELS.get(raw_event.get("type"), HueEvent)
+                        event = event_model.model_validate(raw_event)
+                        await self._event_bus.dispatch(event)
 
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse SSE payload: {e}")

@@ -1,10 +1,8 @@
-from collections.abc import Mapping
-from typing import Any
-
 import httpx
+from pydantic import BaseModel, TypeAdapter
 
 from hueify.credentials import HueBridgeCredentials
-from hueify.http.schemas import ApiResponse
+from hueify.models import HueApiResponse, ResourceIdentifier
 
 
 class HttpClient:
@@ -29,42 +27,49 @@ class HttpClient:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
 
-    async def get(self, endpoint: str) -> ApiResponse:
-        response = await self._client.get(
-            f"{self._base_url}/{self._normalize_endpoint(endpoint)}",
-            headers=self._headers,
-        )
+    async def get[T: BaseModel](
+        self,
+        endpoint: str,
+        response_adapter: TypeAdapter[HueApiResponse[T]],
+    ) -> HueApiResponse[T]:
+        response = await self._client.get(self._url(endpoint), headers=self._headers)
         response.raise_for_status()
-        return response.json()
+        return response_adapter.validate_python(response.json())
 
-    async def post(self, endpoint: str, data: Mapping[str, Any]) -> ApiResponse:
+    async def post(
+        self, endpoint: str, data: BaseModel
+    ) -> HueApiResponse[ResourceIdentifier]:
         response = await self._client.post(
-            f"{self._base_url}/{self._normalize_endpoint(endpoint)}",
+            self._url(endpoint),
             headers=self._headers,
-            json=dict(data),
+            json=data.model_dump(mode="json", exclude_none=True),
         )
         response.raise_for_status()
-        return response.json()
+        return self._validate_write_response(response.json())
 
-    async def put(self, endpoint: str, data: Mapping[str, Any]) -> ApiResponse:
+    async def put(
+        self, endpoint: str, data: BaseModel
+    ) -> HueApiResponse[ResourceIdentifier]:
         response = await self._client.put(
-            f"{self._base_url}/{self._normalize_endpoint(endpoint)}",
+            self._url(endpoint),
             headers=self._headers,
-            json=dict(data),
+            json=data.model_dump(mode="json", exclude_none=True),
         )
         response.raise_for_status()
-        return response.json()
+        return self._validate_write_response(response.json())
 
-    async def delete(self, endpoint: str) -> ApiResponse:
-        response = await self._client.delete(
-            f"{self._base_url}/{self._normalize_endpoint(endpoint)}",
-            headers=self._headers,
-        )
+    async def delete(self, endpoint: str) -> HueApiResponse[ResourceIdentifier]:
+        response = await self._client.delete(self._url(endpoint), headers=self._headers)
         response.raise_for_status()
-        return response.json()
+        return self._validate_write_response(response.json())
 
     async def close(self) -> None:
         await self._client.aclose()
 
-    def _normalize_endpoint(self, endpoint: str) -> str:
-        return endpoint.lstrip("/")
+    def _url(self, endpoint: str) -> str:
+        return f"{self._base_url}/{endpoint.lstrip('/')}"
+
+    def _validate_write_response(
+        self, response: object
+    ) -> HueApiResponse[ResourceIdentifier]:
+        return TypeAdapter(HueApiResponse[ResourceIdentifier]).validate_python(response)

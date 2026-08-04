@@ -1,29 +1,34 @@
 import asyncio
-import logging
 
-from hueify import Hueify
+from hueify import Hueify, LightUpdate
+from hueify.models import DimmingState, OnState
 
-logging.basicConfig(level=logging.DEBUG)
+# adjust with a valid light id for you
+LIGHT_ID = "ab859e4a-eb52-4984-90bb-9931386d9ef8"
+# adjust with a valid scene id for you
+SCENE_ID = "630f2ea8-e4fe-4351-914a-56ffd8dd9cd6"
 
 
 async def main() -> None:
     async with Hueify() as hue:
-        light_strip = hue.lights.from_name("Schreibtisch-Licht")
-        print(f"Light strip: {light_strip}")
+        light = (await hue.lights.get(LIGHT_ID)).data[0]
+        print(f"Light: {light}")
 
-        await light_strip.turn_off()
-        await light_strip.turn_on()
-        await light_strip.set_brightness(50)
-
-        await asyncio.sleep(5)
-
-        room = hue.rooms.from_name("Mein Zimmer")
-        await room.turn_off()
-        await room.activate_scene("Nordlichter")
+        await hue.lights.update(LIGHT_ID, LightUpdate(on=OnState(on=False)))
+        await hue.lights.update(LIGHT_ID, LightUpdate(on=OnState(on=True)))
+        await hue.lights.update(
+            LIGHT_ID, LightUpdate(dimming=DimmingState(brightness=50))
+        )
 
         await asyncio.sleep(5)
 
-        print("light strip brightness:", light_strip.brightness_percentage)
+        await hue.scenes.recall(SCENE_ID)
+
+        await asyncio.sleep(5)
+
+        light = (await hue.lights.get(LIGHT_ID)).data[0]
+        brightness = light.dimming.brightness if light.dimming else None
+        print("light brightness:", brightness)
 
 
 if __name__ == "__main__":

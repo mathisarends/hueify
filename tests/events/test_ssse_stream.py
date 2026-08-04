@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 
 from hueify.credentials import HueBridgeCredentials
+from hueify.models import LightEvent
 from hueify.sse.bus import EventBus
 from hueify.sse.stream import ServerSentEventStream
 
@@ -44,11 +45,15 @@ class TestHandleSse:
     @pytest.mark.asyncio
     async def test_dispatches_event_from_valid_payload(self) -> None:
         stream, bus = make_stream()
-        sse = make_sse([{"data": [make_raw_event()]}])
+        event = make_raw_event()
+        event["unknown_future_field"] = {"nested": [1, 2, 3]}
+        sse = make_sse([{"data": [event]}])
 
         await stream._handle_sse(sse)
 
-        bus.dispatch.assert_called_once()
+        dispatched = bus.dispatch.await_args.args[0]
+        assert isinstance(dispatched, LightEvent)
+        assert dispatched.model_extra == {"unknown_future_field": {"nested": [1, 2, 3]}}
 
     @pytest.mark.asyncio
     async def test_dispatches_multiple_events_from_single_payload(self) -> None:
