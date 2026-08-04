@@ -12,7 +12,7 @@ from hueify.models import (
     SceneUpdate,
 )
 from hueify.resources.base import ResourceId, ResourceNamespace
-from hueify.resources.controls import Transition, transition_to_milliseconds
+from hueify.resources.controls import Transition, _transition_to_milliseconds
 
 
 class SceneNamespace(ResourceNamespace[Scene]):
@@ -57,7 +57,7 @@ class SceneNamespace(ResourceNamespace[Scene]):
                     duration=(
                         None
                         if transition is None
-                        else transition_to_milliseconds(transition)
+                        else _transition_to_milliseconds(transition)
                     ),
                     dimming=(
                         None

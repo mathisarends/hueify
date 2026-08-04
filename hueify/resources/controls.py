@@ -19,11 +19,11 @@ from hueify.resources.base import ResourceId
 
 type Transition = float | timedelta
 
-DEFAULT_BRIGHTNESS_STEP = 10.0
-IDENTIFY_ALERT_ACTION = "breathe"
+_DEFAULT_BRIGHTNESS_STEP = 10.0
+_IDENTIFY_ALERT_ACTION = "breathe"
 
 
-def build_light_update(
+def _build_light_update(
     *,
     on: bool | None = None,
     brightness: float | None = None,
@@ -50,12 +50,12 @@ def build_light_update(
         dynamics=(
             None
             if transition is None
-            else DynamicsState(duration=transition_to_milliseconds(transition))
+            else DynamicsState(duration=_transition_to_milliseconds(transition))
         ),
     )
 
 
-def transition_to_milliseconds(transition: Transition) -> int:
+def _transition_to_milliseconds(transition: Transition) -> int:
     seconds = (
         transition.total_seconds()
         if isinstance(transition, timedelta)
@@ -95,7 +95,7 @@ class LightCommands(ABC):
     ) -> HueApiResponse[ResourceIdentifier]:
         return await self.apply(
             resource_id,
-            build_light_update(
+            _build_light_update(
                 on=on,
                 brightness=brightness,
                 color=color,
@@ -158,14 +158,14 @@ class LightCommands(ABC):
     async def brighten(
         self,
         resource_id: ResourceId,
-        by: float = DEFAULT_BRIGHTNESS_STEP,
+        by: float = _DEFAULT_BRIGHTNESS_STEP,
     ) -> HueApiResponse[ResourceIdentifier]:
         return await self._step_brightness(resource_id, DimmingDeltaAction.UP, by)
 
     async def dim(
         self,
         resource_id: ResourceId,
-        by: float = DEFAULT_BRIGHTNESS_STEP,
+        by: float = _DEFAULT_BRIGHTNESS_STEP,
     ) -> HueApiResponse[ResourceIdentifier]:
         return await self._step_brightness(resource_id, DimmingDeltaAction.DOWN, by)
 
@@ -205,7 +205,7 @@ class LightCommands(ABC):
         self, resource_id: ResourceId
     ) -> HueApiResponse[ResourceIdentifier]:
         return await self.apply(
-            resource_id, LightUpdate(alert=AlertState(action=IDENTIFY_ALERT_ACTION))
+            resource_id, LightUpdate(alert=AlertState(action=_IDENTIFY_ALERT_ACTION))
         )
 
     async def _step_brightness(
