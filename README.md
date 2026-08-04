@@ -2,7 +2,6 @@
 
 [![PyPI](https://img.shields.io/pypi/v/hueify)](https://pypi.org/project/hueify/)
 [![Python](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
-[![Docs](https://img.shields.io/badge/docs-mathisarends.github.io-blue)](https://mathisarends.github.io/hueify/)
 
 Hueify is an async-first Python library for Philips Hue. It lets you control lights, rooms, zones and scenes using the same names you see in the Hue app, with state kept fresh via serversent events.
 
@@ -183,8 +182,7 @@ async with Hueify() as hue:
 ```
 
 Supported event types include `LightEvent`, `GroupedLightEvent`, `SceneEvent`,
-`MotionEvent`, `ButtonEvent`, `TemperatureEvent`, and more — see the
-[Events guide](docs/guide/events.md) for the full list.
+`MotionEvent`, `ButtonEvent`, `TemperatureEvent`, and more.
 
 ---
 

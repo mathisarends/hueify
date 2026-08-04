@@ -46,5 +46,4 @@ async def _run_setup() -> None:
 
 
 def setup() -> None:
-    """Interactive onboarding: discover a bridge on the network and register an app key."""
     asyncio.run(_run_setup())
