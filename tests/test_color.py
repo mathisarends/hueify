@@ -76,3 +76,27 @@ def test_mirek_converts_back_to_kelvin() -> None:
 def test_non_positive_color_temperatures_are_rejected() -> None:
     with pytest.raises(ValueError, match="must be positive"):
         kelvin_to_mirek(0)
+
+
+def test_non_positive_mirek_values_are_rejected() -> None:
+    with pytest.raises(ValueError, match="must be positive"):
+        mirek_to_kelvin(0)
+
+
+def test_invalid_hex_characters_report_the_offending_color() -> None:
+    with pytest.raises(ValueError, match="Invalid hex color"):
+        to_rgb("#gggggg")
+
+
+def test_rgb_tuples_with_an_out_of_range_channel_are_rejected() -> None:
+    with pytest.raises(ValueError, match="Invalid RGB color"):
+        to_rgb((255, 0, 256))
+
+
+def test_rgb_tuples_with_the_wrong_number_of_channels_are_rejected() -> None:
+    with pytest.raises(ValueError, match="Invalid RGB color"):
+        to_rgb((255, 0))
+
+
+def test_zero_y_chromaticity_maps_to_black() -> None:
+    assert xy_to_rgb(ColorXY(x=0.3, y=0.0)) == (0, 0, 0)
