@@ -30,6 +30,31 @@ async def test_exposes_exactly_the_four_supported_resource_namespaces() -> None:
 
 
 @pytest.mark.asyncio
+async def test_lights_rooms_and_zones_share_one_command_surface() -> None:
+    hue = Hueify(bridge_ip=VALID_IP, app_key=VALID_APP_KEY)
+    commands = {
+        "turn_on",
+        "turn_off",
+        "toggle",
+        "is_on",
+        "set_brightness",
+        "brighten",
+        "dim",
+        "set_color",
+        "set_color_temperature",
+        "set_state",
+        "identify",
+        "apply",
+    }
+    try:
+        for namespace in (hue.lights, hue.rooms, hue.zones):
+            missing = {name for name in commands if not hasattr(namespace, name)}
+            assert not missing, f"{namespace.resource_type} is missing {missing}"
+    finally:
+        await hue.close()
+
+
+@pytest.mark.asyncio
 async def test_context_manager_does_not_start_event_stream() -> None:
     hue = Hueify(bridge_ip=VALID_IP, app_key=VALID_APP_KEY)
 
