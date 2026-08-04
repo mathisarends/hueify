@@ -16,7 +16,6 @@ Optional extras:
 
 ```bash
 pip install "hueify[mcp]"   # MCP server support
-pip install "hueify[cli]"   # CLI support
 ```
 
 ## Quick start
@@ -33,7 +32,7 @@ async def main() -> None:
 asyncio.run(main())
 ```
 
-Credentials are read from the config file created by `hueify setup`.
+Credentials are read from the config file created by `hueify.onboarding.setup()`.
 Environment variables (`HUE_BRIDGE_IP`, `HUE_APP_KEY`) and explicit arguments
 override the saved config:
 
