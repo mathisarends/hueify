@@ -15,7 +15,7 @@ LIGHT_NAME = "Desk"
 
 async def main() -> None:
     async with Hueify() as hue:
-        light = await hue.lights.find(LIGHT_NAME)
+        light = await hue.lights.find_by_name(LIGHT_NAME)
 
         # a slow sunrise: start deep warm and barely visible
         await hue.lights.turn_on(light.id, brightness=1, kelvin=2000)

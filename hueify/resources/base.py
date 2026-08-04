@@ -1,3 +1,4 @@
+from difflib import SequenceMatcher
 from urllib.parse import quote
 from uuid import UUID
 
@@ -8,6 +9,8 @@ from hueify.http import HttpClient
 from hueify.models import HueApiResponse, NamedResource, ResourceIdentifier
 
 type ResourceId = str | UUID
+
+_FUZZY_MATCH_CUTOFF = 0.75
 
 
 class ResourceNamespace[TResource: NamedResource]:
@@ -39,13 +42,29 @@ class ResourceNamespace[TResource: NamedResource]:
             )
         return response.data[0]
 
-    async def find(self, name: str) -> TResource:
+    async def find_by_name(self, name: str) -> TResource:
         wanted = _normalized(name)
         resources = (await self.list()).data
         for resource in resources:
             if _normalized(resource.metadata.name) == wanted:
                 return resource
-        known = ", ".join(sorted(resource.metadata.name for resource in resources))
+
+        ranked_resources = sorted(
+            resources,
+            key=lambda resource: (
+                -_similarity(wanted, resource.metadata.name),
+                _normalized(resource.metadata.name),
+                resource.metadata.name,
+            ),
+        )
+        if (
+            ranked_resources
+            and _similarity(wanted, ranked_resources[0].metadata.name)
+            >= _FUZZY_MATCH_CUTOFF
+        ):
+            return ranked_resources[0]
+
+        known = ", ".join(resource.metadata.name for resource in ranked_resources)
         raise ResourceNotFoundError(
             f"No {self.resource_type} named {name!r}. Known names: {known or 'none'}"
         )
@@ -69,3 +88,9 @@ class ResourceNamespace[TResource: NamedResource]:
 
 def _normalized(name: str) -> str:
     return name.strip().casefold()
+
+
+def _similarity(normalized_name: str, candidate: str) -> float:
+    return SequenceMatcher(
+        None, normalized_name, _normalized(candidate), autojunk=False
+    ).ratio()

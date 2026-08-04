@@ -15,11 +15,11 @@ async def main() -> None:
             print(f"{scene.metadata.name} (group {scene.group.rtype})")
 
         # scenes belong to a room or a zone, so ask the group for its scenes
-        office = await hue.rooms.find(ROOM_NAME)
+        office = await hue.rooms.find_by_name(ROOM_NAME)
         for scene in await hue.rooms.scenes(office.id):
             print(f"{ROOM_NAME}: {scene.metadata.name}")
 
-        focus = await hue.scenes.find(SCENE_NAME)
+        focus = await hue.scenes.find_by_name(SCENE_NAME)
 
         await hue.scenes.activate(focus.id)
         await asyncio.sleep(3)

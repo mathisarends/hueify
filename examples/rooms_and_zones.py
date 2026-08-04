@@ -20,7 +20,7 @@ async def main() -> None:
         print("Rooms:", [room.metadata.name for room in (await hue.rooms.list()).data])
         print("Zones:", [zone.metadata.name for zone in (await hue.zones.list()).data])
 
-        office = await hue.rooms.find(ROOM_NAME)
+        office = await hue.rooms.find_by_name(ROOM_NAME)
 
         for light in await hue.rooms.lights(office.id):
             print(f"  light: {light.metadata.name} (on={light.on.on})")
@@ -39,7 +39,7 @@ async def main() -> None:
         await asyncio.sleep(2)
 
         # zones expose exactly the same commands
-        zone = await hue.zones.find(ZONE_NAME)
+        zone = await hue.zones.find_by_name(ZONE_NAME)
         await hue.zones.set_color(zone.id, "warm white", brightness=55)
         await asyncio.sleep(2)
 

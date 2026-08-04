@@ -17,7 +17,7 @@ ROOM_NAME = "Office"
 
 async def main() -> None:
     async with Hueify() as hue:
-        light = await hue.lights.find(LIGHT_NAME)
+        light = await hue.lights.find_by_name(LIGHT_NAME)
 
         # the explicit form of hue.lights.turn_on(light.id, brightness=50)
         result = await hue.lights.update(
@@ -37,7 +37,7 @@ async def main() -> None:
         )
 
         # apply() sends a raw LightUpdate to a room's grouped light
-        office = await hue.rooms.find(ROOM_NAME)
+        office = await hue.rooms.find_by_name(ROOM_NAME)
         await hue.rooms.apply(office.id, LightUpdate(on=OnState(on=False)))
 
         # the grouped light also carries the aggregated state of the room

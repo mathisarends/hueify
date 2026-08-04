@@ -11,7 +11,7 @@ async def main() -> None:
         for light in (await hue.lights.list()).data:
             print(f"{light.metadata.name}: on={light.on.on}")
 
-        desk = await hue.lights.find(LIGHT_NAME)
+        desk = await hue.lights.find_by_name(LIGHT_NAME)
 
         await hue.lights.turn_on(desk.id, brightness=50)
         await asyncio.sleep(2)

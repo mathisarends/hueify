@@ -15,8 +15,8 @@ async def main() -> None:
         print("lights:", [light.metadata.name for light in response.data])
         print("errors:", response.errors)
 
-        # find() resolves the name shown in the Hue app
-        light = await hue.lights.find(LIGHT_NAME)
+        # find_by_name() resolves the name shown in the Hue app
+        light = await hue.lights.find_by_name(LIGHT_NAME)
         print(f"{light.metadata.name} has ID {light.id}")
 
         # get_one() takes an ID and hands back the resource itself
@@ -34,7 +34,7 @@ async def main() -> None:
 
         # a name that does not exist tells you which ones do
         try:
-            await hue.lights.find("Does not exist")
+            await hue.lights.find_by_name("Does not exist")
         except ResourceNotFoundError as error:
             print("expected:", error)
 

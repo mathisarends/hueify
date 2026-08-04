@@ -174,6 +174,6 @@ async def test_group_without_a_grouped_light_service_reports_a_clear_error() -> 
 
 @pytest.mark.asyncio
 async def test_groups_are_found_by_their_user_visible_name() -> None:
-    room = await RoomNamespace(bridge()).find("office")
+    room = await RoomNamespace(bridge()).find_by_name("office")
 
     assert room.id == ROOM_ID

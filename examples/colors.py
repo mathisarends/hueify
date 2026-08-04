@@ -16,7 +16,7 @@ async def main() -> None:
     print("2700K ->", kelvin_to_mirek(2700), "mirek")
 
     async with Hueify() as hue:
-        light = await hue.lights.find(LIGHT_NAME)
+        light = await hue.lights.find_by_name(LIGHT_NAME)
 
         for color in ("#ff8800", "f80", "red", "warm white", (0, 128, 255)):
             await hue.lights.set_color(light.id, color, brightness=70)

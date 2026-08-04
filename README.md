@@ -35,13 +35,13 @@ from hueify import Hueify
 
 async def main() -> None:
     async with Hueify() as hue:
-        desk = await hue.lights.find("Desk")
+        desk = await hue.lights.find_by_name("Desk")
 
         await hue.lights.turn_on(desk.id, brightness=60)
         await hue.lights.set_color(desk.id, "#ff8800")
         await hue.lights.turn_off(desk.id, transition=2)
 
-        office = await hue.rooms.find("Office")
+        office = await hue.rooms.find_by_name("Office")
         await hue.rooms.turn_on(office.id, brightness=70)
 
 
@@ -112,7 +112,7 @@ A room groups devices, a zone groups light services, and scenes belong to either
 Both namespaces resolve that hierarchy:
 
 ```python
-office = await hue.rooms.find("Office")
+office = await hue.rooms.find_by_name("Office")
 
 for light in await hue.rooms.lights(office.id):
     print(light.metadata.name, light.on.on)
@@ -133,7 +133,7 @@ Every namespace resolves the name shown in the Hue app, and unwraps single
 resources for you:
 
 ```python
-light = await hue.lights.find("Desk")       # by name, raises ResourceNotFoundError
+light = await hue.lights.find_by_name("Desk")  # by name, raises ResourceNotFoundError
 light = await hue.lights.get_one(light.id)  # by ID, the resource itself
 ```
 

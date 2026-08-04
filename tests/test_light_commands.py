@@ -20,12 +20,14 @@ ROOM_ID = UUID("33333333-3333-3333-3333-333333333333")
 GROUPED_LIGHT_ID = UUID("44444444-4444-4444-4444-444444444444")
 
 
-def light_payload(*, on: bool = True, brightness: float = 40.0) -> dict:
+def light_payload(
+    *, name: str = "Desk", on: bool = True, brightness: float = 40.0
+) -> dict:
     return {
         "id": str(LIGHT_ID),
         "type": "light",
         "owner": {"rid": str(DEVICE_ID), "rtype": "device"},
-        "metadata": {"name": "Desk"},
+        "metadata": {"name": name},
         "on": {"on": on},
         "dimming": {"brightness": brightness},
     }
@@ -197,7 +199,7 @@ async def test_unknown_light_id_raises_a_named_error(client: AsyncMock) -> None:
 
 
 @pytest.mark.asyncio
-async def test_find_reports_the_known_names_when_nothing_matches(
+async def test_find_by_name_reports_the_known_names_when_nothing_matches(
     client: AsyncMock,
 ) -> None:
     client.get.return_value = HueApiResponse[Light].model_validate(
@@ -205,13 +207,46 @@ async def test_find_reports_the_known_names_when_nothing_matches(
     )
 
     with pytest.raises(ResourceNotFoundError, match="Known names: Desk"):
-        await LightNamespace(client).find("Couch")
+        await LightNamespace(client).find_by_name("Couch")
 
 
 @pytest.mark.asyncio
-async def test_find_matches_a_name_case_insensitively(client: AsyncMock) -> None:
+async def test_find_by_name_matches_a_name_case_insensitively(
+    client: AsyncMock,
+) -> None:
     client.get.return_value = HueApiResponse[Light].model_validate(
         {"data": [light_payload()]}
     )
 
-    assert (await LightNamespace(client).find("  desk ")).id == LIGHT_ID
+    assert (await LightNamespace(client).find_by_name("  desk ")).id == LIGHT_ID
+
+
+@pytest.mark.asyncio
+async def test_find_by_name_fuzzy_matches_a_typo(client: AsyncMock) -> None:
+    client.get.return_value = HueApiResponse[Light].model_validate(
+        {"data": [light_payload()]}
+    )
+
+    result = await LightNamespace(client).find_by_name("Dsek")
+
+    assert result.metadata.name == "Desk"
+
+
+@pytest.mark.asyncio
+async def test_find_by_name_reports_known_names_by_relevance(
+    client: AsyncMock,
+) -> None:
+    client.get.return_value = HueApiResponse[Light].model_validate(
+        {
+            "data": [
+                light_payload(name="Bedroom"),
+                light_payload(name="Desk"),
+                light_payload(name="Kitchen"),
+            ]
+        }
+    )
+
+    with pytest.raises(ResourceNotFoundError) as error:
+        await LightNamespace(client).find_by_name("Ceiling")
+
+    assert "Known names: Kitchen, Desk, Bedroom" in str(error.value)
