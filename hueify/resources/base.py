@@ -3,13 +3,14 @@ from uuid import UUID
 
 from pydantic import BaseModel, TypeAdapter
 
+from hueify.errors import ResourceNotFoundError
 from hueify.http import HttpClient
-from hueify.models import HueApiResponse, ResourceIdentifier
+from hueify.models import HueApiResponse, NamedResource, ResourceIdentifier
 
 type ResourceId = str | UUID
 
 
-class ResourceNamespace[TResource: BaseModel]:
+class ResourceNamespace[TResource: NamedResource]:
     """Typed, stateless interface for one Hue CLIP v2 resource endpoint."""
 
     def __init__(
@@ -30,6 +31,25 @@ class ResourceNamespace[TResource: BaseModel]:
             self._resource_path(resource_id), self._response_adapter
         )
 
+    async def get_one(self, resource_id: ResourceId) -> TResource:
+        response = await self.get(resource_id)
+        if not response.data:
+            raise ResourceNotFoundError(
+                f"No {self.resource_type} with ID {resource_id}"
+            )
+        return response.data[0]
+
+    async def find(self, name: str) -> TResource:
+        wanted = _normalized(name)
+        resources = (await self.list()).data
+        for resource in resources:
+            if _normalized(resource.metadata.name) == wanted:
+                return resource
+        known = ", ".join(sorted(resource.metadata.name for resource in resources))
+        raise ResourceNotFoundError(
+            f"No {self.resource_type} named {name!r}. Known names: {known or 'none'}"
+        )
+
     async def _create(self, data: BaseModel) -> HueApiResponse[ResourceIdentifier]:
         return await self._http_client.post(self.resource_type, data)
 
@@ -45,3 +65,7 @@ class ResourceNamespace[TResource: BaseModel]:
 
     def _resource_path(self, resource_id: ResourceId) -> str:
         return f"{self.resource_type}/{quote(str(resource_id), safe='')}"
+
+
+def _normalized(name: str) -> str:
+    return name.strip().casefold()
