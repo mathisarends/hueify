@@ -12,7 +12,7 @@ _POLL_INTERVAL = 2
 _TIMEOUT_SECONDS = 60
 
 
-async def register_app_key(bridge_ip: str, device_type: str = "hueify#cli") -> str:
+async def register_app_key(bridge_ip: str, device_type: str = "hueify#setup") -> str:
     url = f"https://{bridge_ip}/api"
     payload = {"devicetype": device_type, "generateclientkey": True}
 

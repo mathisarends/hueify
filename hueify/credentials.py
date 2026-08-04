@@ -18,7 +18,7 @@ _CONFIG_FILE_ENV_VAR = "HUEIFY_CONFIG_FILE"
 
 
 def get_credentials_config_path() -> Path:
-    """Return the per-user config file used by the CLI setup command."""
+    """Return the per-user config file used by hueify.onboarding.setup()."""
     if override := os.environ.get(_CONFIG_FILE_ENV_VAR):
         return Path(override).expanduser()
 

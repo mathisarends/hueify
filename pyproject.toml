@@ -13,9 +13,6 @@ dependencies = [
 
 [project.optional-dependencies]
 mcp = ["fastmcp>=2.13.0"]
-cli = [
-    "typer>=0.15.0",
-]
 
 [dependency-groups]
 dev = [
@@ -36,7 +33,6 @@ build-backend = "hatchling.build"
 
 [project.scripts]
 hueify-mcp = "hueify.mcp.server:main"
-hueify = "hueify.cli.server:main"
 
 [tool.ruff.lint]
 select = ["E","F","I","UP","B","SIM","PL","RUF","C90"]
