@@ -1,7 +1,7 @@
 """
 Demonstrates reacting to bridge changes in real time via the event stream.
 
-Hueify is a stateless, JSON-first client: resources returned by get_all()/get()
+Hueify is a stateless, JSON-first client: resources returned by list()/get()
 are snapshots that go stale the moment something changes. To learn about updates
 as they happen (including ones made by other apps or physical switches), subscribe
 to hue.events instead of re-polling the REST endpoints.

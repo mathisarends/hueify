@@ -9,9 +9,9 @@ LIGHT_ID = "ab859e4a-eb52-4984-90bb-9931386d9ef8"
 
 async def main() -> None:
     async with Hueify() as hue:
-        lights = (await hue.lights.get_all()).data
-        rooms = (await hue.rooms.get_all()).data
-        zones = (await hue.zones.get_all()).data
+        lights = (await hue.lights.list()).data
+        rooms = (await hue.rooms.list()).data
+        zones = (await hue.zones.list()).data
 
         print("Lights:", [light.id for light in lights])
         print("Rooms:", [room.id for room in rooms])

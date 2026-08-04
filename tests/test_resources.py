@@ -22,12 +22,12 @@ def client() -> AsyncMock:
 
 
 @pytest.mark.asyncio
-async def test_light_get_all_has_concrete_response_type(client: AsyncMock) -> None:
+async def test_light_list_has_concrete_response_type(client: AsyncMock) -> None:
     namespace = LightNamespace(client)
     response = HueApiResponse[Light]()
     client.get.return_value = response
 
-    result = await namespace.get_all()
+    result = await namespace.list()
 
     assert result is response
     client.get.assert_awaited_once()

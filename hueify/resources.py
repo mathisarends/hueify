@@ -33,7 +33,7 @@ class ResourceNamespace[TResource: BaseModel]:
         self._response_adapter = response_adapter
         self._http_client = http_client
 
-    async def get_all(self) -> HueApiResponse[TResource]:
+    async def list(self) -> HueApiResponse[TResource]:
         return await self._http_client.get(self.resource_type, self._response_adapter)
 
     async def get(self, resource_id: ResourceId) -> HueApiResponse[TResource]:

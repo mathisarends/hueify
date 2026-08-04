@@ -47,7 +47,7 @@ LIGHT_ID = "ab859e4a-eb52-4984-90bb-9931386d9ef8"
 
 async def main() -> None:
     async with Hueify() as hue:
-        all_lights = await hue.lights.get_all()  # HueApiResponse[Light]
+        all_lights = await hue.lights.list()  # HueApiResponse[Light]
         light_response = await hue.lights.get(LIGHT_ID)
         light = light_response.data[0]
 
@@ -95,7 +95,7 @@ async with Hueify() as hue:
     )
 ```
 
-All namespaces support `get_all()` and `get(id)`. Lights additionally support
+All namespaces support `list()` and `get(id)`. Lights additionally support
 typed `update(id, LightUpdate)`. Rooms, zones and scenes expose their native
 create, update and delete operations. Scenes also provide typed recall:
 
