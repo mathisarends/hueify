@@ -14,14 +14,15 @@ pip install hueify
 
 ## Onboarding
 
-If you don't have a bridge IP or app key yet, the `hueify setup` wizard handles everything for you. Requires the `cli` extra:
+If you don't have a bridge IP or app key yet, `hueify.onboarding.setup()` handles everything for you:
 
-```bash
-pip install hueify[cli]
-hueify setup
+```python
+from hueify.onboarding import setup
+
+setup()
 ```
 
-The wizard auto-discovers the bridge on your network, prompts you to press the **link button**, and saves the bridge credentials in your user config file:
+It auto-discovers the bridge on your network, prompts you to press the **link button**, and saves the bridge credentials in your user config file:
 
 ```
 Hue Bridge Setup
@@ -39,7 +40,7 @@ Credentials saved to C:\Users\you\AppData\Roaming\hueify\config.toml
 
 ## Configuration
 
-Hueify reads credentials from the config file created by `hueify setup`.
+Hueify reads credentials from the config file created by `hueify.onboarding.setup()`.
 Environment variables override the saved config:
 
 ```bash
