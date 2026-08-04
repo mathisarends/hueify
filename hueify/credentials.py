@@ -18,7 +18,6 @@ _CONFIG_FILE_ENV_VAR = "HUEIFY_CONFIG_FILE"
 
 
 def get_credentials_config_path() -> Path:
-    """Return the per-user config file used by hueify.onboarding.setup()."""
     if override := os.environ.get(_CONFIG_FILE_ENV_VAR):
         return Path(override).expanduser()
 
@@ -35,7 +34,6 @@ def get_credentials_config_path() -> Path:
 
 
 def save_credentials_config(bridge_ip: str, app_key: str) -> Path:
-    """Persist credentials in the same format HueBridgeCredentials reads."""
     credentials = HueBridgeCredentials(hue_bridge_ip=bridge_ip, hue_app_key=app_key)
     config_path = get_credentials_config_path()
     config_path.parent.mkdir(parents=True, exist_ok=True)

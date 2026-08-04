@@ -79,17 +79,6 @@ class ResourceInfo(BaseModel):
 
 
 class ActionResult(BaseModel):
-    """Outcome returned by every command method on lights, rooms, and zones.
-
-    Attributes:
-        message: Human-readable description of what happened.
-        success: ``True`` when the command completed without errors.
-        clamped: ``True`` when an input value was silently clamped to its
-            valid range (e.g. brightness > 100 → 100).
-        final_value: The effective value that was actually applied, present
-            only when the command accepted a numeric parameter.
-    """
-
     message: str
     success: bool = True
     clamped: bool = False
