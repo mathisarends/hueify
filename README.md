@@ -20,7 +20,6 @@ pip install hueify
 - [Reading state](#reading-state)
 - [Rooms, zones and scenes](#rooms-zones-and-scenes)
 - [Event stream](#event-stream)
-- [Errors and rough edges](#errors-and-rough-edges)
 
 ## Setup
 
@@ -260,27 +259,6 @@ receives every event, in addition to the type-specific ones.
 `hue.off(resource_type, handler)` removes a handler, `hue.stop_events()` ends the
 stream and `hue.events_connected` reports whether it is running. Leaving the
 context manager closes a started stream along with the HTTP client.
-
-## Errors and rough edges
-
-Worth knowing before building on this:
-
-- **A successful response can still carry errors.** Writes return
-  `HueApiResponse[ResourceIdentifier]`, and the bridge reports per-resource
-  problems in `response.errors` instead of failing the request. The commands do
-  not inspect that field, so check it when a write silently does nothing.
-- **Transport errors are httpx errors.** Hueify calls `raise_for_status()`: a 4xx
-  or 5xx surfaces as `httpx.HTTPStatusError`, a timeout as
-  `httpx.TimeoutException`. Only `HueifyError` and its subclasses
-  (`ResourceNotFoundError`, `MissingCredentialsError`) come from hueify itself.
-- **TLS verification is off.** Hue bridges use a self-signed certificate, so the
-  HTTP client and the event stream both connect with `verify=False`.
-- **The event stream does not reconnect.** If it drops, the error is logged and
-  `hue.events_connected` turns `False`; restarting is your call. Exceptions raised
-  by handlers are logged and never take the stream down.
-- **The bridge rate-limits.** Roughly 10 light commands per second, fewer for
-  groups. Hueify neither throttles nor retries - use the room and zone commands
-  instead of looping over their lights.
 
 ## Examples
 
