@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from hueify.models import HueApiResponse, Light, ResourceType
+from hueify.models import HueApiResponse, Light, ResourceType, Room, Scene, Zone
 
 
 def test_light_response_is_typed_and_preserves_new_hue_fields() -> None:
@@ -34,3 +34,60 @@ def test_light_response_is_typed_and_preserves_new_hue_fields() -> None:
     dumped = response.model_dump(mode="json")
     assert dumped["data"][0]["future_bridge_field"] == {"is_preserved": True}
     assert dumped["future_envelope_field"] == "also preserved"
+
+
+def test_room_zone_and_scene_responses_use_concrete_models() -> None:
+    room = (
+        HueApiResponse[Room]
+        .model_validate(
+            {
+                "data": [
+                    {
+                        "id": str(uuid4()),
+                        "type": "room",
+                        "metadata": {"name": "Office", "archetype": "office"},
+                        "children": [],
+                        "services": [],
+                    }
+                ]
+            }
+        )
+        .data[0]
+    )
+    zone = (
+        HueApiResponse[Zone]
+        .model_validate(
+            {
+                "data": [
+                    {
+                        "id": str(uuid4()),
+                        "type": "zone",
+                        "metadata": {"name": "Upstairs", "archetype": "upstairs"},
+                        "children": [],
+                        "services": [],
+                    }
+                ]
+            }
+        )
+        .data[0]
+    )
+    scene = (
+        HueApiResponse[Scene]
+        .model_validate(
+            {
+                "data": [
+                    {
+                        "id": str(uuid4()),
+                        "type": "scene",
+                        "metadata": {"name": "Focus"},
+                        "group": {"rid": str(room.id), "rtype": "room"},
+                    }
+                ]
+            }
+        )
+        .data[0]
+    )
+
+    assert room.type is ResourceType.ROOM
+    assert zone.type is ResourceType.ZONE
+    assert scene.type is ResourceType.SCENE

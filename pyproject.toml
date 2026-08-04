@@ -1,7 +1,7 @@
 [project]
 name = "hueify"
-version = "0.6.1"
-description = "Async Python client for the Philips Hue API with real-time event streaming"
+version = "0.7.0"
+description = "Typed async Python client for the Philips Hue CLIP v2 API"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [

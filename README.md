@@ -1,19 +1,19 @@
-﻿# Hueify
+# Hueify
 
 [![PyPI](https://img.shields.io/pypi/v/hueify)](https://pypi.org/project/hueify/)
 [![Python](https://img.shields.io/badge/python-3.13%2B-blue)](https://www.python.org/)
 
-Hueify is an async-first Python library for Philips Hue. It lets you control lights, rooms, zones and scenes using the same names you see in the Hue app, with state kept fresh via serversent events.
+Hueify is a typed async client for the Philips Hue CLIP v2 API. Its public API is
+ID-based, stateless and close to the JSON structures returned by a Hue Bridge.
 
 ```bash
 pip install hueify
 ```
 
----
-
 ## Onboarding
 
-`hueify.onboarding.setup()` is an interactive wizard that discovers your bridge and registers an app key, no extra install required:
+The interactive setup discovers the bridge, registers an application key and
+stores both values in the user configuration:
 
 ```python
 from hueify.onboarding import setup
@@ -21,170 +21,120 @@ from hueify.onboarding import setup
 setup()
 ```
 
-It will:
+`Hueify()` reads this configuration automatically. `HUE_BRIDGE_IP` and
+`HUE_APP_KEY`, or explicit constructor arguments, can override it.
 
-1. Scan your network for a Hue Bridge
-2. Prompt you to press the **link button** on the bridge
-3. Register an app key and save it in your user config file
+## Resource API
 
-```
-Hue Bridge Setup
+Hueify exposes the four supported resource namespaces directly:
 
-Found bridge at 192.168.1.10
+- `hue.lights`
+- `hue.rooms`
+- `hue.zones`
+- `hue.scenes`
 
-Press the link button on your Hue Bridge, then hit Enter.
-
-Setup complete!
-
-Credentials saved to C:\Users\you\AppData\Roaming\hueify\config.toml
-```
-
-After setup, the Python API reads those credentials automatically. You can still use `HUE_BRIDGE_IP` / `HUE_APP_KEY` to override the saved config.
-
----
-
-## Usage
-
-All interaction goes through the `Hueify` async context manager. It connects to the bridge, populates the cache from the REST API, and subscribes to SSE events so state is always current without polling.
+No resource inventory is loaded when the client is created or entered. Every
+read addresses the bridge directly, either by resource type or stable Hue ID.
 
 ```python
 import asyncio
+
 from hueify import Hueify
+
+
+LIGHT_ID = "ab859e4a-eb52-4984-90bb-9931386d9ef8"
 
 
 async def main() -> None:
     async with Hueify() as hue:
-        # lights, rooms, zones are namespaces on the hue object
-        await hue.rooms.turn_on("Living Room")
+        all_lights = await hue.lights.get_all()  # HueApiResponse[Light]
+        light_response = await hue.lights.get(LIGHT_ID)
+        light = light_response.data[0]
+
+        print(light.id, light.metadata.name, light.on.on)
 
 
 asyncio.run(main())
 ```
 
-Credentials are read from the onboarding config by default. Environment variables (`HUE_BRIDGE_IP`, `HUE_APP_KEY`) and explicit constructor arguments override that config:
+Responses preserve the native Hue envelope and are fully typed:
 
 ```python
-async with Hueify(bridge_ip="192.168.1.10", app_key="your-app-key") as hue:
-    ...
+HueApiResponse[Light](
+    errors=[],
+    data=[...],
+)
 ```
 
----
-
-## Lights
+All Hue models use Pydantic with `extra="allow"`. Known fields are statically
+typed, while fields introduced by newer bridge firmware are retained. Convert a
+response back to complete JSON with:
 
 ```python
-async with Hueify() as hue:
-    await hue.lights.turn_on("Desk lamp")
-    await hue.lights.turn_off("Desk lamp")
-
-    await hue.lights.set_brightness("Desk lamp", 75)
-    await hue.lights.increase_brightness("Desk lamp", 10)
-    await hue.lights.decrease_brightness("Desk lamp", 10)
-
-    await hue.lights.set_color_temperature("Desk lamp", 30)
-
-    brightness = hue.lights.get_brightness("Desk lamp")
-    print("Brightness:", brightness)
+payload = light_response.model_dump(mode="json")
 ```
 
----
+## Updates
 
-## Rooms
+Updates use Pydantic request models and return
+`HueApiResponse[ResourceIdentifier]` rather than an application-specific action
+result:
 
 ```python
+from hueify import Hueify, LightUpdate
+from hueify.models import DimmingState, OnState
+
+
 async with Hueify() as hue:
-    print(hue.rooms.names)  # list of all room names
-
-    await hue.rooms.turn_on("Living Room")
-    await hue.rooms.set_brightness("Living Room", 40)
-    await hue.rooms.increase_brightness("Living Room", 20)
-    await hue.rooms.set_color_temperature("Living Room", 35)
-
-    await hue.rooms.activate_scene("Living Room", "Relax")
-
-    active = hue.rooms.get_active_scene("Living Room")
-    print("Active scene:", active.name if active else None)
-
-    scenes = hue.rooms.scene_names("Living Room")
-    print("Available scenes:", scenes)
+    result = await hue.lights.update(
+        LIGHT_ID,
+        LightUpdate(
+            on=OnState(on=True),
+            dimming=DimmingState(brightness=65),
+        ),
+    )
 ```
 
----
-
-## Zones
-
-Zones work identically to rooms:
+All namespaces support `get_all()` and `get(id)`. Lights additionally support
+typed `update(id, LightUpdate)`. Rooms, zones and scenes expose their native
+create, update and delete operations. Scenes also provide typed recall:
 
 ```python
-async with Hueify() as hue:
-    print(hue.zones.names)
-
-    await hue.zones.turn_on("Downstairs")
-    await hue.zones.set_brightness("Downstairs", 60)
-    await hue.zones.activate_scene("Downstairs", "Focus")
+result = await hue.scenes.recall(scene_id)
 ```
 
----
+## Optional event stream
 
-## Scenes
-
-`hue.scenes` provides bridge-wide access to all scenes, independent of rooms or zones:
-
-```python
-async with Hueify() as hue:
-    print(hue.scenes.names)
-
-    await hue.scenes.activate("Relax")
-
-    scene = hue.scenes.from_name("Relax")
-    print(scene.name, scene.id)
-```
-
-To list or activate scenes scoped to a specific room or zone, use `hue.rooms.scene_names()` and `hue.rooms.activate_scene()` instead.
-
----
-
-## Error handling
-
-All not-found errors raise `ResourceNotFoundException` with the resource type, the lookup name, and a list of fuzzy-matched suggestions:
+Entering `Hueify` does not connect to the SSE stream. Register handlers with the
+re-exported `@hue.on(...)` decorator, then start the stream explicitly:
 
 ```python
-from hueify import Hueify, ResourceNotFoundException
+import asyncio
+
+from hueify import Hueify
+from hueify.models import LightEvent, ResourceType
+
 
 async with Hueify() as hue:
-    try:
-        await hue.rooms.turn_on("Livng Room")  # typo
-    except ResourceNotFoundException as e:
-        print(e)
-        # room 'Livng Room' not found. Did you mean: 'Living Room'?
-```
-
----
-
-## Real-time events via Server-Sent Events
-
-Hueify subscribes to the Hue Bridge's SSE stream inside `__aenter__`. State
-changes made outside your script — via the Hue app, a physical switch, or
-another client — are applied to the cache automatically. No polling required.
-
-You can also react to changes directly by subscribing to typed event classes:
-
-```python
-from hueify.sse.views import LightEvent
-
-async with Hueify() as hue:
-    @hue.on(LightEvent)
+    @hue.on(ResourceType.LIGHT)
     async def on_light(event: LightEvent) -> None:
-        light = hue.lights.from_id(event.id)
-        print(light)  # Light(name='Desk', id=..., on=True, brightness=75.0%)
+        print(event.id, event.on, event.dimming)
 
+    await hue.events.connect()
     await asyncio.Event().wait()
 ```
 
-Supported event types include `LightEvent`, `GroupedLightEvent`, `SceneEvent`,
-`MotionEvent`, `ButtonEvent`, `TemperatureEvent`, and more.
+`hue.off(resource_type, handler)` removes a handler. The context manager closes
+an explicitly started stream and the HTTP client.
 
----
+## Design
+
+- Hue resource IDs are the only lookup keys.
+- There are no light, grouped-light, room, zone or scene caches.
+- Resource reads are snapshots; a later read gets current bridge state.
+- Pydantic models mirror Hue resource JSON and retain additional fields.
+- There are no agent-oriented messages, clamping results or `ActionResult`.
+- The event connection is opt-in and independent of REST access.
 
 ## License
 
