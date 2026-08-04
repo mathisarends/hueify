@@ -6,6 +6,7 @@ import pytest
 from hueify.errors import ResourceNotFoundError
 from hueify.http import HttpClient
 from hueify.models import (
+    ColorXY,
     HueApiResponse,
     Light,
     LightUpdate,
@@ -139,14 +140,52 @@ async def test_dim_steps_down_by_ten_percent_by_default(
 
 
 @pytest.mark.asyncio
-async def test_set_color_translates_a_hex_string_into_cie_xy(
+async def test_set_hex_translates_a_hex_string_into_cie_xy(
     lights: LightNamespace, client: AsyncMock
 ) -> None:
-    await lights.set_color(LIGHT_ID, "#ff8800")
+    await lights.set_hex(LIGHT_ID, "#ff8800")
 
     update = sent_update(client)
     assert update["on"] == {"on": True}
     assert set(update["color"]["xy"]) == {"x", "y"}
+
+
+@pytest.mark.asyncio
+async def test_set_hex_and_set_rgb_agree_on_the_same_color(
+    lights: LightNamespace, client: AsyncMock
+) -> None:
+    await lights.set_hex(LIGHT_ID, "#ff0000")
+    from_hex = sent_update(client)["color"]["xy"]
+
+    await lights.set_rgb(LIGHT_ID, 255, 0, 0)
+
+    assert sent_update(client)["color"]["xy"] == from_hex
+
+
+@pytest.mark.asyncio
+async def test_set_hex_rejects_a_color_name(lights: LightNamespace) -> None:
+    with pytest.raises(ValueError, match="Invalid hex color"):
+        await lights.set_hex(LIGHT_ID, "red")
+
+
+@pytest.mark.asyncio
+async def test_set_rgb_rejects_an_out_of_range_channel(
+    lights: LightNamespace,
+) -> None:
+    with pytest.raises(ValueError, match="Invalid RGB color"):
+        await lights.set_rgb(LIGHT_ID, 255, 0, 256)
+
+
+@pytest.mark.asyncio
+async def test_color_commands_switch_the_target_on(
+    lights: LightNamespace, client: AsyncMock
+) -> None:
+    for command in (
+        lambda: lights.set_rgb(LIGHT_ID, 0, 128, 255),
+        lambda: lights.set_hex(LIGHT_ID, "#0080ff"),
+    ):
+        await command()
+        assert sent_update(client)["on"] == {"on": True}
 
 
 @pytest.mark.asyncio
@@ -175,7 +214,7 @@ async def test_color_and_color_temperature_are_mutually_exclusive(
     lights: LightNamespace,
 ) -> None:
     with pytest.raises(ValueError, match="either a color or a color temperature"):
-        await lights.set_state(LIGHT_ID, color="red", kelvin=2700)
+        await lights.set_state(LIGHT_ID, color=ColorXY(x=0.5, y=0.4), kelvin=2700)
 
 
 @pytest.mark.asyncio

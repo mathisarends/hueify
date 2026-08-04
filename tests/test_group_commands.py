@@ -129,7 +129,7 @@ async def test_room_commands_address_the_grouped_light_service() -> None:
 async def test_zone_commands_use_the_same_command_surface_as_rooms() -> None:
     client = bridge()
 
-    await ZoneNamespace(client).set_color(ZONE_ID, "red")
+    await ZoneNamespace(client).set_hex(ZONE_ID, "#ff0000")
 
     endpoint, _ = client.put.await_args.args
     assert endpoint == f"grouped_light/{GROUPED_LIGHT_ID}"

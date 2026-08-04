@@ -1,6 +1,7 @@
 import pytest
 
 from hueify.color import (
+    hex_to_rgb,
     kelvin_to_mirek,
     mirek_to_kelvin,
     rgb_to_xy,
@@ -100,3 +101,13 @@ def test_rgb_tuples_with_the_wrong_number_of_channels_are_rejected() -> None:
 
 def test_zero_y_chromaticity_maps_to_black() -> None:
     assert xy_to_rgb(ColorXY(x=0.3, y=0.0)) == (0, 0, 0)
+
+
+def test_hex_to_rgb_does_not_accept_color_names() -> None:
+    with pytest.raises(ValueError, match="Invalid hex color"):
+        hex_to_rgb("red")
+
+
+def test_an_unknown_color_name_lists_the_ones_that_exist() -> None:
+    with pytest.raises(ValueError, match="warm_white"):
+        to_rgb("chartreuse")

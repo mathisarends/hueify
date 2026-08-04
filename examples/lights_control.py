@@ -37,7 +37,7 @@ async def main() -> None:
         await lights.set_color_temperature(light.id, 2200, brightness=60)
         await asyncio.sleep(1)
 
-        await lights.set_color(light.id, "#8800ff")
+        await lights.set_hex(light.id, "#8800ff")
         await asyncio.sleep(1)
 
         # set_state sends exactly what you pass and nothing else

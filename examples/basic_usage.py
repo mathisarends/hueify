@@ -16,7 +16,7 @@ async def main() -> None:
         await hue.lights.turn_on(desk.id, brightness=50)
         await asyncio.sleep(2)
 
-        await hue.lights.set_color(desk.id, "#ff8800")
+        await hue.lights.set_hex(desk.id, "#ff8800")
         await asyncio.sleep(2)
 
         await hue.lights.set_color_temperature(desk.id, 2700, transition=2)

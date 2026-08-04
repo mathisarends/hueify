@@ -31,7 +31,7 @@ async def main() -> None:
         await asyncio.sleep(11)
 
         # seconds as a plain number work just as well
-        await hue.lights.set_color(light.id, "#3355ff", transition=3)
+        await hue.lights.set_hex(light.id, "#3355ff", transition=3)
         await asyncio.sleep(4)
 
         # a fade of 0 is the default: change immediately

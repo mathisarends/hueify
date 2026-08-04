@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
 from datetime import timedelta
 
-from hueify.color import Color, kelvin_to_mirek, to_xy
+from hueify.color import hex_to_rgb, kelvin_to_mirek, rgb_to_xy
 from hueify.models import (
     AlertState,
     ColorState,
     ColorTemperatureState,
+    ColorXY,
     DimmingDelta,
     DimmingDeltaAction,
     DimmingState,
@@ -27,7 +28,7 @@ def _build_light_update(
     *,
     on: bool | None = None,
     brightness: float | None = None,
-    color: Color | None = None,
+    color: ColorXY | None = None,
     kelvin: int | None = None,
     mirek: int | None = None,
     transition: Transition | None = None,
@@ -43,7 +44,7 @@ def _build_light_update(
     return LightUpdate(
         on=None if on is None else OnState(on=on),
         dimming=None if brightness is None else DimmingState(brightness=brightness),
-        color=None if color is None else ColorState(xy=to_xy(color)),
+        color=None if color is None else ColorState(xy=color),
         color_temperature=(
             None if mirek is None else ColorTemperatureState(mirek=mirek)
         ),
@@ -88,7 +89,7 @@ class LightCommands(ABC):
         *,
         on: bool | None = None,
         brightness: float | None = None,
-        color: Color | None = None,
+        color: ColorXY | None = None,
         kelvin: int | None = None,
         mirek: int | None = None,
         transition: Transition | None = None,
@@ -110,7 +111,6 @@ class LightCommands(ABC):
         resource_id: ResourceId,
         *,
         brightness: float | None = None,
-        color: Color | None = None,
         kelvin: int | None = None,
         transition: Transition | None = None,
     ) -> HueApiResponse[ResourceIdentifier]:
@@ -118,7 +118,6 @@ class LightCommands(ABC):
             resource_id,
             on=True,
             brightness=brightness,
-            color=color,
             kelvin=kelvin,
             transition=transition,
         )
@@ -169,20 +168,30 @@ class LightCommands(ABC):
     ) -> HueApiResponse[ResourceIdentifier]:
         return await self._step_brightness(resource_id, DimmingDeltaAction.DOWN, by)
 
-    async def set_color(
+    async def set_rgb(
         self,
         resource_id: ResourceId,
-        color: Color,
+        red: int,
+        green: int,
+        blue: int,
         *,
         brightness: float | None = None,
         transition: Transition | None = None,
     ) -> HueApiResponse[ResourceIdentifier]:
-        return await self.set_state(
-            resource_id,
-            on=True,
-            color=color,
-            brightness=brightness,
-            transition=transition,
+        return await self._show_color(
+            resource_id, rgb_to_xy((red, green, blue)), brightness, transition
+        )
+
+    async def set_hex(
+        self,
+        resource_id: ResourceId,
+        hex_color: str,
+        *,
+        brightness: float | None = None,
+        transition: Transition | None = None,
+    ) -> HueApiResponse[ResourceIdentifier]:
+        return await self._show_color(
+            resource_id, rgb_to_xy(hex_to_rgb(hex_color)), brightness, transition
         )
 
     async def set_color_temperature(
@@ -206,6 +215,21 @@ class LightCommands(ABC):
     ) -> HueApiResponse[ResourceIdentifier]:
         return await self.apply(
             resource_id, LightUpdate(alert=AlertState(action=_IDENTIFY_ALERT_ACTION))
+        )
+
+    async def _show_color(
+        self,
+        resource_id: ResourceId,
+        xy: ColorXY,
+        brightness: float | None,
+        transition: Transition | None,
+    ) -> HueApiResponse[ResourceIdentifier]:
+        return await self.set_state(
+            resource_id,
+            on=True,
+            color=xy,
+            brightness=brightness,
+            transition=transition,
         )
 
     async def _step_brightness(

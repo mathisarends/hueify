@@ -1,7 +1,7 @@
-from hueify.color import Color
 from hueify.errors import HueifyError, MissingCredentialsError, ResourceNotFoundError
 from hueify.hueify import Hueify
 from hueify.models import (
+    ColorXY,
     GroupedLight,
     GroupUpdate,
     HueApiError,
@@ -25,7 +25,7 @@ from hueify.resources import (
 )
 
 __all__ = [
-    "Color",
+    "ColorXY",
     "GroupNamespace",
     "GroupUpdate",
     "GroupedLight",

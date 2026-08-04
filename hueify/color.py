@@ -98,26 +98,33 @@ def _clamp_mirek(mirek: int) -> int:
     return max(MIREK_MINIMUM, min(mirek, MIREK_MAXIMUM))
 
 
-def _parse_color_name(color: str) -> RGB:
-    normalized = color.strip().lower().replace(" ", "_").replace("-", "_")
-    if named := NAMED_COLORS.get(normalized):
-        return named
-    return _parse_hex(color)
-
-
-def _parse_hex(color: str) -> RGB:
-    value = color.strip().lstrip("#")
+def hex_to_rgb(hex_color: str) -> RGB:
+    value = hex_color.strip().lstrip("#")
     if len(value) == 3:
         value = "".join(channel * 2 for channel in value)
     if len(value) != 6:
         raise ValueError(
-            f"Unknown color {color!r}: expected a hex string like '#ff8800', "
-            f"an (r, g, b) tuple or one of {sorted(NAMED_COLORS)}"
+            f"Invalid hex color {hex_color!r}: expected '#rgb' or '#rrggbb'"
         )
     try:
         return (int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16))
     except ValueError as error:
-        raise ValueError(f"Invalid hex color {color!r}") from error
+        raise ValueError(f"Invalid hex color {hex_color!r}") from error
+
+
+def _parse_color_name(color: str) -> RGB:
+    normalized = color.strip().lower().replace(" ", "_").replace("-", "_")
+    if named := NAMED_COLORS.get(normalized):
+        return named
+    try:
+        return hex_to_rgb(color)
+    except ValueError as error:
+        if color.strip().startswith("#"):
+            raise
+        raise ValueError(
+            f"Unknown color {color!r}: expected a hex string like '#ff8800', "
+            f"an (r, g, b) tuple or one of {', '.join(sorted(NAMED_COLORS))}"
+        ) from error
 
 
 def _validated_rgb(rgb: RGB) -> RGB:

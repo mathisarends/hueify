@@ -40,7 +40,7 @@ async def main() -> None:
 
         # zones expose exactly the same commands
         zone = await hue.zones.find_by_name(ZONE_NAME)
-        await hue.zones.set_color(zone.id, "warm white", brightness=55)
+        await hue.zones.set_rgb(zone.id, 255, 180, 107, brightness=55)
         await asyncio.sleep(2)
 
         await hue.rooms.turn_off(office.id, transition=3)

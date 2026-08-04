@@ -59,7 +59,7 @@ async def main() -> None:
         desk = await hue.lights.find_by_name("Desk")
 
         await hue.lights.turn_on(desk.id, brightness=60)
-        await hue.lights.set_color(desk.id, "#ff8800")
+        await hue.lights.set_hex(desk.id, "#ff8800")
         await hue.lights.turn_off(desk.id, transition=2)
 
         office = await hue.rooms.find_by_name("Office")
@@ -77,13 +77,14 @@ one per lamp - hueify resolves that service for you.
 
 | Command | Effect |
 | --- | --- |
-| `turn_on(id, brightness=…, color=…, kelvin=…)` | Switch on, optionally in one shot |
+| `turn_on(id, brightness=…, kelvin=…)` | Switch on, optionally in one shot |
 | `turn_off(id)` | Switch off |
 | `toggle(id)` | Read the current state and flip it |
 | `is_on(id)` | `True` if the light or group is on |
 | `set_brightness(id, 65)` | Absolute brightness in percent; `0` switches off |
 | `brighten(id, by=10)` / `dim(id, by=10)` | Relative step, applied by the bridge |
-| `set_color(id, "#ff8800")` | Color from hex, a name, an RGB tuple or CIE xy |
+| `set_hex(id, "#ff8800")` | Color from a hex string, `#rgb` or `#rrggbb` |
+| `set_rgb(id, 0, 128, 255)` | Color from three 0-255 channels |
 | `set_color_temperature(id, 2700)` | White point in kelvin |
 | `set_state(id, …)` | Send exactly the given fields and nothing else |
 | `identify(id)` | Let the lamp breathe so you can tell which one it is |
@@ -101,19 +102,29 @@ bridge.
 
 ### Colors
 
-`set_color` and `turn_on(color=…)` accept whatever is convenient:
+One command per color format, so the signature says which one it wants. Both
+take `brightness` and `transition`, and both switch the light on:
 
 ```python
-await hue.lights.set_color(desk.id, "#ff8800")        # hex, long or short
-await hue.lights.set_color(desk.id, "warm white")     # named color
-await hue.lights.set_color(desk.id, (0, 128, 255))    # RGB tuple
-await hue.lights.set_color(desk.id, ColorXY(x=0.5, y=0.4))
+await hue.lights.set_hex(desk.id, "#ff8800")     # or "#f80"
+await hue.lights.set_rgb(desk.id, 0, 128, 255)
 ```
+
+`set_hex(id, "warm white")` fails rather than guessing.
 
 Color temperatures are given in kelvin and clamped to the 2000-6500 K range Hue
 lamps support. `hueify.color` exposes the conversions themselves - `to_xy`,
-`xy_to_hex`, `kelvin_to_mirek` - for rendering current state back to something
-readable.
+`hex_to_rgb`, `xy_to_hex`, `kelvin_to_mirek` - and `to_xy` is the lenient one:
+it takes a hex string, a name from `NAMED_COLORS`, an RGB tuple or a `ColorXY`.
+That is what you want for colors that arrive as strings, and for CIE xy, which
+`set_state` passes through unchanged:
+
+```python
+from hueify.color import to_xy
+
+await hue.lights.set_state(desk.id, on=True, color=to_xy(configured_color))
+await hue.lights.set_state(desk.id, on=True, color=ColorXY(x=0.5, y=0.4))
+```
 
 ### Transitions
 
