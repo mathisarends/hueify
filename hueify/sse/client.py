@@ -93,12 +93,22 @@ class EventStream:
     def off_connection_change(self, handler: ConnectionHandler) -> None:
         self._connection.off_change(handler)
 
-    async def start(self) -> None:
-        """Start listening in the background; calling twice is harmless."""
-        if self.running:
+    async def start(self, timeout: float | None = None) -> None:
+        """Start listening in the background; calling twice is harmless.
+
+        Returns as soon as the stream is supervised. Pass a timeout to wait for
+        the first connection instead and raise when it does not arrive; the
+        stream keeps reconnecting either way.
+        """
+        if not self.running:
+            self._task = asyncio.create_task(self._supervise())
+            await asyncio.sleep(0)
+
+        if timeout is None or await self.wait_connected(timeout):
             return
-        self._task = asyncio.create_task(self._supervise())
-        await asyncio.sleep(0)
+        if self._last_error is not None:
+            raise self._last_error
+        raise TimeoutError(f"The bridge did not answer within {timeout}s")
 
     async def wait_connected(self, timeout: float | None = None) -> bool:
         """Wait for the connection to be open, returning ``False`` on timeout."""

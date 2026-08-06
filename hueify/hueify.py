@@ -12,6 +12,7 @@ from hueify.resources import (
     ZoneNamespace,
 )
 from hueify.sse import (
+    ConnectionHandler,
     EventHandler,
     EventResourceType,
     EventStream,
@@ -25,6 +26,10 @@ class Hueify:
     Credentials are read from the constructor arguments, the
     ``HUE_BRIDGE_IP``/``HUE_APP_KEY`` environment variables and a ``.env``
     file, in that order.
+
+    Subscribing to events and starting the stream read better on the client
+    itself, so those delegate to ``hue.events``, which owns the connection and
+    reports its state.
     """
 
     def __init__(
@@ -59,13 +64,29 @@ class Hueify:
         resource_type: EventResourceType,
         handler: EventHandler[T] | None = None,
     ) -> EventHandler[T] | Callable[[EventHandler[T]], EventHandler[T]]:
-        """Shortcut for ``hue.events.on`` - registering handlers reads better here."""
         return self.events.on(resource_type, handler)
 
     def off[T: HueEvent](
         self, resource_type: EventResourceType, handler: EventHandler[T]
     ) -> None:
         self.events.off(resource_type, handler)
+
+    def on_connection_change(self, handler: ConnectionHandler) -> ConnectionHandler:
+        return self.events.on_connection_change(handler)
+
+    def off_connection_change(self, handler: ConnectionHandler) -> None:
+        self.events.off_connection_change(handler)
+
+    async def start_stream(self, timeout: float | None = None) -> None:
+        """Start receiving events in the background; calling twice is harmless.
+
+        Pass a timeout to wait for the first connection and raise when the
+        bridge does not answer in time.
+        """
+        await self.events.start(timeout)
+
+    async def stop_stream(self) -> None:
+        await self.events.stop()
 
     async def __aexit__(
         self,

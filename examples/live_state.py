@@ -26,8 +26,7 @@ async def main() -> None:
             if event.id == light.id and event.brightness is not None:
                 print(f"[event]  brightness: {event.brightness}%")
 
-        await hue.events.start()
-        await hue.events.wait_connected(timeout=5)
+        await hue.start_stream(timeout=5)
 
         await hue.lights.set_brightness(light.id, 66)
 

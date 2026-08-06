@@ -134,6 +134,49 @@ class TestLifecycle:
             await events.stop()
 
 
+class TestStartWithTimeout:
+    @pytest.mark.asyncio
+    async def test_returns_once_the_connection_is_open(self) -> None:
+        events = make_events()
+
+        async def stay_connected() -> None:
+            await events._connection.opened()
+            await never_returns()
+
+        with patch.object(
+            events._stream, "run_once", new=AsyncMock(side_effect=stay_connected)
+        ):
+            await events.start(timeout=1)
+
+            assert events.connected is True
+            await events.stop()
+
+    @pytest.mark.asyncio
+    async def test_raises_when_the_bridge_stays_unreachable(self) -> None:
+        events = make_events(INSTANT_RETRY)
+
+        with patch.object(
+            events._stream, "run_once", new=AsyncMock(side_effect=never_returns)
+        ):
+            with pytest.raises(TimeoutError):
+                await events.start(timeout=0.05)
+
+            # Waiting in vain does not stop the stream from trying.
+            assert events.running is True
+            await events.stop()
+
+    @pytest.mark.asyncio
+    async def test_reports_the_real_cause_instead_of_a_bare_timeout(self) -> None:
+        events = make_events(INSTANT_RETRY)
+        error = StreamAuthenticationError("rejected")
+
+        with patch.object(events._stream, "run_once", new=AsyncMock(side_effect=error)):
+            with pytest.raises(StreamAuthenticationError):
+                await events.start(timeout=0.2)
+
+            await events.stop()
+
+
 class TestReconnecting:
     @pytest.mark.asyncio
     async def test_retries_until_the_bridge_accepts_the_connection(self) -> None:
