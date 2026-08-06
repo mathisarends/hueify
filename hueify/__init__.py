@@ -1,4 +1,9 @@
-from hueify.errors import HueifyError, MissingCredentialsError, ResourceNotFoundError
+from hueify.errors import (
+    HueifyError,
+    MissingCredentialsError,
+    ResourceNotFoundError,
+    StreamAuthenticationError,
+)
 from hueify.hueify import Hueify
 from hueify.models import (
     ColorXY,
@@ -23,9 +28,12 @@ from hueify.resources import (
     Transition,
     ZoneNamespace,
 )
+from hueify.sse import ConnectionStatus, EventStream, ReconnectPolicy
 
 __all__ = [
     "ColorXY",
+    "ConnectionStatus",
+    "EventStream",
     "GroupNamespace",
     "GroupUpdate",
     "GroupedLight",
@@ -37,6 +45,7 @@ __all__ = [
     "LightNamespace",
     "LightUpdate",
     "MissingCredentialsError",
+    "ReconnectPolicy",
     "ResourceId",
     "ResourceNotFoundError",
     "Room",
@@ -45,6 +54,7 @@ __all__ = [
     "SceneNamespace",
     "SceneRecallRequest",
     "SceneUpdate",
+    "StreamAuthenticationError",
     "Transition",
     "Zone",
     "ZoneNamespace",

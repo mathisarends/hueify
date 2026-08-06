@@ -8,3 +8,7 @@ class ResourceNotFoundError(HueifyError):
 
 class MissingCredentialsError(HueifyError):
     """No bridge IP and application key could be resolved for this client."""
+
+
+class StreamAuthenticationError(HueifyError):
+    """The bridge rejected the application key, so reconnecting cannot help."""

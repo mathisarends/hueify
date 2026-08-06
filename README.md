@@ -247,7 +247,7 @@ async with Hueify() as hue:
     async def on_any(event: HueEvent) -> None:
         print(event.type, event.id)
 
-    await hue.start_events()
+    await hue.events.start()
     await asyncio.Event().wait()
 ```
 
@@ -256,9 +256,46 @@ matching update model plus an ID, so a `LightEvent` reads like a light, includin
 the flat accessors. Anything else arrives as the base `HueEvent`. A `"*"` handler
 receives every event, in addition to the type-specific ones.
 
-`hue.off(resource_type, handler)` removes a handler, `hue.stop_events()` ends the
-stream and `hue.events_connected` reports whether it is running. Leaving the
-context manager closes a started stream along with the HTTP client.
+`hue.off(resource_type, handler)` removes a handler and `hue.events.stop()` ends
+the stream. Leaving the context manager closes a started stream along with the
+HTTP client. `hue.on` and `hue.off` are shortcuts for the same methods on
+`hue.events`, which owns everything else about the stream.
+
+### Reconnects
+
+Bridges reboot, get new IPs and drop connections; the stream reconnects on its
+own with an exponential, jittered backoff until you stop it. It gives up on one
+thing only: an application key the bridge rejects, because retrying cannot fix
+that. Configure the timing with `Hueify(reconnect=ReconnectPolicy(...))`.
+
+What a reconnect cannot do is replay what happened while the connection was
+down. The stream resumes with `Last-Event-ID`, so the bridge closes brief gaps
+from its short buffer, but a longer outage loses events for good. If you keep a
+local copy of bridge state, re-read it whenever the connection comes back:
+
+```python
+from hueify import ConnectionStatus
+
+
+@hue.events.on_connection_change
+async def on_connection(status: ConnectionStatus) -> None:
+    if status.connected:
+        await resync()
+```
+
+| Property | Meaning |
+| --- | --- |
+| `hue.events.running` | The stream is supervised - connected or reconnecting |
+| `hue.events.connected` | The connection to the bridge is open right now |
+| `hue.events.status` | `connected`, `since` and `last_event_at` in one snapshot |
+| `hue.events.last_error` | The most recent connection failure, for diagnostics |
+
+`await hue.events.wait_connected(timeout=5)` waits for the first successful
+connection and returns `False` if it does not arrive in time.
+
+Because the bridge stays silent while nothing changes, silence is not a health
+signal - `read_timeout` (90s by default) only bounds how long a dead socket can
+look alive before the stream reconnects.
 
 ## Examples
 

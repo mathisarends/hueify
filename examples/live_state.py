@@ -26,8 +26,8 @@ async def main() -> None:
             if event.id == light.id and event.brightness is not None:
                 print(f"[event]  brightness: {event.brightness}%")
 
-        await hue.start_events()
-        await asyncio.sleep(2)  # give the SSE connection time to establish
+        await hue.events.start()
+        await hue.events.wait_connected(timeout=5)
 
         await hue.lights.set_brightness(light.id, 66)
 

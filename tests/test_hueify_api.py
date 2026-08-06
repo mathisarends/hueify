@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from hueify import Hueify
+from hueify import EventStream, Hueify
 from hueify.models import LightEvent, ResourceType
 from hueify.resources import (
     LightNamespace,
@@ -23,8 +23,8 @@ async def _never_returns() -> None:
 
 def _patched_stream(hue: Hueify) -> AsyncMock:
     return patch.object(
-        hue._events._stream,
-        "connect",
+        hue.events._stream,
+        "run_once",
         new_callable=AsyncMock,
         side_effect=_never_returns,
     )
@@ -38,6 +38,7 @@ async def test_exposes_exactly_the_four_supported_resource_namespaces() -> None:
         assert isinstance(hue.rooms, RoomNamespace)
         assert isinstance(hue.zones, ZoneNamespace)
         assert isinstance(hue.scenes, SceneNamespace)
+        assert isinstance(hue.events, EventStream)
         assert not hasattr(hue, "grouped_lights")
         assert not hasattr(hue, "geolocations")
     finally:
@@ -74,36 +75,36 @@ async def test_lights_rooms_and_zones_share_one_command_surface() -> None:
 async def test_context_manager_does_not_start_event_stream() -> None:
     hue = Hueify(bridge_ip=VALID_IP, app_key=VALID_APP_KEY)
 
-    with _patched_stream(hue) as connect:
+    with _patched_stream(hue) as run_once:
         async with hue:
-            assert hue.events_connected is False
+            assert hue.events.running is False
 
-    connect.assert_not_awaited()
+    run_once.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_start_events_connects_and_stop_events_disconnects() -> None:
+async def test_events_start_and_stop_through_the_namespace() -> None:
     hue = Hueify(bridge_ip=VALID_IP, app_key=VALID_APP_KEY)
 
     with _patched_stream(hue):
         async with hue:
-            await hue.start_events()
-            assert hue.events_connected is True
+            await hue.events.start()
+            assert hue.events.running is True
 
-            await hue.stop_events()
-            assert hue.events_connected is False
+            await hue.events.stop()
+            assert hue.events.running is False
 
 
 @pytest.mark.asyncio
 async def test_starting_events_twice_keeps_one_connection() -> None:
     hue = Hueify(bridge_ip=VALID_IP, app_key=VALID_APP_KEY)
 
-    with _patched_stream(hue) as connect:
+    with _patched_stream(hue) as run_once:
         async with hue:
-            await hue.start_events()
-            await hue.start_events()
+            await hue.events.start()
+            await hue.events.start()
 
-    assert connect.await_count == 1
+    assert run_once.await_count == 1
 
 
 @pytest.mark.asyncio
@@ -112,9 +113,10 @@ async def test_leaving_the_context_manager_stops_a_started_stream() -> None:
 
     with _patched_stream(hue):
         async with hue:
-            await hue.start_events()
+            await hue.events.start()
 
-    assert hue.events_connected is False
+    assert hue.events.running is False
+    assert hue.events.connected is False
 
 
 @pytest.mark.asyncio
@@ -130,7 +132,7 @@ async def test_on_decorator_is_reexposed_on_hueify() -> None:
         id="00000000-0000-0000-0000-000000000001",
         type=ResourceType.LIGHT,
     )
-    await hue._events._bus.dispatch(event)
+    await hue.events._bus.dispatch(event)
     await hue.close()
 
     assert received == [event]
@@ -151,7 +153,7 @@ async def test_off_is_reexposed_on_hueify_and_stops_further_dispatches() -> None
         id="00000000-0000-0000-0000-000000000001",
         type=ResourceType.LIGHT,
     )
-    await hue._events._bus.dispatch(event)
+    await hue.events._bus.dispatch(event)
     await hue.close()
 
     assert received == []

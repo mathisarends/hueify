@@ -11,7 +11,12 @@ from hueify.resources import (
     SceneNamespace,
     ZoneNamespace,
 )
-from hueify.sse import EventHandler, EventResourceType, EventStream
+from hueify.sse import (
+    EventHandler,
+    EventResourceType,
+    EventStream,
+    ReconnectPolicy,
+)
 
 
 class Hueify:
@@ -26,6 +31,7 @@ class Hueify:
         self,
         bridge_ip: str | None = None,
         app_key: str | None = None,
+        reconnect: ReconnectPolicy | None = None,
     ) -> None:
         self._credentials = load_credentials(bridge_ip, app_key)
         self._http_client = HttpClient(self._credentials)
@@ -33,20 +39,10 @@ class Hueify:
         self.rooms = RoomNamespace(self._http_client)
         self.zones = ZoneNamespace(self._http_client)
         self.scenes = SceneNamespace(self._http_client)
-        self._events = EventStream(self._credentials)
+        self.events = EventStream(self._credentials, reconnect)
 
     async def __aenter__(self) -> Self:
         return self
-
-    @property
-    def events_connected(self) -> bool:
-        return self._events.connected
-
-    async def start_events(self) -> None:
-        await self._events.connect()
-
-    async def stop_events(self) -> None:
-        await self._events.close()
 
     @overload
     def on[T: HueEvent](
@@ -63,12 +59,13 @@ class Hueify:
         resource_type: EventResourceType,
         handler: EventHandler[T] | None = None,
     ) -> EventHandler[T] | Callable[[EventHandler[T]], EventHandler[T]]:
-        return self._events.on(resource_type, handler)
+        """Shortcut for ``hue.events.on`` - registering handlers reads better here."""
+        return self.events.on(resource_type, handler)
 
     def off[T: HueEvent](
         self, resource_type: EventResourceType, handler: EventHandler[T]
     ) -> None:
-        self._events.off(resource_type, handler)
+        self.events.off(resource_type, handler)
 
     async def __aexit__(
         self,
@@ -79,5 +76,5 @@ class Hueify:
         await self.close()
 
     async def close(self) -> None:
-        await self._events.close()
+        await self.events.stop()
         await self._http_client.close()
