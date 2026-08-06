@@ -363,6 +363,27 @@ class TestReconnecting:
 
         assert isinstance(events.last_error, httpx.ConnectError)
 
+    @pytest.mark.asyncio
+    async def test_clears_the_last_error_after_recovery(self) -> None:
+        events = make_events(INSTANT_RETRY)
+        attempts = 0
+
+        async def fail_then_recover() -> None:
+            nonlocal attempts
+            attempts += 1
+            if attempts == 1:
+                raise httpx.ConnectError("refused")
+            await events._connection.opened()
+            await never_returns()
+
+        with patch.object(
+            events._stream, "run_once", new=AsyncMock(side_effect=fail_then_recover)
+        ):
+            await events.start()
+            assert await events.wait_connected(timeout=1) is True
+            assert events.last_error is None
+            await events.stop()
+
 
 class TestBackoffReset:
     @pytest.mark.asyncio

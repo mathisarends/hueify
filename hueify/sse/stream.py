@@ -1,7 +1,7 @@
 import logging
 
 import httpx
-from httpx_sse import ServerSentEvent, aconnect_sse
+from httpx_sse import ServerSentEvent, SSEError, aconnect_sse
 from pydantic import TypeAdapter, ValidationError
 
 from hueify.credentials import HueBridgeCredentials
@@ -47,24 +47,32 @@ class ServerSentEventStream:
     async def run_once(self) -> None:
         """Consume events until the stream ends; raises when the connection fails."""
         logger.info("Connecting to event stream at %s", self._credentials.hue_bridge_ip)
+        received_event = False
 
-        async with (
-            httpx.AsyncClient(verify=False, timeout=self._timeout) as client,
-            aconnect_sse(
-                client=client,
-                method="GET",
-                url=self._url,
-                headers=self._request_headers(),
-            ) as event_source,
-        ):
-            _raise_for_status(event_source.response)
-            await self._connection.opened()
-            logger.info("Connected to event stream")
+        try:
+            async with (
+                httpx.AsyncClient(verify=False, timeout=self._timeout) as client,
+                aconnect_sse(
+                    client=client,
+                    method="GET",
+                    url=self._url,
+                    headers=self._request_headers(),
+                ) as event_source,
+            ):
+                _raise_for_status(event_source.response)
+                _raise_for_content_type(event_source.response)
+                await self._connection.opened()
+                logger.info("Connected to event stream")
 
-            async for sse in event_source.aiter_sse():
-                self._connection.record_event()
-                self._last_event_id = sse.id or self._last_event_id
-                await self._handle_sse(sse)
+                async for sse in event_source.aiter_sse():
+                    received_event = True
+                    self._connection.record_event()
+                    self._last_event_id = sse.id or self._last_event_id
+                    await self._handle_sse(sse)
+        except Exception:
+            if not received_event:
+                self._last_event_id = None
+            raise
 
     def _request_headers(self) -> dict[str, str]:
         headers = {
@@ -101,3 +109,13 @@ def _raise_for_status(response: httpx.Response) -> None:
             f"The bridge rejected the application key (HTTP {response.status_code})"
         )
     response.raise_for_status()
+
+
+def _raise_for_content_type(response: httpx.Response) -> None:
+    """Validate the response before reporting the stream as connected."""
+    content_type = response.headers.get("content-type", "").partition(";")[0]
+    if "text/event-stream" not in content_type:
+        raise SSEError(
+            "Expected response header Content-Type to contain 'text/event-stream', "
+            f"got {content_type!r}"
+        )

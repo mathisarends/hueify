@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
+from httpx_sse import SSEError
 
 from hueify.credentials import HueBridgeCredentials
 from hueify.errors import StreamAuthenticationError
@@ -66,14 +67,22 @@ def _async_cm(value: object) -> MagicMock:
 def patched_bridge(
     events: Sequence[MagicMock] = (),
     status_code: int = 200,
+    content_type: str = "text/event-stream",
     connect_error: Exception | None = None,
+    stream_error: Exception | None = None,
 ) -> Iterator[dict[str, dict[str, str]]]:
     """Replace the bridge with a canned response and capture the request headers."""
-    response = httpx.Response(status_code, request=httpx.Request("GET", URL))
+    response = httpx.Response(
+        status_code,
+        headers={"Content-Type": content_type},
+        request=httpx.Request("GET", URL),
+    )
 
     async def aiter_sse():
         for sse in events:
             yield sse
+        if stream_error is not None:
+            raise stream_error
 
     event_source = MagicMock(response=response)
     event_source.aiter_sse = aiter_sse
@@ -229,6 +238,18 @@ class TestRunOnce:
             await stream.run_once()
 
     @pytest.mark.asyncio
+    async def test_rejects_a_non_event_stream_before_marking_connected(self) -> None:
+        stream, _, connection = make_stream()
+        seen: list[bool] = []
+        connection.on_change(lambda status: _record(seen, status.connected))
+
+        with patched_bridge(content_type="text/html"), pytest.raises(SSEError):
+            await stream.run_once()
+
+        assert seen == []
+        assert connection.connected is False
+
+    @pytest.mark.asyncio
     async def test_first_connection_sends_no_resume_header(self) -> None:
         stream, _, _ = make_stream()
 
@@ -249,6 +270,46 @@ class TestRunOnce:
             await stream.run_once()
 
         assert sent["headers"]["Last-Event-ID"] == "42"
+
+    @pytest.mark.asyncio
+    async def test_discards_resume_id_after_attempt_fails_without_an_event(
+        self,
+    ) -> None:
+        stream, _, _ = make_stream()
+        sse = make_sse([{"data": [make_raw_event()]}], event_id="42")
+
+        with patched_bridge([sse]):
+            await stream.run_once()
+
+        with patched_bridge(status_code=400), pytest.raises(httpx.HTTPStatusError):
+            await stream.run_once()
+
+        with patched_bridge() as sent:
+            await stream.run_once()
+
+        assert "Last-Event-ID" not in sent["headers"]
+
+    @pytest.mark.asyncio
+    async def test_keeps_new_resume_id_after_attempt_fails_following_an_event(
+        self,
+    ) -> None:
+        stream, _, _ = make_stream()
+        old_sse = make_sse([{"data": [make_raw_event()]}], event_id="42")
+        new_sse = make_sse([{"data": [make_raw_event()]}], event_id="84")
+
+        with patched_bridge([old_sse]):
+            await stream.run_once()
+
+        with (
+            patched_bridge([new_sse], stream_error=httpx.ReadError("reset")),
+            pytest.raises(httpx.ReadError),
+        ):
+            await stream.run_once()
+
+        with patched_bridge() as sent:
+            await stream.run_once()
+
+        assert sent["headers"]["Last-Event-ID"] == "84"
 
 
 async def _record(seen: list[bool], connected: bool) -> None:

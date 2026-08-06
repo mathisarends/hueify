@@ -40,6 +40,7 @@ class EventStream:
         )
         self._task: asyncio.Task[None] | None = None
         self._last_error: Exception | None = None
+        self._connection.on_change(self._clear_error_after_recovery)
 
     @property
     def running(self) -> bool:
@@ -61,8 +62,8 @@ class EventStream:
 
     @property
     def last_error(self) -> Exception | None:
-        """The most recent connection failure, kept for diagnostics."""
-        return self._last_error
+        """The latest connection failure, or ``None`` after recovery."""
+        return None if self.connected else self._last_error
 
     @overload
     def on[T: HueEvent](
@@ -160,3 +161,7 @@ class EventStream:
             logger.warning("Event stream connection lost: %s", error)
         finally:
             await self._connection.closed()
+
+    async def _clear_error_after_recovery(self, status: ConnectionStatus) -> None:
+        if status.connected:
+            self._last_error = None

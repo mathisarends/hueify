@@ -287,7 +287,7 @@ async def on_connection(status: ConnectionStatus) -> None:
 | `hue.events.running` | The stream is supervised - connected or reconnecting |
 | `hue.events.connected` | The connection to the bridge is open right now |
 | `hue.events.status` | `connected`, `since` and `last_event_at` in one snapshot |
-| `hue.events.last_error` | The most recent connection failure, for diagnostics |
+| `hue.events.last_error` | The latest connection failure; cleared after recovery |
 
 `hue.start_stream()` returns as soon as the stream is supervised, which is what
 a long-running app wants. A script that needs to be listening before it changes
