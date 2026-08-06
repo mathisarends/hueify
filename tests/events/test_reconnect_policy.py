@@ -49,3 +49,15 @@ class TestBackoff:
         backoff.reset()
 
         assert backoff.next_delay() <= 1.0
+
+    def test_delays_never_overflow_after_many_failed_attempts(self) -> None:
+        # Regression: with backoff_factor=2.0, the attempt counter used to keep
+        # growing past the point the ceiling saturated, and around attempt 1024
+        # `backoff_factor**attempt` overflowed a float - crashing a supervisor
+        # that never gets a healthy connection to reset against (e.g. the
+        # bridge being unreachable for hours).
+        backoff = make_backoff()
+
+        delays = [backoff.next_delay() for _ in range(5000)]
+
+        assert max(delays) <= 8.0

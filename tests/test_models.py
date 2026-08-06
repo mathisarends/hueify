@@ -1,14 +1,23 @@
+from datetime import UTC, datetime
 from uuid import uuid4
+
+import pytest
+from pydantic import ValidationError
 
 from hueify.models import (
     GroupedLight,
     HueApiResponse,
+    HueEvent,
+    HueEventMessage,
     Light,
     LightEvent,
     ResourceType,
     Room,
+    RoomEvent,
     Scene,
+    SceneEvent,
     Zone,
+    ZoneEvent,
 )
 
 
@@ -172,3 +181,66 @@ def test_light_event_flattened_state_properties_reflect_partial_payload() -> Non
     assert event.is_on is None
     assert event.mirek is None
     assert event.xy is None
+
+
+def _make_message(*events: dict) -> dict:
+    return {
+        "creationtime": "2026-08-06T07:29:23Z",
+        "id": str(uuid4()),
+        "type": "update",
+        "data": list(events),
+    }
+
+
+@pytest.mark.parametrize(
+    ("resource_type", "expected_model"),
+    [
+        ("light", LightEvent),
+        ("room", RoomEvent),
+        ("zone", ZoneEvent),
+        ("scene", SceneEvent),
+    ],
+)
+def test_event_message_parses_each_resource_type_into_its_own_model(
+    resource_type: str, expected_model: type[HueEvent]
+) -> None:
+    message = HueEventMessage.model_validate(
+        _make_message({"id": str(uuid4()), "type": resource_type})
+    )
+
+    assert type(message.data[0]) is expected_model
+
+
+def test_event_message_keeps_unmodelled_resource_types_generic() -> None:
+    # The bridge reports far more resource types than hueify models, and new
+    # ones arrive with firmware updates - they must not break the payload.
+    message = HueEventMessage.model_validate(
+        _make_message(
+            {"id": str(uuid4()), "type": "light"},
+            {"id": str(uuid4()), "type": "motion", "motion": {"motion": True}},
+        )
+    )
+
+    light, motion = message.data
+    assert isinstance(light, LightEvent)
+    assert type(motion) is HueEvent
+    assert motion.type == "motion"
+    assert motion.model_extra == {"motion": {"motion": True}}
+
+
+def test_event_message_parses_typed_fields_of_the_envelope() -> None:
+    message = HueEventMessage.model_validate(_make_message())
+
+    assert message.creationtime == datetime(2026, 8, 6, 7, 29, 23, tzinfo=UTC)
+    assert message.data == []
+
+
+def test_event_message_without_data_holds_no_events() -> None:
+    message = HueEventMessage.model_validate({"type": "update"})
+
+    assert message.data == []
+
+
+def test_event_message_rejects_an_event_without_an_id() -> None:
+    with pytest.raises(ValidationError):
+        HueEventMessage.model_validate(_make_message({"type": "light"}))

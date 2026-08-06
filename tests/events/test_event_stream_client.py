@@ -1,4 +1,5 @@
 import asyncio
+import time
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -11,6 +12,39 @@ from hueify.sse import ConnectionStatus, EventStream, ReconnectPolicy
 
 # Keeps the supervisor's backoff below a millisecond so tests stay fast.
 INSTANT_RETRY = ReconnectPolicy(initial_backoff=0.001, max_backoff=0.001)
+
+
+class _FakeClock:
+    """Replays fixed `time.monotonic()` readings so "healthy" uptime can be
+    simulated without the test actually waiting for it."""
+
+    def __init__(self, readings: list[float]) -> None:
+        self._readings = readings
+        self._index = 0
+
+    def __call__(self) -> float:
+        reading = self._readings[min(self._index, len(self._readings) - 1)]
+        self._index += 1
+        return reading
+
+
+class _FakeModule:
+    """Delegates to a real module except for the overridden attributes.
+
+    Patching `time.monotonic` or `asyncio.sleep` directly would corrupt
+    asyncio's own event-loop clock, since the loop also reads them. Swapping
+    the whole `time`/`asyncio` name inside `client.py`'s namespace for one of
+    these keeps the fake confined to the module under test.
+    """
+
+    def __init__(self, real_module: object, **overrides: object) -> None:
+        self._real_module = real_module
+        self._overrides = overrides
+
+    def __getattr__(self, name: str) -> object:
+        if name in self._overrides:
+            return self._overrides[name]
+        return getattr(self._real_module, name)
 
 
 def make_events(policy: ReconnectPolicy | None = None) -> EventStream:
@@ -30,6 +64,42 @@ def make_light_event() -> LightEvent:
 
 async def never_returns() -> None:
     await asyncio.Event().wait()
+
+
+class TestConnectionAccessors:
+    @pytest.mark.asyncio
+    async def test_status_reflects_the_underlying_connection(self) -> None:
+        events = make_events()
+
+        await events._connection.opened()
+
+        assert events.status.connected is True
+        await events.stop()
+
+    @pytest.mark.asyncio
+    async def test_last_event_at_reflects_the_underlying_connection(self) -> None:
+        events = make_events()
+
+        events._connection.record_event()
+
+        assert events.last_event_at is not None
+        await events.stop()
+
+    @pytest.mark.asyncio
+    async def test_off_connection_change_stops_notifications(self) -> None:
+        events = make_events()
+        seen: list[ConnectionStatus] = []
+
+        def handler(status: ConnectionStatus) -> None:
+            seen.append(status)
+
+        events.on_connection_change(handler)
+        events.off_connection_change(handler)
+
+        await events._connection.opened()
+
+        assert seen == []
+        await events.stop()
 
 
 class TestHandlers:
@@ -292,6 +362,72 @@ class TestReconnecting:
             await events.stop()
 
         assert isinstance(events.last_error, httpx.ConnectError)
+
+
+class TestBackoffReset:
+    @pytest.mark.asyncio
+    async def test_resets_backoff_after_a_healthy_connection(self) -> None:
+        # Two quick failures climb the backoff ladder, a third connection is
+        # "healthy" long enough to reset it, and a fourth failure should see
+        # the delay drop back down instead of continuing to climb.
+        policy = ReconnectPolicy(
+            initial_backoff=0.01,
+            max_backoff=1.0,
+            backoff_factor=10.0,
+            healthy_after=0.05,
+        )
+        events = make_events(policy)
+        attempts = 0
+        delays: list[float] = []
+        real_sleep = asyncio.sleep
+        reached_fourth_attempt = asyncio.Event()
+
+        async def flaky() -> None:
+            nonlocal attempts
+            attempts += 1
+            if attempts < 3:
+                raise httpx.ConnectError("refused")
+            if attempts == 3:
+                raise httpx.ReadError("reset")
+            reached_fourth_attempt.set()
+            await never_returns()
+
+        async def recording_sleep(delay: float) -> None:
+            # `start()` also yields via `asyncio.sleep(0)` - only the
+            # supervisor's backoff delays are of interest here.
+            if delay > 0:
+                delays.append(delay)
+            await real_sleep(0)
+
+        clock = _FakeClock(
+            [
+                0,
+                0.001,  # attempt 1: 0.001s elapsed - not healthy
+                1,
+                1.001,  # attempt 2: 0.001s elapsed - not healthy
+                2,
+                102,  # attempt 3: 100s elapsed - healthy, backoff resets
+                100,  # attempt 4: started
+            ]
+        )
+
+        fake_time = _FakeModule(time, monotonic=clock)
+        fake_asyncio = _FakeModule(asyncio, sleep=recording_sleep)
+
+        with (
+            patch.object(events._stream, "run_once", new=AsyncMock(side_effect=flaky)),
+            patch("hueify.sse.client.time", new=fake_time),
+            patch("hueify.sse.client.asyncio", new=fake_asyncio),
+        ):
+            await events.start()
+            await asyncio.wait_for(reached_fourth_attempt.wait(), timeout=1)
+            await events.stop()
+
+        # Attempt 2 climbed the ladder; attempt 3 (post-reset) drops back down
+        # to the shortest delay instead of climbing further.
+        assert len(delays) == 3
+        assert delays[2] < delays[1]
+        assert delays[2] <= policy.initial_backoff
 
 
 class TestGivingUp:

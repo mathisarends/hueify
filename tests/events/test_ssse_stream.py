@@ -9,7 +9,7 @@ import pytest
 
 from hueify.credentials import HueBridgeCredentials
 from hueify.errors import StreamAuthenticationError
-from hueify.models import LightEvent
+from hueify.models import HueEvent, LightEvent
 from hueify.sse.bus import EventBus
 from hueify.sse.connection import StreamConnection
 from hueify.sse.retry import ReconnectPolicy
@@ -131,6 +131,26 @@ class TestHandleSse:
     async def test_skips_container_without_data_key(self) -> None:
         stream, bus, _ = make_stream()
         sse = make_sse([{"other": "field"}])
+
+        await stream._handle_sse(sse)
+
+        bus.dispatch.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_dispatches_unmodelled_resource_type_as_a_plain_event(self) -> None:
+        stream, bus, _ = make_stream()
+        sse = make_sse([{"data": [make_raw_event("button")]}])
+
+        await stream._handle_sse(sse)
+
+        dispatched = bus.dispatch.await_args.args[0]
+        assert type(dispatched) is HueEvent
+        assert dispatched.type == "button"
+
+    @pytest.mark.asyncio
+    async def test_drops_a_payload_that_does_not_match_the_event_schema(self) -> None:
+        stream, bus, _ = make_stream()
+        sse = make_sse([{"data": [{"type": "light"}]}])  # no id
 
         await stream._handle_sse(sse)
 

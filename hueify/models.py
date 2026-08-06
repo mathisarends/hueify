@@ -1,8 +1,9 @@
+from datetime import datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag
 
 
 class HueModel(BaseModel):
@@ -514,3 +515,36 @@ class ZoneEvent(GroupUpdate, HueEvent):
 class SceneEvent(SceneUpdate, HueEvent):
     type: Literal[ResourceType.SCENE] = ResourceType.SCENE
     status: SceneStatus | None = None
+
+
+_UNTYPED_EVENT = "other"
+_TYPED_EVENTS = frozenset(
+    {ResourceType.LIGHT, ResourceType.ROOM, ResourceType.ZONE, ResourceType.SCENE}
+)
+
+
+def _event_tag(value: Any) -> str:
+    resource_type = (
+        value.get("type") if isinstance(value, dict) else getattr(value, "type", None)
+    )
+    tag = str(resource_type)
+    return tag if tag in _TYPED_EVENTS else _UNTYPED_EVENT
+
+
+# Resource types hueify models explicitly are parsed into their own event; every
+# other type the bridge reports stays a plain HueEvent instead of failing.
+AnyHueEvent = Annotated[
+    Annotated[LightEvent, Tag(ResourceType.LIGHT)]
+    | Annotated[RoomEvent, Tag(ResourceType.ROOM)]
+    | Annotated[ZoneEvent, Tag(ResourceType.ZONE)]
+    | Annotated[SceneEvent, Tag(ResourceType.SCENE)]
+    | Annotated[HueEvent, Tag(_UNTYPED_EVENT)],
+    Discriminator(_event_tag),
+]
+
+
+class HueEventMessage(HueModel):
+    """One container of an event stream payload, holding the changed resources."""
+
+    data: list[AnyHueEvent] = Field(default_factory=list)
+    creationtime: datetime | None = None

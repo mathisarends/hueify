@@ -36,5 +36,8 @@ class Backoff:
             self._policy.initial_backoff * self._policy.backoff_factor**self._attempt,
             self._policy.max_backoff,
         )
-        self._attempt += 1
+        # Stop climbing once the ceiling is saturated - further increments would
+        # not change the result but would eventually overflow the float power.
+        if ceiling < self._policy.max_backoff:
+            self._attempt += 1
         return ceiling / 2 + random.uniform(0, ceiling / 2)
