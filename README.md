@@ -276,7 +276,6 @@ local copy of bridge state, re-read it whenever the connection comes back:
 ```python
 from hueify import ConnectionStatus
 
-
 @hue.on_connection_change
 async def on_connection(status: ConnectionStatus) -> None:
     if status.connected:
