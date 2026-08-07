@@ -13,6 +13,9 @@ dependencies = [
 
 [project.optional-dependencies]
 entertainment = ["cryptography>=44"]
+cli = [
+    "typer>=0.15,<1",
+]
 
 [project.scripts]
 hueify = "hueify.cli:main"
