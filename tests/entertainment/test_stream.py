@@ -176,15 +176,43 @@ class TestOpening:
             async def connect(self, *args: object) -> object:
                 raise EntertainmentError("no answer")
 
+        def refusing_connection() -> Refusing:
+            return Refusing()
+
         monkeypatch.setattr(
-            "hueify.entertainment.stream._dtls_connection", lambda: Refusing()
+            "hueify.entertainment.stream._dtls_connection", refusing_connection
         )
 
+        stream = make_stream(areas, credentials)
         with pytest.raises(EntertainmentError, match="no answer"):
-            await make_stream(areas, credentials).open()
+            await stream.open()
 
         areas.start.assert_awaited_once()
         areas.stop.assert_awaited_once_with(AREA_ID)
+        with pytest.raises(EntertainmentError, match="not open"):
+            _ = stream.area
+        with pytest.raises(EntertainmentError, match="not open"):
+            _ = stream.frame
+
+    @pytest.mark.asyncio
+    async def test_a_rejected_start_leaves_the_stream_closed(
+        self,
+        areas: AsyncMock,
+        credentials: HueBridgeCredentials,
+        dtls: FakeDtls,
+    ) -> None:
+        areas.start.side_effect = EntertainmentError("area is busy")
+        stream = make_stream(areas, credentials)
+
+        with pytest.raises(EntertainmentError, match="area is busy"):
+            await stream.open()
+
+        areas.stop.assert_not_awaited()
+        assert dtls.connection.connected_to is None
+        with pytest.raises(EntertainmentError, match="not open"):
+            _ = stream.area
+        with pytest.raises(EntertainmentError, match="not open"):
+            _ = stream.frame
 
     @pytest.mark.asyncio
     async def test_says_which_extra_is_missing(
@@ -381,6 +409,22 @@ class TestFailures:
             assert isinstance(stream.error, EntertainmentError)
 
     @pytest.mark.asyncio
+    async def test_cancelling_one_waiter_does_not_stop_the_shared_stream(
+        self,
+        areas: AsyncMock,
+        credentials: HueBridgeCredentials,
+        dtls: FakeDtls,
+    ) -> None:
+        async with make_stream(areas, credentials) as stream:
+            waiting = asyncio.create_task(stream.wait_closed())
+            await asyncio.sleep(0)
+            waiting.cancel()
+
+            with pytest.raises(asyncio.CancelledError):
+                await waiting
+            assert stream.sending
+
+    @pytest.mark.asyncio
     async def test_closing_gives_the_area_back_and_closes_the_socket(
         self,
         areas: AsyncMock,
@@ -396,6 +440,23 @@ class TestFailures:
         assert not stream.sending
         assert connection.closed
         areas.stop.assert_awaited_once_with(AREA_ID)
+
+    @pytest.mark.asyncio
+    async def test_closing_twice_releases_the_area_only_once(
+        self,
+        areas: AsyncMock,
+        credentials: HueBridgeCredentials,
+        dtls: FakeDtls,
+    ) -> None:
+        stream = make_stream(areas, credentials)
+        await stream.open()
+
+        await stream.close()
+        await stream.close()
+
+        areas.stop.assert_awaited_once_with(AREA_ID)
+        with pytest.raises(EntertainmentError, match="not open"):
+            _ = stream.area
 
     @pytest.mark.asyncio
     async def test_an_area_the_bridge_already_took_away_still_closes(

@@ -127,15 +127,22 @@ class EntertainmentStream:
         self._area = await self._resolve_area()
         self._frame = Frame(channel.channel_id for channel in self._area.channels)
 
-        await self._areas.start(self._area.id)
+        area_started = False
         try:
+            await self._areas.start(self._area.id)
+            area_started = True
             self._connection = await connection_type.connect(
                 self._credentials.hue_bridge_ip,
                 self._credentials.hue_app_key,
                 str(self._credentials.hue_client_key),
             )
         except BaseException:
-            await self._release_area()
+            if area_started:
+                await self._release_area()
+            else:
+                self._area = None
+            self._frame = None
+            self._connection = None
             raise
 
         self._started_at = datetime.now(UTC)
@@ -239,8 +246,10 @@ class EntertainmentStream:
     async def _release_area(self) -> None:
         if self._area is None:
             return
+        area = self._area
+        self._area = None
         try:
-            await self._areas.stop(self._area.id)
+            await self._areas.stop(area.id)
         except Exception as error:
             logger.debug("Could not stop streaming on the area: %s", error)
 

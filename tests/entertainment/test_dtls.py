@@ -128,6 +128,11 @@ class TestParseHandshakeMessages:
         with pytest.raises(EntertainmentError, match="fragmented"):
             parse_handshake_messages(bytes(fragmented))
 
+    def test_drops_a_message_that_claims_more_than_arrived(self) -> None:
+        truncated = handshake_message(HandshakeType.SERVER_HELLO, 1, b"body")[:-2]
+
+        assert parse_handshake_messages(truncated) == []
+
 
 class TestClientHelloOnTheWire:
     """Pins the bytes the bridge has to recognize, without a peer to parse them."""
