@@ -1,3 +1,5 @@
+import hashlib
+
 import pytest
 
 from hueify.entertainment import crypto
@@ -103,6 +105,23 @@ class TestSessionKeys:
 
         assert len(client) == VERIFY_DATA_LENGTH
         assert client != server
+
+    def test_finished_proofs_use_the_tls_labels(self, keys: SessionKeys) -> None:
+        transcript = b"transcript"
+        transcript_hash = hashlib.sha256(transcript).digest()
+
+        assert keys.client_finished(transcript) == crypto._prf(
+            keys._master_secret,
+            b"client finished",
+            transcript_hash,
+            VERIFY_DATA_LENGTH,
+        )
+        assert keys.server_finished(transcript) == crypto._prf(
+            keys._master_secret,
+            b"server finished",
+            transcript_hash,
+            VERIFY_DATA_LENGTH,
+        )
 
     def test_a_changed_transcript_changes_the_proof(self, keys: SessionKeys) -> None:
         assert keys.client_finished(b"a") != keys.client_finished(b"b")

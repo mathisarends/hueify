@@ -11,7 +11,7 @@ __all__ = ["RecordAuthenticationError", "RecordProtection", "SessionKeys"]
 
 
 class RecordAuthenticationError(Exception):
-    """A record was not produced with the expected session key."""
+    """A record could not be authenticated with the session key."""
 
 
 @_dataclass(frozen=True, slots=True)
@@ -32,6 +32,7 @@ class SessionKeys:
             client_random + server_random,
             _MASTER_SECRET_LENGTH,
         )
+        # TLS deliberately reverses the randoms between these two derivations.
         key_block = _prf(
             master_secret,
             _KEY_EXPANSION_LABEL,
