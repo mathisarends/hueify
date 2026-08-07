@@ -119,3 +119,40 @@ def test_light_off_uses_a_uuid_without_an_unnecessary_lookup() -> None:
     assert result.exit_code == 0
     hue.lights.find_by_name.assert_not_called()
     hue.lights.turn_off.assert_awaited_once_with(resource_id, transition=None)
+
+
+def test_scene_activate_uses_the_scene_api() -> None:
+    resource_id = UUID("a1b2c3d4-1111-2222-3333-444455556666")
+    hue = MagicMock()
+    hue.__aenter__ = AsyncMock(return_value=hue)
+    hue.__aexit__ = AsyncMock(return_value=None)
+    hue.scenes.find_by_name = AsyncMock(return_value=SimpleNamespace(id=resource_id))
+    hue.scenes.activate = AsyncMock(return_value=SimpleNamespace(data=[]))
+
+    with patch("hueify.cli.Hueify", return_value=hue):
+        result = runner.invoke(
+            app,
+            ["scene", "activate", "Movie time", "--brightness", "35", "--dynamic"],
+        )
+
+    assert result.exit_code == 0
+    hue.scenes.activate.assert_awaited_once_with(
+        resource_id, brightness=35.0, transition=None, dynamic=True
+    )
+
+
+def test_entertainment_start_resolves_the_area_name() -> None:
+    resource_id = UUID("a1b2c3d4-1111-2222-3333-444455556666")
+    hue = MagicMock()
+    hue.__aenter__ = AsyncMock(return_value=hue)
+    hue.__aexit__ = AsyncMock(return_value=None)
+    hue.entertainment.find_by_name = AsyncMock(
+        return_value=SimpleNamespace(id=resource_id)
+    )
+    hue.entertainment.start = AsyncMock(return_value=SimpleNamespace(data=[]))
+
+    with patch("hueify.cli.Hueify", return_value=hue):
+        result = runner.invoke(app, ["entertainment", "start", "TV"])
+
+    assert result.exit_code == 0
+    hue.entertainment.start.assert_awaited_once_with(resource_id)

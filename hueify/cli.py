@@ -375,6 +375,51 @@ if typer is not None:
     add_control_commands(room_app, "rooms")
     add_control_commands(zone_app, "zones")
 
+    @scene_app.command("activate")
+    def activate_scene(
+        context: typer.Context,
+        target: str = typer.Argument(help="A scene UUID or name."),
+        brightness: float | None = typer.Option(
+            None, "--brightness", "-b", help="Brightness in percent."
+        ),
+        transition: float | None = typer.Option(
+            None, "--transition", help="Fade duration in seconds."
+        ),
+        dynamic: bool = typer.Option(
+            False, "--dynamic", help="Start the scene's dynamic palette."
+        ),
+    ) -> None:
+        """Activate a scene, optionally with a brightness or fade."""
+        _write_response(
+            context,
+            _run(
+                _control(
+                    "scenes",
+                    "activate",
+                    target,
+                    brightness=brightness,
+                    transition=transition,
+                    dynamic=dynamic,
+                )
+            ),
+        )
+
+    @entertainment_app.command("start")
+    def start_entertainment_area(
+        context: typer.Context,
+        target: str = typer.Argument(help="An entertainment-area UUID or name."),
+    ) -> None:
+        """Take an entertainment area over for a streaming client."""
+        _write_response(context, _run(_control("entertainment", "start", target)))
+
+    @entertainment_app.command("stop")
+    def stop_entertainment_area(
+        context: typer.Context,
+        target: str = typer.Argument(help="An entertainment-area UUID or name."),
+    ) -> None:
+        """Release an entertainment area held by this application."""
+        _write_response(context, _run(_control("entertainment", "stop", target)))
+
 else:
     app = None
 
