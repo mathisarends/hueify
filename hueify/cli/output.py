@@ -13,7 +13,6 @@ from hueify.models import (
     EntertainmentConfiguration,
     HueApiResponse,
     Light,
-    NamedResource,
     ResourceIdentifier,
     Room,
     Scene,
@@ -39,13 +38,18 @@ class OutputOptions:
 
 
 def print_json(value: JsonValue) -> None:
-    print(json.dumps(value, indent=2, sort_keys=True))
+    print(json.dumps(value, separators=(",", ":"), sort_keys=True))
 
 
-def _resource_json(resource: NamedResource) -> dict[str, JsonValue]:
-    # Pydantic's return annotation is deliberately broad. At mode="json" this
-    # cast records the narrower guarantee made by Pydantic's serializer.
-    return cast("dict[str, JsonValue]", resource.model_dump(mode="json"))
+def _resource_json(resource: ListedResource) -> dict[str, JsonValue]:
+    summary: dict[str, JsonValue] = {
+        "id": str(resource.id),
+        "name": resource.name,
+    }
+    state = _resource_state(resource)
+    if state:
+        summary["state"] = state
+    return summary
 
 
 def _resource_state(resource: ListedResource) -> str:

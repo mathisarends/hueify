@@ -1,3 +1,4 @@
+import json
 import re
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, call, patch
@@ -129,7 +130,7 @@ def test_light_list_uses_the_hueify_api_and_writes_stable_plain_output() -> None
     hue.lights.list.assert_awaited_once_with()
 
 
-def test_resource_list_json_preserves_the_full_model_shape() -> None:
+def test_resource_list_json_is_a_compact_resource_summary() -> None:
     light = Light(
         id=RESOURCE_ID,
         metadata=LightMetadata(name="Desk"),
@@ -145,8 +146,10 @@ def test_resource_list_json_preserves_the_full_model_shape() -> None:
 
     assert result.exit_code == 0
     assert plain_result.exit_code == 0
-    assert str(RESOURCE_ID) in result.output
-    assert '"metadata"' in result.output
+    assert json.loads(result.output) == [
+        {"id": str(RESOURCE_ID), "name": "Desk", "state": "off"}
+    ]
+    assert result.output.count("\n") == 1
     assert plain_result.output.endswith("\tDesk\toff\n")
 
 

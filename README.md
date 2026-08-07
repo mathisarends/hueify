@@ -102,7 +102,7 @@ scripts:
 ```bash
 hueify light list                 # human table
 hueify --plain light list         # id<TAB>name<TAB>state
-hueify light list --json | jq .   # complete bridge models
+hueify light list --json | jq .   # compact id/name/state objects
 ```
 
 The global output flags may appear before or after a subcommand. `--json` and
