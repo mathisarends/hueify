@@ -22,13 +22,25 @@ def _select_bridge(bridges: list[DiscoveredBridge]) -> DiscoveredBridge:
 
 
 def _print_credentials(credentials: HueBridgeCredentials) -> None:
-    print("\nSetup complete. Hueify reads these two values:\n")
+    print("\nSetup complete. Hueify reads these values:\n")
     print(f"  HUE_BRIDGE_IP={credentials.hue_bridge_ip}")
     print(f"  HUE_APP_KEY={credentials.hue_app_key}")
+    if credentials.hue_client_key is not None:
+        print(f"  HUE_CLIENT_KEY={credentials.hue_client_key}")
     print(
         "\nSet them in your environment or write them to a .env file.\n"
-        "The app key controls your bridge - keep it out of version control."
+        "These keys control your bridge - keep them out of version control."
     )
+    if credentials.hue_client_key is None:
+        print(
+            "\nThe bridge did not return a client key, so entertainment streaming "
+            "is unavailable. Run the setup again to get one."
+        )
+    else:
+        print(
+            "\nThe client key is only needed for entertainment streaming, and the "
+            "bridge never shows it again."
+        )
 
 
 async def _run_setup() -> HueBridgeCredentials:
@@ -43,11 +55,12 @@ async def _run_setup() -> HueBridgeCredentials:
     input()
 
     print("Registering app key...")
-    app_key = await register_app_key(bridge.internalipaddress)
+    app = await register_app_key(bridge.internalipaddress)
 
     credentials = HueBridgeCredentials(
         hue_bridge_ip=bridge.internalipaddress,
-        hue_app_key=app_key,
+        hue_app_key=app.app_key,
+        hue_client_key=app.client_key,
     )
     _print_credentials(credentials)
     return credentials
