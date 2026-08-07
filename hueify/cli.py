@@ -6,6 +6,7 @@ import sys
 from dataclasses import dataclass
 from importlib.metadata import version
 from typing import Any, NoReturn
+from uuid import UUID
 
 try:
     import typer
@@ -91,6 +92,42 @@ def _run(coroutine: Any) -> Any:
     except HueifyError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(1) from error
+
+
+async def _resolve_target(namespace: Any, target: str) -> UUID | str:
+    try:
+        UUID(target)
+    except ValueError:
+        return (await namespace.find_by_name(target)).id
+    return target
+
+
+async def _control(
+    namespace_name: str,
+    action: str,
+    target: str,
+    *args: Any,
+    **kwargs: Any,
+) -> Any:
+    async with Hueify() as hue:
+        namespace = getattr(hue, namespace_name)
+        resource_id = await _resolve_target(namespace, target)
+        return await getattr(namespace, action)(resource_id, *args, **kwargs)
+
+
+def _write_response(context: Any, response: Any) -> None:
+    output = context.obj
+    assert isinstance(output, OutputOptions)
+    if output.json:
+        _print_json(_resource_json(response))
+        return
+
+    identifiers = getattr(response, "data", [])
+    if output.plain:
+        for identifier in identifiers:
+            typer.echo(f"{identifier.rid}\t{identifier.rtype}")
+        return
+    typer.echo(f"Updated {len(identifiers)} resource(s).")
 
 
 if typer is not None:
@@ -192,6 +229,151 @@ if typer is not None:
             _run(_list_resources("entertainment")),
             "Entertainment areas",
         )
+
+    def add_control_commands(command_app: typer.Typer, namespace_name: str) -> None:
+        @command_app.command("on")
+        def turn_on(
+            context: typer.Context,
+            target: str = typer.Argument(help="A resource UUID or name."),
+            brightness: float | None = typer.Option(
+                None, "--brightness", "-b", help="Brightness in percent."
+            ),
+            transition: float | None = typer.Option(
+                None, "--transition", help="Fade duration in seconds."
+            ),
+        ) -> None:
+            """Turn a light, room, or zone on."""
+            _write_response(
+                context,
+                _run(
+                    _control(
+                        namespace_name,
+                        "turn_on",
+                        target,
+                        brightness=brightness,
+                        transition=transition,
+                    )
+                ),
+            )
+
+        @command_app.command("off")
+        def turn_off(
+            context: typer.Context,
+            target: str = typer.Argument(help="A resource UUID or name."),
+            transition: float | None = typer.Option(
+                None, "--transition", help="Fade duration in seconds."
+            ),
+        ) -> None:
+            """Turn a light, room, or zone off."""
+            _write_response(
+                context,
+                _run(
+                    _control(namespace_name, "turn_off", target, transition=transition)
+                ),
+            )
+
+        @command_app.command("toggle")
+        def toggle(
+            context: typer.Context,
+            target: str = typer.Argument(help="A resource UUID or name."),
+            transition: float | None = typer.Option(
+                None, "--transition", help="Fade duration in seconds."
+            ),
+        ) -> None:
+            """Toggle a light, room, or zone."""
+            _write_response(
+                context,
+                _run(_control(namespace_name, "toggle", target, transition=transition)),
+            )
+
+        @command_app.command("brightness")
+        def set_brightness(
+            context: typer.Context,
+            target: str = typer.Argument(help="A resource UUID or name."),
+            percent: float = typer.Argument(help="Brightness from 0 to 100."),
+            transition: float | None = typer.Option(
+                None, "--transition", help="Fade duration in seconds."
+            ),
+        ) -> None:
+            """Set brightness; zero turns the target off."""
+            _write_response(
+                context,
+                _run(
+                    _control(
+                        namespace_name,
+                        "set_brightness",
+                        target,
+                        percent,
+                        transition=transition,
+                    )
+                ),
+            )
+
+        @command_app.command("color")
+        def set_color(
+            context: typer.Context,
+            target: str = typer.Argument(help="A resource UUID or name."),
+            hex_color: str = typer.Argument(help="A #rgb or #rrggbb colour."),
+            brightness: float | None = typer.Option(
+                None, "--brightness", "-b", help="Brightness in percent."
+            ),
+            transition: float | None = typer.Option(
+                None, "--transition", help="Fade duration in seconds."
+            ),
+        ) -> None:
+            """Set a colour from hexadecimal RGB."""
+            _write_response(
+                context,
+                _run(
+                    _control(
+                        namespace_name,
+                        "set_hex",
+                        target,
+                        hex_color,
+                        brightness=brightness,
+                        transition=transition,
+                    )
+                ),
+            )
+
+        @command_app.command("temperature")
+        def set_temperature(
+            context: typer.Context,
+            target: str = typer.Argument(help="A resource UUID or name."),
+            kelvin: int = typer.Argument(help="Colour temperature in kelvin."),
+            brightness: float | None = typer.Option(
+                None, "--brightness", "-b", help="Brightness in percent."
+            ),
+            transition: float | None = typer.Option(
+                None, "--transition", help="Fade duration in seconds."
+            ),
+        ) -> None:
+            """Set a colour temperature in kelvin."""
+            _write_response(
+                context,
+                _run(
+                    _control(
+                        namespace_name,
+                        "set_color_temperature",
+                        target,
+                        kelvin,
+                        brightness=brightness,
+                        transition=transition,
+                    )
+                ),
+            )
+
+        @command_app.command("identify")
+        def identify(
+            context: typer.Context,
+            target: str = typer.Argument(help="A resource UUID or name."),
+        ) -> None:
+            """Make the target breathe so it can be identified."""
+            _write_response(context, _run(_control(namespace_name, "identify", target)))
+
+    add_control_commands(light_app, "lights")
+    add_control_commands(room_app, "rooms")
+    add_control_commands(zone_app, "zones")
 
 else:
     app = None

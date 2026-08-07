@@ -74,3 +74,48 @@ def test_resource_list_json_preserves_the_full_model_shape() -> None:
     assert result.exit_code == 0
     assert '"light-id"' in result.output
     assert '"metadata"' in result.output
+
+
+def test_light_on_resolves_a_name_and_passes_all_control_options() -> None:
+    resource_id = UUID("a1b2c3d4-1111-2222-3333-444455556666")
+    hue = MagicMock()
+    hue.__aenter__ = AsyncMock(return_value=hue)
+    hue.__aexit__ = AsyncMock(return_value=None)
+    hue.lights.find_by_name = AsyncMock(return_value=SimpleNamespace(id=resource_id))
+    hue.lights.turn_on = AsyncMock(return_value=SimpleNamespace(data=[]))
+
+    with patch("hueify.cli.Hueify", return_value=hue):
+        result = runner.invoke(
+            app,
+            [
+                "light",
+                "on",
+                "Desk",
+                "--brightness",
+                "60",
+                "--transition",
+                "0.3",
+            ],
+        )
+
+    assert result.exit_code == 0
+    hue.lights.find_by_name.assert_awaited_once_with("Desk")
+    hue.lights.turn_on.assert_awaited_once_with(
+        resource_id, brightness=60.0, transition=0.3
+    )
+    assert result.output == "Updated 0 resource(s).\n"
+
+
+def test_light_off_uses_a_uuid_without_an_unnecessary_lookup() -> None:
+    resource_id = "a1b2c3d4-1111-2222-3333-444455556666"
+    hue = MagicMock()
+    hue.__aenter__ = AsyncMock(return_value=hue)
+    hue.__aexit__ = AsyncMock(return_value=None)
+    hue.lights.turn_off = AsyncMock(return_value=SimpleNamespace(data=[]))
+
+    with patch("hueify.cli.Hueify", return_value=hue):
+        result = runner.invoke(app, ["light", "off", resource_id])
+
+    assert result.exit_code == 0
+    hue.lights.find_by_name.assert_not_called()
+    hue.lights.turn_off.assert_awaited_once_with(resource_id, transition=None)
