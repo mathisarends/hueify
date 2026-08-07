@@ -355,6 +355,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-mock" },
     { name = "ruff" },
+    { name = "typer" },
 ]
 
 [package.metadata]
@@ -376,6 +377,7 @@ dev = [
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-mock", specifier = ">=3.14.1,<4" },
     { name = "ruff", specifier = ">=0.13.1" },
+    { name = "typer", specifier = ">=0.15,<1" },
 ]
 
 [[package]]
