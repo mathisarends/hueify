@@ -7,11 +7,44 @@ from typing import Self as _Self
 from cryptography.exceptions import InvalidTag as _InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM as _AESGCM
 
-__all__ = ["RecordAuthenticationError", "RecordProtection", "SessionKeys"]
-
 
 class RecordAuthenticationError(Exception):
     """A record could not be authenticated with the session key."""
+
+
+class RecordProtection:
+    """Encrypt and authenticate DTLS records in one direction."""
+
+    def __init__(self, key: bytes, implicit_iv: bytes) -> None:
+        self._cipher = _AESGCM(key)
+        self._implicit_iv = implicit_iv
+
+    def protect(
+        self, content_type: int, epoch: int, sequence: int, plaintext: bytes
+    ) -> bytes:
+        explicit_nonce = _explicit_nonce(epoch, sequence)
+        sealed = self._cipher.encrypt(
+            self._implicit_iv + explicit_nonce,
+            plaintext,
+            _additional_data(explicit_nonce, content_type, len(plaintext)),
+        )
+        return explicit_nonce + sealed
+
+    def unprotect(self, content_type: int, fragment: bytes) -> bytes:
+        if len(fragment) < _EXPLICIT_NONCE_LENGTH + _TAG_LENGTH:
+            raise ValueError(f"Record fragment is too short: {len(fragment)} bytes")
+
+        explicit_nonce = fragment[:_EXPLICIT_NONCE_LENGTH]
+        sealed = fragment[_EXPLICIT_NONCE_LENGTH:]
+        plaintext_length = len(sealed) - _TAG_LENGTH
+        try:
+            return self._cipher.decrypt(
+                self._implicit_iv + explicit_nonce,
+                sealed,
+                _additional_data(explicit_nonce, content_type, plaintext_length),
+            )
+        except _InvalidTag:
+            raise RecordAuthenticationError from None
 
 
 @_dataclass(frozen=True, slots=True)
@@ -58,10 +91,10 @@ class SessionKeys:
     def server_finished(self, transcript: bytes) -> bytes:
         return self._finished(_SERVER_FINISHED_LABEL, transcript)
 
-    def client_protection(self) -> "RecordProtection":
+    def client_protection(self) -> RecordProtection:
         return RecordProtection(self._client_write_key, self._client_write_iv)
 
-    def server_protection(self) -> "RecordProtection":
+    def server_protection(self) -> RecordProtection:
         return RecordProtection(self._server_write_key, self._server_write_iv)
 
     def _finished(self, label: bytes, transcript: bytes) -> bytes:
@@ -71,41 +104,6 @@ class SessionKeys:
             _hashlib.sha256(transcript).digest(),
             _VERIFY_DATA_LENGTH,
         )
-
-
-class RecordProtection:
-    """Encrypt and authenticate DTLS records in one direction."""
-
-    def __init__(self, key: bytes, implicit_iv: bytes) -> None:
-        self._cipher = _AESGCM(key)
-        self._implicit_iv = implicit_iv
-
-    def protect(
-        self, content_type: int, epoch: int, sequence: int, plaintext: bytes
-    ) -> bytes:
-        explicit_nonce = _explicit_nonce(epoch, sequence)
-        sealed = self._cipher.encrypt(
-            self._implicit_iv + explicit_nonce,
-            plaintext,
-            _additional_data(explicit_nonce, content_type, len(plaintext)),
-        )
-        return explicit_nonce + sealed
-
-    def unprotect(self, content_type: int, fragment: bytes) -> bytes:
-        if len(fragment) < _EXPLICIT_NONCE_LENGTH + _TAG_LENGTH:
-            raise ValueError(f"Record fragment is too short: {len(fragment)} bytes")
-
-        explicit_nonce = fragment[:_EXPLICIT_NONCE_LENGTH]
-        sealed = fragment[_EXPLICIT_NONCE_LENGTH:]
-        plaintext_length = len(sealed) - _TAG_LENGTH
-        try:
-            return self._cipher.decrypt(
-                self._implicit_iv + explicit_nonce,
-                sealed,
-                _additional_data(explicit_nonce, content_type, plaintext_length),
-            )
-        except _InvalidTag:
-            raise RecordAuthenticationError from None
 
 
 _DTLS_1_2 = 0xFEFD

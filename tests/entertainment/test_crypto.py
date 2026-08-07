@@ -21,14 +21,6 @@ MASTER_SECRET_LENGTH = 48
 VERIFY_DATA_LENGTH = 12
 
 
-def test_public_api_is_explicit() -> None:
-    assert crypto.__all__ == [
-        "RecordAuthenticationError",
-        "RecordProtection",
-        "SessionKeys",
-    ]
-
-
 class TestPseudorandomFunction:
     def test_matches_the_published_tls_1_2_sha256_vector(self) -> None:
         """The only independent check of the key schedule there can be.
