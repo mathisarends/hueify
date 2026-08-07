@@ -121,7 +121,9 @@ def make_stream(
 
 
 class TestOpening:
-    def test_a_missing_client_key_says_where_to_get_one(self, areas: AsyncMock) -> None:
+    def test_a_missing_client_key_says_where_to_get_one(
+        self, areas: AsyncMock, without_stored_credentials: None
+    ) -> None:
         without_client_key = HueBridgeCredentials(
             hue_bridge_ip=BRIDGE_IP, hue_app_key=APP_KEY
         )
