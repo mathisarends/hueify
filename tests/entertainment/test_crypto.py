@@ -4,6 +4,7 @@ from cryptography.exceptions import InvalidTag
 from hueify.entertainment.crypto import (
     CLIENT_FINISHED_LABEL,
     EXPLICIT_NONCE_LENGTH,
+    IMPLICIT_IV_LENGTH,
     KEY_LENGTH,
     MASTER_SECRET_LENGTH,
     SERVER_FINISHED_LABEL,
@@ -96,6 +97,79 @@ class TestSessionKeys:
     def test_a_changed_transcript_changes_the_proof(self, keys: SessionKeys) -> None:
         assert keys.verify_data(CLIENT_FINISHED_LABEL, b"a") != keys.verify_data(
             CLIENT_FINISHED_LABEL, b"b"
+        )
+
+
+class TestTheOrderTheBridgeInsistsOn:
+    """The key schedule, recomputed from the PRF instead of from ``derive``.
+
+    Every round trip in this suite has both sides call ``SessionKeys.derive``,
+    so a swapped pair of randoms or a swapped pair of key halves would stay
+    green here and still be rejected by a real bridge - it would decrypt
+    nothing and answer ``bad_record_mac``. These assertions spell out the order
+    RFC 5246 section 6.3 fixes, which is the one a bridge agrees with.
+    """
+
+    @pytest.fixture
+    def keys(self) -> SessionKeys:
+        return SessionKeys.derive(PSK, CLIENT_RANDOM, SERVER_RANDOM)
+
+    @pytest.fixture
+    def key_block(self, keys: SessionKeys) -> bytes:
+        # Note the randoms: the master secret is seeded client first, the key
+        # block server first.
+        return prf(
+            keys.master_secret,
+            b"key expansion",
+            SERVER_RANDOM + CLIENT_RANDOM,
+            2 * KEY_LENGTH + 2 * IMPLICIT_IV_LENGTH,
+        )
+
+    def test_the_master_secret_comes_from_the_psk_and_both_randoms(
+        self, keys: SessionKeys
+    ) -> None:
+        assert keys.master_secret == prf(
+            psk_premaster_secret(PSK),
+            b"master secret",
+            CLIENT_RANDOM + SERVER_RANDOM,
+            MASTER_SECRET_LENGTH,
+        )
+
+    def test_the_key_block_is_split_keys_first_then_ivs(
+        self, keys: SessionKeys, key_block: bytes
+    ) -> None:
+        assert keys.client_write_key == key_block[:KEY_LENGTH]
+        assert keys.server_write_key == key_block[KEY_LENGTH : 2 * KEY_LENGTH]
+        assert keys.client_write_iv == key_block[32:36]
+        assert keys.server_write_iv == key_block[36:40]
+
+    def test_this_side_writes_with_the_first_half_of_the_block(
+        self, keys: SessionKeys, key_block: bytes
+    ) -> None:
+        """Which half is 'ours' is the part a symmetric round trip cannot show."""
+        fragment = keys.client_protection().protect(
+            ContentType.APPLICATION_DATA, epoch=1, sequence=0, plaintext=b"frame"
+        )
+
+        as_the_bridge_reads_it = RecordProtection(
+            key_block[:KEY_LENGTH], key_block[32:36]
+        )
+
+        assert (
+            as_the_bridge_reads_it.unprotect(ContentType.APPLICATION_DATA, fragment)
+            == b"frame"
+        )
+
+    def test_the_bridge_writes_with_the_second_half(
+        self, keys: SessionKeys, key_block: bytes
+    ) -> None:
+        fragment = RecordProtection(
+            key_block[KEY_LENGTH : 2 * KEY_LENGTH], key_block[36:40]
+        ).protect(ContentType.HANDSHAKE, epoch=1, sequence=0, plaintext=b"finished")
+
+        assert (
+            keys.server_protection().unprotect(ContentType.HANDSHAKE, fragment)
+            == b"finished"
         )
 
 
