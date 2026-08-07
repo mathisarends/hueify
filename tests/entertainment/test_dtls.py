@@ -221,17 +221,25 @@ class TestHandshake:
         connection.close()
 
     @pytest.mark.asyncio
-    async def test_a_wrong_client_key_is_reported_as_such(
+    async def test_a_client_key_the_bridge_does_not_share_is_reported_as_such(
         self, impatient_handshake: None
     ) -> None:
+        """A key left over from an earlier registration looks exactly like this.
+
+        The bridge keeps one client key per application key, finds the identity,
+        derives a session from the *other* key and cannot read the client's
+        Finished - so the message has to name the pairing, not just the key.
+        """
         bridge, port = await FakeBridge.listening(client_key="ff" * 16)
         try:
-            with pytest.raises(
-                EntertainmentAuthenticationError, match="rejected the client key"
-            ):
+            with pytest.raises(EntertainmentAuthenticationError) as error:
                 await DtlsPskConnection.connect("127.0.0.1", APP_KEY, CLIENT_KEY, port)
         finally:
             bridge.close()
+
+        assert "bad record mac" in str(error.value)
+        assert "HUE_CLIENT_KEY" in str(error.value)
+        assert "HUE_APP_KEY" in str(error.value)
 
     @pytest.mark.asyncio
     async def test_a_silent_bridge_names_the_likely_reason(

@@ -593,8 +593,10 @@ def _alert_error(fragment: bytes) -> EntertainmentError:
     name = _ALERT_DESCRIPTIONS.get(description, f"alert {description}")
     if description in _AUTHENTICATION_ALERTS:
         return EntertainmentAuthenticationError(
-            f"The bridge rejected the client key: {name}. Run `hueify setup` "
-            "again to register a new application and client key."
+            f"The bridge rejected the client key: {name}. HUE_CLIENT_KEY has to "
+            "come from the same registration as HUE_APP_KEY - the bridge keeps "
+            "one client key per application key, so a key left over from an "
+            "earlier `hueify setup` fails exactly like a wrong one."
         )
     return EntertainmentError(f"The bridge ended the DTLS connection: {name}")
 
