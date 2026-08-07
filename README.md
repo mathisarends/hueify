@@ -12,6 +12,7 @@ pip install hueify
 ```
 
 - [Setup](#setup)
+- [CLI](#cli)
 - [Quickstart](#quickstart)
 - [Commands](#commands)
   - [Colors](#colors)
@@ -61,6 +62,53 @@ hue = Hueify(bridge_ip="192.168.1.10", app_key="…")
 
 Without any of these, `Hueify()` raises `MissingCredentialsError` and names
 what is missing.
+
+## CLI
+
+The Python library has no command-line dependency. Install the optional CLI
+extra when you want the `hueify` command:
+
+```bash
+pip install "hueify[cli]"
+```
+
+The CLI follows a predictable command shape: resource type first, action
+second, then a UUID or a resource name. Names use the same exact-then-fuzzy
+resolution as the Python API.
+
+```bash
+hueify setup
+hueify light list
+hueify light on "Desk" --brightness 60 --transition 0.3
+hueify room off Office
+hueify zone color Garden "#ff8800"
+hueify scene activate "Movie time" --dynamic
+hueify entertainment start TV
+```
+
+| Group | Commands |
+| --- | --- |
+| `light`, `room`, `zone` | `list`, `on`, `off`, `toggle`, `brightness`, `color`, `temperature`, `identify` |
+| `scene` | `list`, `activate` |
+| `entertainment` | `list`, `start`, `stop` |
+
+Every command reads `HUE_BRIDGE_IP`, `HUE_APP_KEY`, and, where needed,
+`HUE_CLIENT_KEY` from the environment or `.env`; keys are deliberately not CLI
+flags. Results always go to stdout; errors go to stderr.
+
+Three global output modes make the CLI useful both interactively and in
+scripts:
+
+```bash
+hueify light list                 # human table
+hueify --plain light list         # id<TAB>name<TAB>state
+hueify --json light list | jq .   # complete bridge models
+```
+
+`--json` and `--plain` are mutually exclusive. Use `--no-color` for plain CI
+logs. Exit codes are `0` for success, `1` for Hueify failures, `2` for invalid
+usage or values, `3` for missing or invalid credentials, and `4` for network
+failures.
 
 ## Quickstart
 
