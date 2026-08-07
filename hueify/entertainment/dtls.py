@@ -1,16 +1,3 @@
-"""The DTLS 1.2 connection the bridge listens for on UDP port 2100.
-
-The entertainment port speaks exactly one cipher suite,
-``TLS_PSK_WITH_AES_128_GCM_SHA256``, and no Python runtime offers DTLS. What
-it does need is small: no certificates, no key agreement, one cipher, and a
-handshake of three flights. That is what this module implements, on top of
-:mod:`hueify.entertainment.crypto`.
-
-Receiving runs on the event loop, sending does not: :meth:`DtlsPskConnection.send`
-encrypts and hands the datagram to the socket in the same tick that produced
-the frame, because a frame that waits for a scheduler slot arrives late.
-"""
-
 import asyncio
 import logging
 import os
@@ -35,13 +22,11 @@ ENTERTAINMENT_PORT = 2100
 DTLS_1_2 = 0xFEFD
 
 CIPHER_SUITE = b"\x00\xa8"
-"""TLS_PSK_WITH_AES_128_GCM_SHA256, the only suite the bridge accepts."""
 
 RECORD_HEADER_LENGTH = 13
 HANDSHAKE_HEADER_LENGTH = 12
 
 _FLIGHT_TIMEOUT = 1.0
-"""RFC 6347 initial retransmission timer, doubled per attempt."""
 
 _FLIGHT_ATTEMPTS = 4
 _SERVER_FINISHED_TIMEOUT = 1.0
@@ -86,13 +71,10 @@ _ALERT_DESCRIPTIONS = {
 }
 
 _AUTHENTICATION_ALERTS = frozenset({20, 40, 47, 51, 71, 115})
-"""Alerts the bridge sends when it cannot make sense of our client key."""
 
 
 @dataclass(frozen=True, slots=True)
 class Record:
-    """One DTLS record, still carrying whichever protection it arrived with."""
-
     content_type: int
     epoch: int
     sequence: int
@@ -101,8 +83,6 @@ class Record:
 
 @dataclass(frozen=True, slots=True)
 class HandshakeMessage:
-    """One handshake message, plus the bytes the transcript hash is over."""
-
     type: int
     message_seq: int
     body: bytes
@@ -110,7 +90,6 @@ class HandshakeMessage:
 
 
 def parse_records(datagram: bytes) -> list[Record]:
-    """Split a datagram into records; several of them share one datagram."""
     records: list[Record] = []
     offset = 0
     while offset + RECORD_HEADER_LENGTH <= len(datagram):
@@ -133,13 +112,6 @@ def parse_records(datagram: bytes) -> list[Record]:
 
 
 def parse_handshake_messages(fragment: bytes) -> list[HandshakeMessage]:
-    """Read the handshake messages a record fragment holds.
-
-    Raises:
-        EntertainmentError: If a message arrives fragmented. The handshake of
-            this cipher suite fits in single datagrams, so fragments would
-            only ever mean the peer is not the bridge.
-    """
     messages: list[HandshakeMessage] = []
     offset = 0
     while offset + HANDSHAKE_HEADER_LENGTH <= len(fragment):
@@ -169,11 +141,7 @@ def parse_handshake_messages(fragment: bytes) -> list[HandshakeMessage]:
 
 
 class DtlsPskConnection:
-    """A DTLS 1.2 connection to the bridge, authenticated by the client key.
-
-    Open one with :meth:`connect`. It stays usable until :meth:`close`, the
-    bridge sends an alert, or the socket fails - :attr:`error` says which.
-    """
+    """A DTLS 1.2 PSK connection to the entertainment endpoint."""
 
     def __init__(
         self,
@@ -200,7 +168,6 @@ class DtlsPskConnection:
 
     @property
     def _peer(self) -> str:
-        """The bridge address, for error messages that name where they looked."""
         peername = self._transport.get_extra_info("peername")
         if isinstance(peername, tuple):
             host, port, *_ = peername
@@ -215,19 +182,6 @@ class DtlsPskConnection:
         client_key: str,
         port: int = ENTERTAINMENT_PORT,
     ) -> Self:
-        """Handshake with the bridge and return the open connection.
-
-        Args:
-            host: The bridge IP.
-            identity: The application key, which is also the PSK identity.
-            client_key: The client key from registration, as hex.
-
-        Raises:
-            EntertainmentAuthenticationError: If the bridge rejects the key.
-            EntertainmentError: If the bridge does not complete a handshake -
-                most often because the area is not streaming, or another
-                application is already streaming to it.
-        """
         psk = _decoded_client_key(client_key)
         loop = asyncio.get_running_loop()
         transport, datagrams = await loop.create_datagram_endpoint(
@@ -248,15 +202,9 @@ class DtlsPskConnection:
 
     @property
     def error(self) -> Exception | None:
-        """Why the connection stopped being usable, if it did."""
         return self._error
 
     def send(self, payload: bytes) -> None:
-        """Encrypt one payload and put it on the wire, without awaiting.
-
-        Raises:
-            EntertainmentError: If the connection is no longer usable.
-        """
         if self._error is not None:
             raise EntertainmentError(
                 f"The DTLS connection failed: {self._error}"
@@ -266,14 +214,11 @@ class DtlsPskConnection:
         self._send_record(ContentType.APPLICATION_DATA, payload)
 
     def close(self) -> None:
-        """Close the socket. The bridge stops the area on its own timeout."""
         self._closed = True
         if self._watcher is not None:
             self._watcher.cancel()
             self._watcher = None
         self._transport.close()
-
-    # -- Handshake --
 
     async def _handshake(self) -> None:
         client_random = _handshake_random()
@@ -286,12 +231,6 @@ class DtlsPskConnection:
         logger.debug("DTLS handshake complete")
 
     async def _request_cookie(self, client_random: bytes) -> bytes:
-        """Flight one: the bridge answers a first hello with a cookie only.
-
-        Neither this hello nor the answer count towards the transcript hash,
-        which starts over with the hello that carries the cookie.
-        """
-
         def send() -> None:
             self._message_seq = 0
             self._send_handshake(
@@ -304,8 +243,6 @@ class DtlsPskConnection:
         return _parse_cookie(messages[HandshakeType.HELLO_VERIFY_REQUEST].body)
 
     async def _exchange_hello(self, client_random: bytes, cookie: bytes) -> bytes:
-        """Flight two: the hello with the cookie, answered with the randomness."""
-
         def send() -> None:
             # RFC 6347: the repeated hello continues the sequence at one and is
             # the first message of the transcript.
@@ -321,7 +258,6 @@ class DtlsPskConnection:
         return _parse_server_random(messages[HandshakeType.SERVER_HELLO].body)
 
     def _send_client_flight(self) -> None:
-        """Flight three: name the key, switch on encryption, prove the transcript."""
         assert self._keys is not None
 
         self._send_handshake(
@@ -340,13 +276,6 @@ class DtlsPskConnection:
         )
 
     async def _verify_server_finished(self) -> None:
-        """Check the bridge's own transcript proof, if it sends one in time.
-
-        A bridge that stays silent here has still accepted the handshake - it
-        answers the first frames all the same - so silence is not an error. A
-        wrong client key is not silent: it comes back as an alert, or as a
-        proof that does not match.
-        """
         assert self._keys is not None
         expected = self._keys.server_finished(bytes(self._transcript))
         try:
@@ -370,14 +299,6 @@ class DtlsPskConnection:
         send: "_SendFlight",
         wanted: set[HandshakeType],
     ) -> dict[int, HandshakeMessage]:
-        """Send a flight until the wanted answers arrive, as DTLS expects.
-
-        Datagrams get lost, and DTLS has no retransmission of its own: each
-        attempt resends the whole flight and waits twice as long as the last.
-
-        Raises:
-            EntertainmentError: If the bridge never answers.
-        """
         collected: dict[int, HandshakeMessage] = {}
         for attempt in range(_FLIGHT_ATTEMPTS):
             collected.clear()
@@ -400,8 +321,6 @@ class DtlsPskConnection:
             "Streaming has to be started on the entertainment area first, and "
             "only one application at a time can stream to it."
         )
-
-    # -- Record layer --
 
     def _send_handshake(
         self, message_type: HandshakeType, body: bytes, transcript: bool = True
@@ -508,10 +427,7 @@ class DtlsPskConnection:
             logger.debug("Discarding an unreadable DTLS record: %s", error)
             return None
 
-    # -- After the handshake --
-
     def _watch(self) -> None:
-        """Keep reading, so an alert from the bridge is noticed, not ignored."""
         self._watcher = asyncio.create_task(self._watch_for_alerts())
 
     async def _watch_for_alerts(self) -> None:

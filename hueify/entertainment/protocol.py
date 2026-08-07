@@ -1,10 +1,3 @@
-"""The HueStream v2 wire format and the frame buffer that feeds it.
-
-A frame is one UDP datagram: a fixed header, the entertainment area ID as
-ASCII, and seven bytes per channel. Nothing here touches the network, so the
-encoding is exercised byte for byte in the tests.
-"""
-
 from collections.abc import Iterable, Mapping
 from enum import IntEnum
 from uuid import UUID
@@ -20,23 +13,15 @@ AREA_ID_LENGTH = 36
 CHANNEL_LENGTH = 7
 
 MAX_CHANNELS = 20
-"""Channels an entertainment area can hold, and so a frame can address."""
 
 _UINT16_MAX = 0xFFFF
 _UINT8_MAX = 0xFF
 _SEQUENCE_MODULUS = 0x100
 
 type Rgb = tuple[float, float, float]
-"""One channel color, as three 0-1 fractions of full output."""
 
 
 class ColorSpace(IntEnum):
-    """The color space byte of the header.
-
-    Hueify streams ``RGB`` and converts CIE xy input for it, which leaves the
-    per-light gamut mapping to the bridge.
-    """
-
     RGB = 0x00
     XY_BRIGHTNESS = 0x01
 
@@ -45,12 +30,7 @@ BLACK: Rgb = (0.0, 0.0, 0.0)
 
 
 class Frame:
-    """The colors of one entertainment area, mutable and reused every tick.
-
-    Writing a frame is deliberately synchronous and allocation-free: it
-    happens on the deadline of the next datagram, however irregularly the
-    colors themselves arrive.
-    """
+    """The mutable colors of one entertainment area."""
 
     def __init__(self, channel_ids: Iterable[int]) -> None:
         self._colors: dict[int, Rgb] = {
@@ -59,42 +39,30 @@ class Frame:
 
     @property
     def channels(self) -> tuple[int, ...]:
-        """The channel IDs this frame addresses, in the order they are sent."""
         return tuple(self._colors)
 
     def __len__(self) -> int:
         return len(self._colors)
 
     def get(self, channel_id: int) -> Rgb:
-        """The color currently held for one channel."""
         self._require_channel(channel_id)
         return self._colors[channel_id]
 
     def set(self, channel_id: int, color: Color, brightness: float = 1.0) -> None:
-        """Set one channel, dimmed by ``brightness`` between 0 and 1.
-
-        Raises:
-            ValueError: If the channel is not part of this area, or the color
-                cannot be read.
-        """
         self._require_channel(channel_id)
         self._colors[channel_id] = to_stream_rgb(color, brightness)
 
     def set_all(self, color: Color, brightness: float = 1.0) -> None:
-        """Set every channel of the area to the same color."""
         rgb = to_stream_rgb(color, brightness)
         self._colors = dict.fromkeys(self._colors, rgb)
 
     def clear(self) -> None:
-        """Turn every channel black without leaving the stream."""
         self._colors = dict.fromkeys(self._colors, BLACK)
 
     def colors(self) -> Mapping[int, Rgb]:
-        """A snapshot of the frame, safe to keep after the frame moves on."""
         return dict(self._colors)
 
     def encode(self, area_id: UUID | str, sequence: int = 0) -> bytes:
-        """The datagram this frame currently stands for."""
         return encode_frame(area_id, self._colors, sequence)
 
     def _require_channel(self, channel_id: int) -> None:
@@ -107,11 +75,6 @@ class Frame:
 
 
 def to_stream_rgb(color: Color, brightness: float = 1.0) -> Rgb:
-    """Read any hueify color as 0-1 RGB, scaled by ``brightness``.
-
-    Raises:
-        ValueError: If the color or the brightness cannot be read.
-    """
     if not 0.0 <= brightness <= 1.0:
         raise ValueError(f"Brightness must be between 0 and 1, got {brightness}")
 
@@ -130,12 +93,6 @@ def encode_frame(
     sequence: int = 0,
     color_space: ColorSpace = ColorSpace.RGB,
 ) -> bytes:
-    """Build one HueStream v2 datagram.
-
-    Raises:
-        ValueError: If the area ID is not a UUID, or the frame addresses more
-            channels than an area can hold.
-    """
     if len(colors) > MAX_CHANNELS:
         raise ValueError(
             f"A frame carries at most {MAX_CHANNELS} channels, got {len(colors)}"
@@ -149,7 +106,6 @@ def encode_frame(
 
 
 def frame_length(channel_count: int) -> int:
-    """How long the datagram for ``channel_count`` channels is."""
     return HEADER_LENGTH + AREA_ID_LENGTH + CHANNEL_LENGTH * channel_count
 
 
@@ -159,15 +115,14 @@ def _encode_header(
     header = bytearray(PROTOCOL_NAME)
     header.extend(PROTOCOL_VERSION)
     header.append(sequence % _SEQUENCE_MODULUS)
-    header.extend(b"\x00\x00")  # reserved
+    header.extend(b"\x00\x00")
     header.append(color_space)
-    header.append(0x00)  # reserved
+    header.append(0x00)
     header.extend(_encode_area_id(area_id))
     return bytes(header)
 
 
 def _encode_area_id(area_id: UUID | str) -> bytes:
-    """The area ID as the bridge wants it: 36 ASCII characters, with dashes."""
     try:
         canonical = str(UUID(str(area_id)))
     except ValueError as error:

@@ -1,17 +1,3 @@
-"""Fixed-rate delivery of frames to one entertainment area.
-
-The bridge stops listening to an area that falls silent for a few seconds, and
-it forwards whatever arrived last to the lamps at about 25 Hz. Both point at
-the same design: one loop that sends on a fixed clock, and colors that are
-written into the next frame rather than sent themselves.
-
-That decoupling is the whole job. A source produces colors whenever it happens
-to have them - on a beat, on a packet, on a screen refresh - and the loop turns
-that into an even stream of datagrams, drops nothing, queues nothing, and
-resends the last frame when nothing new arrived, which is also what keeps the
-area alive.
-"""
-
 import asyncio
 import contextlib
 import logging
@@ -40,7 +26,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 DEFAULT_RATE = 50
-"""Frames per second. The bridge accepts 50 and passes on about 25."""
 
 MIN_RATE = 1
 MAX_RATE = 60
@@ -48,29 +33,14 @@ MAX_RATE = 60
 
 @dataclass(frozen=True, slots=True)
 class StreamStats:
-    """What the sender loop has done so far."""
-
     frames_sent: int
     late_frames: int
-    """Frames whose deadline had already passed - the loop skipped ahead."""
-
     started_at: datetime | None
     rate: int
 
 
 class EntertainmentStream:
-    """An open streaming session, sending frames until it is closed.
-
-    Enter it to take the area over, and leave it to give the area back::
-
-        async with hue.entertainment.stream(area) as stream:
-            stream.set_all("#ff8800")
-            await asyncio.sleep(5)
-
-    Colors are written synchronously and read by the sender loop between
-    awaits, so a frame is never sent half-updated - however many channels one
-    write touches.
-    """
+    """A fixed-rate streaming session for one entertainment area."""
 
     def __init__(
         self,
@@ -104,27 +74,16 @@ class EntertainmentStream:
 
     @property
     def area(self) -> EntertainmentConfiguration:
-        """The area being streamed to.
-
-        Raises:
-            EntertainmentError: If the stream is not open yet.
-        """
         if self._area is None:
             raise EntertainmentError("The stream is not open")
         return self._area
 
     @property
     def channels(self) -> tuple[EntertainmentChannel, ...]:
-        """The channels of the area, with the positions they sit at."""
         return tuple(self.area.channels)
 
     @property
     def frame(self) -> Frame:
-        """The frame the next datagram will carry.
-
-        Raises:
-            EntertainmentError: If the stream is not open yet.
-        """
         if self._frame is None:
             raise EntertainmentError("The stream is not open")
         return self._frame
@@ -135,16 +94,11 @@ class EntertainmentStream:
 
     @property
     def sending(self) -> bool:
-        """Whether the sender loop is running."""
         return self._sender is not None and not self._sender.done()
 
     @property
     def error(self) -> Exception | None:
-        """Why the stream stopped sending, if it stopped on its own.
-
-        Outlives the session, so it is still readable after closing - which is
-        where a caller that only noticed the lights going still looks.
-        """
+        """The failure that stopped the sender, preserved after closing."""
         return self._error
 
     @property
@@ -157,24 +111,13 @@ class EntertainmentStream:
         )
 
     def set(self, channel_id: int, color: Color, brightness: float = 1.0) -> None:
-        """Set one channel of the next frame."""
         self.frame.set(channel_id, color, brightness)
 
     def set_all(self, color: Color, brightness: float = 1.0) -> None:
-        """Set every channel of the next frame."""
         self.frame.set_all(color, brightness)
 
     async def open(self) -> Self:
-        """Take the area over and start sending.
-
-        Returns once frames are going out, which is what a caller that then
-        goes off to produce colors wants. Calling it twice is harmless.
-
-        Raises:
-            EntertainmentAuthenticationError: If the bridge rejects the key.
-            EntertainmentError: If the bridge does not take the connection.
-            MissingDependencyError: If the entertainment extra is not installed.
-        """
+        """Take the area over and start sending; calling twice is harmless."""
         if self.sending:
             return self
 
@@ -198,14 +141,7 @@ class EntertainmentStream:
         return self
 
     async def close(self) -> None:
-        """Stop sending, close the connection and give the area back."""
-        if self._sender is not None:
-            self._sender.cancel()
-            # A sender that already failed has reported itself through `error`
-            # and `wait_closed`; closing is not the place to hear it again.
-            with contextlib.suppress(asyncio.CancelledError, Exception):
-                await self._sender
-            self._sender = None
+        await self._stop_sender()
 
         if self._connection is not None:
             self._connection.close()
@@ -215,12 +151,7 @@ class EntertainmentStream:
         self._frame = None
 
     async def run(self, source: Renderer) -> None:
-        """Let ``source`` paint every frame, until the stream stops.
-
-        Returns when the stream is closed from elsewhere, and raises what
-        stopped it otherwise - including anything the source raised, because a
-        source that cannot paint has nothing left to send.
-        """
+        """Let ``source`` paint frames until the stream stops."""
         self._render = as_renderer(source)
         try:
             await self.wait_closed()
@@ -228,15 +159,15 @@ class EntertainmentStream:
             self._render = None
 
     async def wait_closed(self) -> None:
-        """Wait for the sender loop to stop, and raise why if it failed."""
         sender = self._sender
         if sender is None:
             return
         try:
             await asyncio.shield(sender)
         except asyncio.CancelledError:
-            if not sender.cancelled():
-                raise  # the caller was cancelled, not the stream
+            if sender.cancelled():
+                return
+            raise
 
     async def __aenter__(self) -> Self:
         return await self.open()
@@ -250,7 +181,6 @@ class EntertainmentStream:
         await self.close()
 
     async def _send_frames(self) -> None:
-        """Run the sender loop, keeping hold of whatever ends it."""
         try:
             await self._send_frames_forever()
         except asyncio.CancelledError:
@@ -261,13 +191,7 @@ class EntertainmentStream:
             raise
 
     async def _send_frames_forever(self) -> None:
-        """Send one datagram per tick, on a clock that does not drift.
-
-        Deadlines are absolute, so the small cost of painting and encoding a
-        frame does not accumulate into a slower and slower stream. A deadline
-        that has already passed is not made up for either: the frame it wanted
-        is stale, and catching up would only send a burst.
-        """
+        """Use absolute deadlines so rendering time does not accumulate."""
         assert self._connection is not None
 
         loop = asyncio.get_running_loop()
@@ -302,8 +226,15 @@ class EntertainmentStream:
             return self._requested_area
         return await self._areas.get_one(self._requested_area)
 
+    async def _stop_sender(self) -> None:
+        if self._sender is None:
+            return
+        self._sender.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await self._sender
+        self._sender = None
+
     async def _release_area(self) -> None:
-        """Hand the area back, tolerating a bridge that already took it away."""
         if self._area is None:
             return
         try:
@@ -313,14 +244,6 @@ class EntertainmentStream:
 
 
 def _dtls_connection() -> "type[DtlsPskConnection]":
-    """The DTLS client, imported only once streaming actually starts.
-
-    Everything up to here works without the extra installed, which keeps
-    listing and inspecting entertainment areas part of plain hueify.
-
-    Raises:
-        MissingDependencyError: If the entertainment extra is not installed.
-    """
     try:
         from hueify.entertainment.dtls import DtlsPskConnection
     except ImportError as error:
