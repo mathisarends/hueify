@@ -1,24 +1,30 @@
 import pytest
-from cryptography.exceptions import InvalidTag
 
+from hueify.entertainment import crypto
 from hueify.entertainment.crypto import (
-    CLIENT_FINISHED_LABEL,
-    EXPLICIT_NONCE_LENGTH,
-    IMPLICIT_IV_LENGTH,
-    KEY_LENGTH,
-    MASTER_SECRET_LENGTH,
-    SERVER_FINISHED_LABEL,
-    VERIFY_DATA_LENGTH,
+    RecordAuthenticationError,
     RecordProtection,
     SessionKeys,
-    prf,
-    psk_premaster_secret,
 )
 from hueify.entertainment.dtls import ContentType
 
 PSK = bytes.fromhex("0123456789abcdef0123456789abcdef")
 CLIENT_RANDOM = bytes(range(32))
 SERVER_RANDOM = bytes(range(32, 64))
+
+KEY_LENGTH = 16
+IMPLICIT_IV_LENGTH = 4
+EXPLICIT_NONCE_LENGTH = 8
+MASTER_SECRET_LENGTH = 48
+VERIFY_DATA_LENGTH = 12
+
+
+def test_public_api_is_explicit() -> None:
+    assert crypto.__all__ == [
+        "RecordAuthenticationError",
+        "RecordProtection",
+        "SessionKeys",
+    ]
 
 
 class TestPseudorandomFunction:
@@ -37,20 +43,24 @@ class TestPseudorandomFunction:
             "8734"
         )
 
-        assert prf(secret, b"test label", seed, len(expected)) == expected
+        assert crypto._prf(secret, b"test label", seed, len(expected)) == expected
 
     def test_stretches_to_any_length(self) -> None:
-        assert len(prf(PSK, b"label", b"seed", 100)) == 100
-        assert prf(PSK, b"label", b"seed", 100)[:32] == prf(PSK, b"label", b"seed", 32)
+        assert len(crypto._prf(PSK, b"label", b"seed", 100)) == 100
+        assert crypto._prf(PSK, b"label", b"seed", 100)[:32] == crypto._prf(
+            PSK, b"label", b"seed", 32
+        )
 
     def test_label_and_seed_both_change_the_output(self) -> None:
-        assert prf(PSK, b"a", b"seed", 16) != prf(PSK, b"b", b"seed", 16)
-        assert prf(PSK, b"a", b"one", 16) != prf(PSK, b"a", b"two", 16)
+        assert crypto._prf(PSK, b"a", b"seed", 16) != crypto._prf(
+            PSK, b"b", b"seed", 16
+        )
+        assert crypto._prf(PSK, b"a", b"one", 16) != crypto._prf(PSK, b"a", b"two", 16)
 
 
 class TestPskPremasterSecret:
     def test_pads_the_missing_key_agreement_with_zeroes(self) -> None:
-        assert psk_premaster_secret(b"\xaa\xbb") == (
+        assert crypto._psk_premaster_secret(b"\xaa\xbb") == (
             b"\x00\x02"  # length of the other half
             b"\x00\x00"  # which a pure PSK exchange does not have
             b"\x00\x02"  # length of the key
@@ -64,11 +74,11 @@ class TestSessionKeys:
         return SessionKeys.derive(PSK, CLIENT_RANDOM, SERVER_RANDOM)
 
     def test_derives_one_key_and_one_iv_per_direction(self, keys: SessionKeys) -> None:
-        assert len(keys.master_secret) == MASTER_SECRET_LENGTH
-        assert len(keys.client_write_key) == KEY_LENGTH
-        assert len(keys.server_write_key) == KEY_LENGTH
-        assert keys.client_write_key != keys.server_write_key
-        assert keys.client_write_iv != keys.server_write_iv
+        assert len(keys._master_secret) == MASTER_SECRET_LENGTH
+        assert len(keys._client_write_key) == KEY_LENGTH
+        assert len(keys._server_write_key) == KEY_LENGTH
+        assert keys._client_write_key != keys._server_write_key
+        assert keys._client_write_iv != keys._server_write_iv
 
     def test_is_reproducible_from_the_same_handshake(self, keys: SessionKeys) -> None:
         assert SessionKeys.derive(PSK, CLIENT_RANDOM, SERVER_RANDOM) == keys
@@ -78,26 +88,24 @@ class TestSessionKeys:
     ) -> None:
         other = SessionKeys.derive(b"\x00" * 16, CLIENT_RANDOM, SERVER_RANDOM)
 
-        assert other.client_write_key != keys.client_write_key
+        assert other._client_write_key != keys._client_write_key
 
     def test_the_randoms_are_not_interchangeable(self, keys: SessionKeys) -> None:
         swapped = SessionKeys.derive(PSK, SERVER_RANDOM, CLIENT_RANDOM)
 
-        assert swapped.master_secret != keys.master_secret
+        assert swapped._master_secret != keys._master_secret
 
     def test_each_side_proves_the_transcript_with_its_own_label(
         self, keys: SessionKeys
     ) -> None:
-        client = keys.verify_data(CLIENT_FINISHED_LABEL, b"transcript")
-        server = keys.verify_data(SERVER_FINISHED_LABEL, b"transcript")
+        client = keys.client_finished(b"transcript")
+        server = keys.server_finished(b"transcript")
 
         assert len(client) == VERIFY_DATA_LENGTH
         assert client != server
 
     def test_a_changed_transcript_changes_the_proof(self, keys: SessionKeys) -> None:
-        assert keys.verify_data(CLIENT_FINISHED_LABEL, b"a") != keys.verify_data(
-            CLIENT_FINISHED_LABEL, b"b"
-        )
+        assert keys.client_finished(b"a") != keys.client_finished(b"b")
 
 
 class TestTheOrderTheBridgeInsistsOn:
@@ -118,8 +126,8 @@ class TestTheOrderTheBridgeInsistsOn:
     def key_block(self, keys: SessionKeys) -> bytes:
         # Note the randoms: the master secret is seeded client first, the key
         # block server first.
-        return prf(
-            keys.master_secret,
+        return crypto._prf(
+            keys._master_secret,
             b"key expansion",
             SERVER_RANDOM + CLIENT_RANDOM,
             2 * KEY_LENGTH + 2 * IMPLICIT_IV_LENGTH,
@@ -128,8 +136,8 @@ class TestTheOrderTheBridgeInsistsOn:
     def test_the_master_secret_comes_from_the_psk_and_both_randoms(
         self, keys: SessionKeys
     ) -> None:
-        assert keys.master_secret == prf(
-            psk_premaster_secret(PSK),
+        assert keys._master_secret == crypto._prf(
+            crypto._psk_premaster_secret(PSK),
             b"master secret",
             CLIENT_RANDOM + SERVER_RANDOM,
             MASTER_SECRET_LENGTH,
@@ -138,10 +146,10 @@ class TestTheOrderTheBridgeInsistsOn:
     def test_the_key_block_is_split_keys_first_then_ivs(
         self, keys: SessionKeys, key_block: bytes
     ) -> None:
-        assert keys.client_write_key == key_block[:KEY_LENGTH]
-        assert keys.server_write_key == key_block[KEY_LENGTH : 2 * KEY_LENGTH]
-        assert keys.client_write_iv == key_block[32:36]
-        assert keys.server_write_iv == key_block[36:40]
+        assert keys._client_write_key == key_block[:KEY_LENGTH]
+        assert keys._server_write_key == key_block[KEY_LENGTH : 2 * KEY_LENGTH]
+        assert keys._client_write_iv == key_block[32:36]
+        assert keys._server_write_iv == key_block[36:40]
 
     def test_this_side_writes_with_the_first_half_of_the_block(
         self, keys: SessionKeys, key_block: bytes
@@ -186,7 +194,7 @@ class TestRecordProtection:
         )
 
         plaintext = RecordProtection(
-            keys.client_write_key, keys.client_write_iv
+            keys._client_write_key, keys._client_write_iv
         ).unprotect(ContentType.APPLICATION_DATA, fragment)
 
         assert plaintext == b"frame"
@@ -222,7 +230,7 @@ class TestRecordProtection:
             ContentType.APPLICATION_DATA, 1, 0, b"frame"
         )
 
-        with pytest.raises(InvalidTag):
+        with pytest.raises(RecordAuthenticationError):
             keys.server_protection().unprotect(ContentType.APPLICATION_DATA, fragment)
 
     def test_the_content_type_is_authenticated_too(self, keys: SessionKeys) -> None:
@@ -230,7 +238,7 @@ class TestRecordProtection:
             ContentType.HANDSHAKE, 1, 0, b"frame"
         )
 
-        with pytest.raises(InvalidTag):
+        with pytest.raises(RecordAuthenticationError):
             keys.client_protection().unprotect(ContentType.APPLICATION_DATA, fragment)
 
     def test_a_tampered_record_does_not_decrypt(self, keys: SessionKeys) -> None:
@@ -241,7 +249,7 @@ class TestRecordProtection:
         )
         fragment[-1] ^= 0xFF
 
-        with pytest.raises(InvalidTag):
+        with pytest.raises(RecordAuthenticationError):
             keys.client_protection().unprotect(
                 ContentType.APPLICATION_DATA, bytes(fragment)
             )

@@ -10,9 +10,12 @@ import struct
 from typing import Self
 
 import pytest
-from cryptography.exceptions import InvalidTag
 
-from hueify.entertainment.crypto import RANDOM_LENGTH, RecordProtection, SessionKeys
+from hueify.entertainment.crypto import (
+    RecordAuthenticationError,
+    RecordProtection,
+    SessionKeys,
+)
 from hueify.entertainment.dtls import (
     CIPHER_SUITE,
     ContentType,
@@ -25,6 +28,7 @@ from hueify.entertainment.dtls import (
 CLIENT_KEY = "0123456789abcdef0123456789abcdef"
 APP_KEY = "the-app-key-that-is-long-enough"
 COOKIE = bytes.fromhex("cafebabe")
+RANDOM_LENGTH = 32
 
 CLOSE_NOTIFY = 0
 BAD_RECORD_MAC = 20
@@ -152,7 +156,7 @@ class FakeBridge(asyncio.DatagramProtocol):
 
     def _handle_client_finished(self, verify_data: bytes, raw: bytes) -> None:
         assert self._keys is not None
-        expected = self._keys.verify_data(b"client finished", bytes(self._transcript))
+        expected = self._keys.client_finished(bytes(self._transcript))
         self.client_finished_verified = verify_data == expected
         if not self.client_finished_verified:
             self._send_alert(BAD_RECORD_MAC)
@@ -164,7 +168,7 @@ class FakeBridge(asyncio.DatagramProtocol):
         self._sequence = 0
         self._send_handshake(
             HandshakeType.FINISHED,
-            self._keys.verify_data(b"server finished", bytes(self._transcript)),
+            self._keys.server_finished(bytes(self._transcript)),
         )
         self.handshake_complete.set()
         if self._alert_after_handshake is not None:
@@ -229,7 +233,7 @@ class FakeBridge(asyncio.DatagramProtocol):
             return self._client_protection.unprotect(
                 record.content_type, record.fragment
             )
-        except InvalidTag:
+        except RecordAuthenticationError:
             # What a bridge does when the client key does not match.
             self._send_alert(BAD_RECORD_MAC)
             return None

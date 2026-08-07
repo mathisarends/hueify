@@ -11,7 +11,6 @@ from conftest import (
     unpack_record_header,
 )
 
-from hueify.entertainment.crypto import RANDOM_LENGTH
 from hueify.entertainment.dtls import (
     CIPHER_SUITE,
     HANDSHAKE_HEADER_LENGTH,
@@ -25,6 +24,7 @@ from hueify.entertainment.dtls import (
 from hueify.errors import EntertainmentAuthenticationError, EntertainmentError
 
 DTLS_1_2_ON_THE_WIRE = 0xFEFD
+RANDOM_LENGTH = 32
 
 
 async def first_client_hello() -> bytes:

@@ -21,13 +21,8 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import Self
 
-from cryptography.exceptions import InvalidTag
-
 from hueify.entertainment.crypto import (
-    CLIENT_FINISHED_LABEL,
-    DTLS_1_2,
-    RANDOM_LENGTH,
-    SERVER_FINISHED_LABEL,
+    RecordAuthenticationError,
     RecordProtection,
     SessionKeys,
 )
@@ -36,6 +31,8 @@ from hueify.errors import EntertainmentAuthenticationError, EntertainmentError
 logger = logging.getLogger(__name__)
 
 ENTERTAINMENT_PORT = 2100
+
+DTLS_1_2 = 0xFEFD
 
 CIPHER_SUITE = b"\x00\xa8"
 """TLS_PSK_WITH_AES_128_GCM_SHA256, the only suite the bridge accepts."""
@@ -48,6 +45,7 @@ _FLIGHT_TIMEOUT = 1.0
 
 _FLIGHT_ATTEMPTS = 4
 _SERVER_FINISHED_TIMEOUT = 1.0
+_RANDOM_LENGTH = 32
 
 type _SendFlight = Callable[[], None]
 
@@ -338,7 +336,7 @@ class DtlsPskConnection:
 
         self._send_handshake(
             HandshakeType.FINISHED,
-            self._keys.verify_data(CLIENT_FINISHED_LABEL, bytes(self._transcript)),
+            self._keys.client_finished(bytes(self._transcript)),
         )
 
     async def _verify_server_finished(self) -> None:
@@ -350,9 +348,7 @@ class DtlsPskConnection:
         proof that does not match.
         """
         assert self._keys is not None
-        expected = self._keys.verify_data(
-            SERVER_FINISHED_LABEL, bytes(self._transcript)
-        )
+        expected = self._keys.server_finished(bytes(self._transcript))
         try:
             async with asyncio.timeout(_SERVER_FINISHED_TIMEOUT):
                 while True:
@@ -503,7 +499,7 @@ class DtlsPskConnection:
             return self._server_protection.unprotect(
                 record.content_type, record.fragment
             )
-        except InvalidTag as error:
+        except RecordAuthenticationError as error:
             raise EntertainmentAuthenticationError(
                 "The bridge encrypted its answer with a different client key than "
                 "the one hueify used"
@@ -582,7 +578,7 @@ def _parse_cookie(hello_verify_request: bytes) -> bytes:
 
 
 def _parse_server_random(server_hello: bytes) -> bytes:
-    return server_hello[2 : 2 + RANDOM_LENGTH]
+    return server_hello[2 : 2 + _RANDOM_LENGTH]
 
 
 def _alert_error(fragment: bytes) -> EntertainmentError:
@@ -613,7 +609,7 @@ def _decoded_client_key(client_key: str) -> bytes:
 
 def _handshake_random() -> bytes:
     """32 bytes of randomness, the first four of them the clock (RFC 5246)."""
-    return struct.pack("!I", int(time.time())) + os.urandom(RANDOM_LENGTH - 4)
+    return struct.pack("!I", int(time.time())) + os.urandom(_RANDOM_LENGTH - 4)
 
 
 def _name(message_type: HandshakeType) -> str:

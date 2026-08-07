@@ -1,129 +1,87 @@
-"""Key schedule and record protection for TLS_PSK_WITH_AES_128_GCM_SHA256.
+import hashlib as _hashlib
+import hmac as _hmac_module
+import struct as _struct
+from dataclasses import dataclass as _dataclass
+from typing import Self as _Self
 
-The one cipher suite the Hue bridge accepts needs no certificates and no key
-agreement: both sides already share the client key, so the master secret falls
-out of the PSK and the two handshake randoms. That makes this module small
-enough to be pure, deterministic and fully testable - no sockets, no state
-beyond the sequence numbers its caller passes in.
+from cryptography.exceptions import InvalidTag as _InvalidTag
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM as _AESGCM
 
-``cryptography`` is imported here and nowhere else, which is what makes
-entertainment streaming an optional install.
-"""
-
-import hashlib
-import hmac
-import struct
-from dataclasses import dataclass
-from typing import Self
-
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-
-DTLS_1_2 = 0xFEFD
-
-KEY_LENGTH = 16
-IMPLICIT_IV_LENGTH = 4
-EXPLICIT_NONCE_LENGTH = 8
-TAG_LENGTH = 16
-MASTER_SECRET_LENGTH = 48
-VERIFY_DATA_LENGTH = 12
-RANDOM_LENGTH = 32
-
-CLIENT_FINISHED_LABEL = b"client finished"
-SERVER_FINISHED_LABEL = b"server finished"
-
-_KEY_BLOCK_LENGTH = 2 * KEY_LENGTH + 2 * IMPLICIT_IV_LENGTH
+__all__ = ["RecordAuthenticationError", "RecordProtection", "SessionKeys"]
 
 
-def prf(secret: bytes, label: bytes, seed: bytes, length: int) -> bytes:
-    """The TLS 1.2 pseudorandom function, P_SHA256 (RFC 5246 section 5)."""
-    output = bytearray()
-    salt = label + seed
-    fragment = _hmac(secret, salt)  # A(1)
-    while len(output) < length:
-        output.extend(_hmac(secret, fragment + salt))
-        fragment = _hmac(secret, fragment)  # A(i + 1)
-    return bytes(output[:length])
+class RecordAuthenticationError(Exception):
+    """A record was not produced with the expected session key."""
 
 
-def psk_premaster_secret(psk: bytes) -> bytes:
-    """The premaster secret of a pure PSK exchange (RFC 4279 section 2).
-
-    The other half of the usual key agreement is not there, so its place is
-    taken by zeroes of the same length as the key.
-    """
-    length = struct.pack("!H", len(psk))
-    return length + bytes(len(psk)) + length + psk
-
-
-@dataclass(frozen=True, slots=True)
+@_dataclass(frozen=True, slots=True)
 class SessionKeys:
-    """Everything the record layer needs, derived once per handshake."""
+    """The secrets and record protection derived for one DTLS session."""
 
-    master_secret: bytes
-    client_write_key: bytes
-    client_write_iv: bytes
-    server_write_key: bytes
-    server_write_iv: bytes
+    _master_secret: bytes
+    _client_write_key: bytes
+    _client_write_iv: bytes
+    _server_write_key: bytes
+    _server_write_iv: bytes
 
     @classmethod
-    def derive(cls, psk: bytes, client_random: bytes, server_random: bytes) -> Self:
-        master_secret = prf(
-            psk_premaster_secret(psk),
-            b"master secret",
+    def derive(cls, psk: bytes, client_random: bytes, server_random: bytes) -> _Self:
+        master_secret = _prf(
+            _psk_premaster_secret(psk),
+            _MASTER_SECRET_LABEL,
             client_random + server_random,
-            MASTER_SECRET_LENGTH,
+            _MASTER_SECRET_LENGTH,
         )
-        # Note the reversed randoms: key expansion is seeded server first.
-        key_block = prf(
+        key_block = _prf(
             master_secret,
-            b"key expansion",
+            _KEY_EXPANSION_LABEL,
             server_random + client_random,
             _KEY_BLOCK_LENGTH,
         )
         keys = memoryview(key_block)
+        client_key_end = _KEY_LENGTH
+        server_key_end = 2 * _KEY_LENGTH
+        client_iv_end = server_key_end + _IMPLICIT_IV_LENGTH
+
         return cls(
-            master_secret=master_secret,
-            client_write_key=bytes(keys[:KEY_LENGTH]),
-            server_write_key=bytes(keys[KEY_LENGTH : 2 * KEY_LENGTH]),
-            client_write_iv=bytes(
-                keys[2 * KEY_LENGTH : 2 * KEY_LENGTH + IMPLICIT_IV_LENGTH]
-            ),
-            server_write_iv=bytes(keys[2 * KEY_LENGTH + IMPLICIT_IV_LENGTH :]),
+            _master_secret=master_secret,
+            _client_write_key=bytes(keys[:client_key_end]),
+            _server_write_key=bytes(keys[client_key_end:server_key_end]),
+            _client_write_iv=bytes(keys[server_key_end:client_iv_end]),
+            _server_write_iv=bytes(keys[client_iv_end:]),
         )
 
-    def verify_data(self, label: bytes, transcript: bytes) -> bytes:
-        """The ``Finished`` payload proving both sides saw the same handshake."""
-        return prf(
-            self.master_secret,
-            label,
-            hashlib.sha256(transcript).digest(),
-            VERIFY_DATA_LENGTH,
-        )
+    def client_finished(self, transcript: bytes) -> bytes:
+        return self._finished(_CLIENT_FINISHED_LABEL, transcript)
+
+    def server_finished(self, transcript: bytes) -> bytes:
+        return self._finished(_SERVER_FINISHED_LABEL, transcript)
 
     def client_protection(self) -> "RecordProtection":
-        """Protection for the records this side writes."""
-        return RecordProtection(self.client_write_key, self.client_write_iv)
+        return RecordProtection(self._client_write_key, self._client_write_iv)
 
     def server_protection(self) -> "RecordProtection":
-        """Protection for the records the bridge writes."""
-        return RecordProtection(self.server_write_key, self.server_write_iv)
+        return RecordProtection(self._server_write_key, self._server_write_iv)
+
+    def _finished(self, label: bytes, transcript: bytes) -> bytes:
+        return _prf(
+            self._master_secret,
+            label,
+            _hashlib.sha256(transcript).digest(),
+            _VERIFY_DATA_LENGTH,
+        )
 
 
 class RecordProtection:
-    """AES-128-GCM in one direction, as TLS 1.2 wires it up for DTLS.
-
-    The nonce is the four secret bytes of the key block plus the record's own
-    epoch and sequence number, which travel in front of the ciphertext.
-    """
+    """Encrypt and authenticate DTLS records in one direction."""
 
     def __init__(self, key: bytes, implicit_iv: bytes) -> None:
-        self._cipher = AESGCM(key)
+        self._cipher = _AESGCM(key)
         self._implicit_iv = implicit_iv
 
     def protect(
         self, content_type: int, epoch: int, sequence: int, plaintext: bytes
     ) -> bytes:
-        """Encrypt one record fragment: explicit nonce, ciphertext and tag."""
         explicit_nonce = _explicit_nonce(epoch, sequence)
         sealed = self._cipher.encrypt(
             self._implicit_iv + explicit_nonce,
@@ -133,37 +91,60 @@ class RecordProtection:
         return explicit_nonce + sealed
 
     def unprotect(self, content_type: int, fragment: bytes) -> bytes:
-        """Decrypt one record fragment.
-
-        The epoch and sequence number are read back off the fragment rather
-        than trusted from the record header, because that is what the sender
-        authenticated.
-
-        Raises:
-            ValueError: If the fragment is too short.
-            InvalidTag: If it was not written with the matching key.
-        """
-        if len(fragment) < EXPLICIT_NONCE_LENGTH + TAG_LENGTH:
+        if len(fragment) < _EXPLICIT_NONCE_LENGTH + _TAG_LENGTH:
             raise ValueError(f"Record fragment is too short: {len(fragment)} bytes")
 
-        explicit_nonce = fragment[:EXPLICIT_NONCE_LENGTH]
-        sealed = fragment[EXPLICIT_NONCE_LENGTH:]
-        plaintext_length = len(sealed) - TAG_LENGTH
-        return self._cipher.decrypt(
-            self._implicit_iv + explicit_nonce,
-            sealed,
-            _additional_data(explicit_nonce, content_type, plaintext_length),
-        )
+        explicit_nonce = fragment[:_EXPLICIT_NONCE_LENGTH]
+        sealed = fragment[_EXPLICIT_NONCE_LENGTH:]
+        plaintext_length = len(sealed) - _TAG_LENGTH
+        try:
+            return self._cipher.decrypt(
+                self._implicit_iv + explicit_nonce,
+                sealed,
+                _additional_data(explicit_nonce, content_type, plaintext_length),
+            )
+        except _InvalidTag:
+            raise RecordAuthenticationError from None
+
+
+_DTLS_1_2 = 0xFEFD
+_KEY_LENGTH = 16
+_IMPLICIT_IV_LENGTH = 4
+_EXPLICIT_NONCE_LENGTH = 8
+_TAG_LENGTH = 16
+_MASTER_SECRET_LENGTH = 48
+_VERIFY_DATA_LENGTH = 12
+
+_MASTER_SECRET_LABEL = b"master secret"
+_KEY_EXPANSION_LABEL = b"key expansion"
+_CLIENT_FINISHED_LABEL = b"client finished"
+_SERVER_FINISHED_LABEL = b"server finished"
+
+_KEY_BLOCK_LENGTH = 2 * _KEY_LENGTH + 2 * _IMPLICIT_IV_LENGTH
+
+
+def _prf(secret: bytes, label: bytes, seed: bytes, length: int) -> bytes:
+    output = bytearray()
+    salt = label + seed
+    fragment = _hmac(secret, salt)
+    while len(output) < length:
+        output.extend(_hmac(secret, fragment + salt))
+        fragment = _hmac(secret, fragment)
+    return bytes(output[:length])
+
+
+def _psk_premaster_secret(psk: bytes) -> bytes:
+    length = _struct.pack("!H", len(psk))
+    return length + bytes(len(psk)) + length + psk
 
 
 def _explicit_nonce(epoch: int, sequence: int) -> bytes:
-    return struct.pack("!H", epoch) + sequence.to_bytes(6, "big")
+    return _struct.pack("!H", epoch) + sequence.to_bytes(6, "big")
 
 
 def _additional_data(explicit_nonce: bytes, content_type: int, length: int) -> bytes:
-    """Authenticated but unencrypted: the sequence number and record header."""
-    return explicit_nonce + struct.pack("!BHH", content_type, DTLS_1_2, length)
+    return explicit_nonce + _struct.pack("!BHH", content_type, _DTLS_1_2, length)
 
 
 def _hmac(key: bytes, message: bytes) -> bytes:
-    return hmac.new(key, message, hashlib.sha256).digest()
+    return _hmac_module.new(key, message, _hashlib.sha256).digest()
