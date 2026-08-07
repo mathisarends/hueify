@@ -1,4 +1,6 @@
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID
 
 from typer.testing import CliRunner
 
@@ -37,3 +39,38 @@ def test_version_info_has_human_plain_and_json_forms() -> None:
     assert plain.exit_code == structured.exit_code == 0
     assert plain.output.strip()
     assert '"version"' in structured.output
+
+
+def test_light_list_uses_the_hueify_api_and_writes_stable_plain_output() -> None:
+    light = SimpleNamespace(
+        id=UUID("a1b2c3d4-1111-2222-3333-444455556666"),
+        name="Desk",
+        is_on=True,
+    )
+    hue = MagicMock()
+    hue.__aenter__ = AsyncMock(return_value=hue)
+    hue.__aexit__ = AsyncMock(return_value=None)
+    hue.lights.list = AsyncMock(return_value=SimpleNamespace(data=[light]))
+
+    with patch("hueify.cli.Hueify", return_value=hue):
+        result = runner.invoke(app, ["--plain", "light", "list"])
+
+    assert result.exit_code == 0
+    assert result.output == f"{light.id}\tDesk\ton\n"
+    hue.lights.list.assert_awaited_once_with()
+
+
+def test_resource_list_json_preserves_the_full_model_shape() -> None:
+    light = MagicMock()
+    light.model_dump.return_value = {"id": "light-id", "metadata": {"name": "Desk"}}
+    hue = MagicMock()
+    hue.__aenter__ = AsyncMock(return_value=hue)
+    hue.__aexit__ = AsyncMock(return_value=None)
+    hue.lights.list = AsyncMock(return_value=SimpleNamespace(data=[light]))
+
+    with patch("hueify.cli.Hueify", return_value=hue):
+        result = runner.invoke(app, ["--json", "light", "list"])
+
+    assert result.exit_code == 0
+    assert '"light-id"' in result.output
+    assert '"metadata"' in result.output
