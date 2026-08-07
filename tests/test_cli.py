@@ -5,6 +5,7 @@ from uuid import UUID
 from typer.testing import CliRunner
 
 from hueify.cli import app
+from hueify.errors import MissingCredentialsError
 
 runner = CliRunner()
 
@@ -156,3 +157,14 @@ def test_entertainment_start_resolves_the_area_name() -> None:
 
     assert result.exit_code == 0
     hue.entertainment.start.assert_awaited_once_with(resource_id)
+
+
+def test_missing_credentials_are_a_clean_error_with_a_stable_exit_code() -> None:
+    with patch(
+        "hueify.cli.Hueify",
+        side_effect=MissingCredentialsError("HUE_APP_KEY is missing"),
+    ):
+        result = runner.invoke(app, ["light", "list"])
+
+    assert result.exit_code == 3
+    assert result.output == "HUE_APP_KEY is missing\n"

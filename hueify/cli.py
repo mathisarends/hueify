@@ -8,6 +8,8 @@ from importlib.metadata import version
 from typing import Any, NoReturn
 from uuid import UUID
 
+import httpx
+
 try:
     import typer
     from rich.console import Console
@@ -16,7 +18,12 @@ except ImportError:  # pragma: no cover - exercised without the optional extra
     typer = None
 
 from hueify import Hueify
-from hueify.errors import HueifyError
+from hueify.errors import (
+    EntertainmentAuthenticationError,
+    HueifyError,
+    MissingCredentialsError,
+    StreamAuthenticationError,
+)
 
 _CLI_EXTRA_MESSAGE = (
     "Install the command line interface with: pip install 'hueify[cli]'"
@@ -89,6 +96,19 @@ async def _list_resources(namespace_name: str) -> list[Any]:
 def _run(coroutine: Any) -> Any:
     try:
         return asyncio.run(coroutine)
+    except (
+        MissingCredentialsError,
+        StreamAuthenticationError,
+        EntertainmentAuthenticationError,
+    ) as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(3) from error
+    except httpx.HTTPError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(4) from error
+    except ValueError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(2) from error
     except HueifyError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(1) from error
