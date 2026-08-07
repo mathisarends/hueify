@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import contextlib
 import logging
@@ -45,7 +47,7 @@ class EntertainmentStream:
     def __init__(
         self,
         area: EntertainmentConfiguration | ResourceId,
-        areas: "EntertainmentNamespace",
+        areas: EntertainmentNamespace,
         credentials: HueBridgeCredentials,
         rate: int = DEFAULT_RATE,
     ) -> None:
@@ -243,7 +245,7 @@ class EntertainmentStream:
             logger.debug("Could not stop streaming on the area: %s", error)
 
 
-def _dtls_connection() -> "type[DtlsPskConnection]":
+def _dtls_connection() -> type[DtlsPskConnection]:
     try:
         from hueify.entertainment.dtls import DtlsPskConnection
     except ImportError as error:

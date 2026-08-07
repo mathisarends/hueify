@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
@@ -148,7 +150,7 @@ class DtlsPskConnection:
     def __init__(
         self,
         transport: asyncio.DatagramTransport,
-        datagrams: "_Datagrams",
+        datagrams: _Datagrams,
         identity: bytes,
         psk: bytes,
     ) -> None:
@@ -298,7 +300,7 @@ class DtlsPskConnection:
 
     async def _flight(
         self,
-        send: "_SendFlight",
+        send: _SendFlight,
         wanted: set[HandshakeType],
     ) -> dict[int, HandshakeMessage]:
         collected: dict[int, HandshakeMessage] = {}
