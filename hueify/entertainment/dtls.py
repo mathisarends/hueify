@@ -31,6 +31,8 @@ _FLIGHT_TIMEOUT = 1.0
 _FLIGHT_ATTEMPTS = 4
 _SERVER_FINISHED_TIMEOUT = 1.0
 _RANDOM_LENGTH = 32
+_NO_SESSION_ID = b"\x00"
+_NULL_COMPRESSION_METHOD = b"\x01\x00"
 
 type _SendFlight = Callable[[], None]
 
@@ -359,12 +361,6 @@ class DtlsPskConnection:
         self._send_sequence += 1
 
     async def _receive(self) -> bytes:
-        """The next datagram from the bridge.
-
-        Raises:
-            EntertainmentError: If the socket failed instead. On most systems
-                that is the ICMP answer of a port nobody listens on.
-        """
         datagram = await self._datagrams.received.get()
         if datagram is None:
             raise EntertainmentError(
@@ -374,17 +370,6 @@ class DtlsPskConnection:
         return datagram
 
     def _read_handshake(self, datagram: bytes) -> dict[int, HandshakeMessage]:
-        """Decode one datagram into handshake messages, updating the transcript.
-
-        Every message except the cookie request is part of the transcript
-        hash, in the order the bridge sent it. Retransmissions are not: the
-        bridge repeats a flight when it thinks we did not hear it.
-
-        Raises:
-            EntertainmentAuthenticationError: On an alert that means the
-                bridge could not read what this client key produced.
-            EntertainmentError: On any other alert.
-        """
         messages: dict[int, HandshakeMessage] = {}
         for record in parse_records(datagram):
             fragment = self._unprotect(record)
@@ -399,17 +384,12 @@ class DtlsPskConnection:
                 if message.type in messages:
                     continue
                 messages[message.type] = message
+                # DTLS starts the transcript after its stateless cookie exchange.
                 if message.type != HandshakeType.HELLO_VERIFY_REQUEST:
                     self._transcript.extend(message.raw)
         return messages
 
     def _unprotect(self, record: Record) -> bytes | None:
-        """The plaintext of a record, or ``None`` if it cannot be read.
-
-        Raises:
-            EntertainmentAuthenticationError: If the bridge encrypted with
-                keys that this client key does not derive.
-        """
         if record.epoch == 0:
             return record.fragment
         if self._server_protection is None:
@@ -449,8 +429,6 @@ class DtlsPskConnection:
 
 
 class _Datagrams(asyncio.DatagramProtocol):
-    """Hands incoming datagrams to the connection, and failures along with them."""
-
     def __init__(self) -> None:
         self.received: asyncio.Queue[bytes | None] = asyncio.Queue()
         self.failure: OSError | None = None
@@ -470,21 +448,18 @@ class _Datagrams(asyncio.DatagramProtocol):
 
 
 def _client_hello(client_random: bytes, cookie: bytes) -> bytes:
-    """A hello that offers the bridge nothing to choose from."""
     hello = bytearray(DTLS_1_2.to_bytes(2, "big"))
     hello.extend(client_random)
-    hello.append(0)  # no session to resume
+    hello.extend(_NO_SESSION_ID)
     hello.append(len(cookie))
     hello.extend(cookie)
     hello.extend(struct.pack("!H", len(CIPHER_SUITE)))
     hello.extend(CIPHER_SUITE)
-    hello.append(1)  # one compression method
-    hello.append(0)  # which is none
+    hello.extend(_NULL_COMPRESSION_METHOD)
     return bytes(hello)
 
 
 def _client_key_exchange(identity: bytes) -> bytes:
-    """Which pre-shared key we mean: the application key, as its identity."""
     return struct.pack("!H", len(identity)) + identity
 
 
@@ -514,7 +489,6 @@ def _alert_error(fragment: bytes) -> EntertainmentError:
 
 
 def _decoded_client_key(client_key: str) -> bytes:
-    """Raises: EntertainmentError: If the key is not hexadecimal."""
     try:
         return bytes.fromhex(client_key)
     except ValueError as error:
@@ -524,7 +498,6 @@ def _decoded_client_key(client_key: str) -> bytes:
 
 
 def _handshake_random() -> bytes:
-    """32 bytes of randomness, the first four of them the clock (RFC 5246)."""
     return struct.pack("!I", int(time.time())) + os.urandom(_RANDOM_LENGTH - 4)
 
 
