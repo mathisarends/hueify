@@ -5,6 +5,7 @@ from uuid import UUID
 
 import httpx
 import typer
+from pydantic import ValidationError
 
 from hueify import Hueify
 from hueify.errors import (
@@ -52,12 +53,29 @@ def run[T](coroutine: Coroutine[object, object, T]) -> T:
     except httpx.HTTPError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(4) from error
+    except ValidationError as error:
+        typer.echo(_validation_error_message(error), err=True)
+        raise typer.Exit(2) from error
     except ValueError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(2) from error
     except HueifyError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(1) from error
+
+
+def _validation_error_message(error: ValidationError) -> str:
+    """Turn Pydantic's diagnostic payload into a concise command-line error."""
+    details = []
+    for issue in error.errors(
+        include_url=False,
+        include_context=False,
+        include_input=False,
+    ):
+        location = ".".join(str(part) for part in issue["loc"])
+        message = issue["msg"]
+        details.append(f"Invalid {location}: {message}" if location else message)
+    return "; ".join(details) or "Invalid command value"
 
 
 async def list_lights() -> list[Light]:

@@ -1,9 +1,11 @@
+import re
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, call, patch
 from uuid import UUID
 
 import httpx
 import pytest
+from pydantic import ValidationError
 from typer.testing import CliRunner
 
 from hueify import cli
@@ -31,6 +33,7 @@ from hueify.models import (
 )
 
 runner = CliRunner()
+ANSI_ESCAPE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 
 RESOURCE_ID = UUID("a1b2c3d4-1111-2222-3333-444455556666")
 OWNER_ID = UUID("b1b2c3d4-1111-2222-3333-444455556666")
@@ -61,8 +64,9 @@ def test_bare_invocation_prints_contextual_help() -> None:
     result = runner.invoke(app, [])
 
     assert result.exit_code == 2
-    assert "setup" in result.output
-    assert "--json" in result.output
+    output = ANSI_ESCAPE.sub("", result.output)
+    assert "setup" in output
+    assert "--json" in output
 
 
 def test_main_forwards_arguments_to_the_public_application() -> None:
@@ -87,7 +91,7 @@ def test_the_global_output_modes_are_mutually_exclusive() -> None:
     result = runner.invoke(app, ["--json", "--plain", "version-info"])
 
     assert result.exit_code == 2
-    assert "either --json or --plain" in result.output
+    assert "either --json or --plain" in ANSI_ESCAPE.sub("", result.output)
 
 
 def test_version_info_has_human_plain_and_json_forms() -> None:
@@ -181,11 +185,33 @@ def test_every_resource_app_lists_its_typed_models_in_human_output() -> None:
     assert "Kitchen" in results[0].output
     assert "Kitchen" in results[1].output
     assert "Dinner" in results[2].output
+    assert "active=<" not in results[2].output
+    assert "last_recall" not in results[2].output
     assert "active" in results[3].output
     hue.rooms.list.assert_awaited_once_with()
     hue.zones.list.assert_awaited_once_with()
     hue.scenes.list.assert_awaited_once_with()
     hue.entertainment.list.assert_awaited_once_with()
+
+
+def test_scene_list_renders_only_the_active_status_value() -> None:
+    scene = Scene(
+        id=RESOURCE_ID,
+        metadata=SceneMetadata(name="Dinner"),
+        group=ResourceReference(rid=OWNER_ID, rtype=ResourceType.ROOM),
+        status=SceneStatus(
+            active=SceneStatusValue.DYNAMIC_PALETTE,
+            last_recall="2026-08-07T20:00:00Z",
+        ),
+    )
+    hue = bridge_mock()
+    hue.scenes.list = AsyncMock(return_value=SimpleNamespace(data=[scene]))
+
+    with patch("hueify.cli.operations.Hueify", return_value=hue):
+        result = runner.invoke(app, ["--plain", "scene", "list"])
+
+    assert result.exit_code == 0
+    assert result.output == f"{RESOURCE_ID}\tDinner\tdynamic_palette\n"
 
 
 def test_light_on_resolves_a_name_and_passes_all_control_options() -> None:
@@ -403,3 +429,29 @@ def test_bridge_failures_have_stable_exit_codes(
 
     assert result.exit_code == exit_code
     assert result.output == f"{error}\n"
+
+
+def test_pydantic_validation_errors_are_concise_cli_errors() -> None:
+    try:
+        from hueify.models import DimmingState
+
+        DimmingState(brightness=150)
+    except ValidationError as error:
+        validation_error = error
+    else:  # pragma: no cover - the model constraint is part of the public API
+        pytest.fail("Expected brightness validation to fail")
+
+    hue = bridge_mock()
+    hue.lights.set_brightness = AsyncMock(side_effect=validation_error)
+
+    with patch("hueify.cli.operations.Hueify", return_value=hue):
+        result = runner.invoke(
+            app,
+            ["light", "brightness", str(RESOURCE_ID), "150"],
+        )
+
+    assert result.exit_code == 2
+    assert result.output == (
+        "Invalid brightness: Input should be less than or equal to 100\n"
+    )
+    assert "pydantic.dev" not in result.output

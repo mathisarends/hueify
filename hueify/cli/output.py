@@ -56,8 +56,8 @@ def _resource_state(resource: ListedResource) -> str:
             return "off"
         case Light():
             return ""
-        case Scene(status=status) if status is not None:
-            return str(status)
+        case Scene(status=status) if status is not None and status.active is not None:
+            return status.active.value
         case EntertainmentConfiguration(status=status) if status is not None:
             return str(status)
         case Room() | Zone() | Scene() | EntertainmentConfiguration():
