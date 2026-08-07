@@ -12,3 +12,15 @@ class MissingCredentialsError(HueifyError):
 
 class StreamAuthenticationError(HueifyError):
     """The bridge rejected the application key, so reconnecting cannot help."""
+
+
+class MissingDependencyError(HueifyError):
+    """A feature was used that needs an optional dependency of hueify."""
+
+
+class EntertainmentError(HueifyError):
+    """Streaming to an entertainment area failed."""
+
+
+class EntertainmentAuthenticationError(EntertainmentError):
+    """The bridge rejected the client key, so retrying cannot help."""

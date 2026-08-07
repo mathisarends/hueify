@@ -4,11 +4,14 @@ import pytest
 
 from hueify.credentials import HueBridgeCredentials
 from hueify.onboarding.discovery import DiscoveredBridge
+from hueify.onboarding.registration import RegisteredApp
 from hueify.onboarding.setup import _run_setup, _select_bridge, setup
 
 BRIDGE_A = DiscoveredBridge(id="a1", internalipaddress="192.168.1.10")
 BRIDGE_B = DiscoveredBridge(id="b2", internalipaddress="192.168.1.20")
 APP_KEY = "the-app-key-that-is-long-enough"
+CLIENT_KEY = "0123456789abcdef0123456789abcdef"
+REGISTERED_APP = RegisteredApp(app_key=APP_KEY, client_key=CLIENT_KEY)
 
 
 def test_select_bridge_auto_selects_the_only_bridge_without_prompting() -> None:
@@ -38,7 +41,7 @@ async def test_run_setup_returns_the_discovered_and_registered_credentials() -> 
         patch(
             "hueify.onboarding.setup.register_app_key",
             new_callable=AsyncMock,
-            return_value=APP_KEY,
+            return_value=REGISTERED_APP,
         ) as register,
         patch("builtins.input"),
     ):
@@ -48,6 +51,7 @@ async def test_run_setup_returns_the_discovered_and_registered_credentials() -> 
     register.assert_awaited_once_with(BRIDGE_A.internalipaddress)
     assert credentials.hue_bridge_ip == BRIDGE_A.internalipaddress
     assert credentials.hue_app_key == APP_KEY
+    assert credentials.hue_client_key == CLIENT_KEY
 
 
 @pytest.mark.asyncio
@@ -61,7 +65,7 @@ async def test_run_setup_writes_nothing_and_prints_the_variables(capsys) -> None
         patch(
             "hueify.onboarding.setup.register_app_key",
             new_callable=AsyncMock,
-            return_value=APP_KEY,
+            return_value=REGISTERED_APP,
         ),
         patch("builtins.input"),
         patch("pathlib.Path.write_text") as write_text,
@@ -72,6 +76,7 @@ async def test_run_setup_writes_nothing_and_prints_the_variables(capsys) -> None
     printed = capsys.readouterr().out
     assert f"HUE_BRIDGE_IP={BRIDGE_A.internalipaddress}" in printed
     assert f"HUE_APP_KEY={APP_KEY}" in printed
+    assert f"HUE_CLIENT_KEY={CLIENT_KEY}" in printed
 
 
 def test_setup_runs_run_setup_to_completion_and_passes_the_result_through() -> None:

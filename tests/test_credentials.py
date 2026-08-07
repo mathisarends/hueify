@@ -6,8 +6,10 @@ from hueify.credentials import HueBridgeCredentials, load_credentials
 
 VALID_IP = "192.168.1.1"
 VALID_APP_KEY = "a" * 20
+VALID_CLIENT_KEY = "0123456789abcdef0123456789abcdef"
 OTHER_IP = "192.168.1.10"
 OTHER_APP_KEY = "b" * 20
+OTHER_CLIENT_KEY = "fedcba9876543210fedcba9876543210"
 
 
 class TestHueBridgeIpValidation:
@@ -84,6 +86,40 @@ class TestHueAppKeyValidation:
             self._make("a" * 19 + " ")
 
 
+class TestHueClientKeyValidation:
+    def _make(self, client_key: str) -> HueBridgeCredentials:
+        return HueBridgeCredentials(
+            HUE_BRIDGE_IP=VALID_IP, HUE_APP_KEY=VALID_APP_KEY, HUE_CLIENT_KEY=client_key
+        )
+
+    def test_valid_client_key(self):
+        assert self._make(VALID_CLIENT_KEY).hue_client_key == VALID_CLIENT_KEY
+
+    def test_uppercase_hexadecimal_is_a_client_key_too(self):
+        key = VALID_CLIENT_KEY.upper()
+
+        assert self._make(key).hue_client_key == key
+
+    def test_surrounding_whitespace_is_stripped(self):
+        """A key copied out of the setup output brings a newline along."""
+        assert self._make(f" {VALID_CLIENT_KEY}\n").hue_client_key == VALID_CLIENT_KEY
+
+    def test_a_truncated_key_is_refused(self):
+        with pytest.raises(ValidationError, match="32 hexadecimal characters"):
+            self._make(VALID_CLIENT_KEY[:-1])
+
+    def test_a_key_that_is_not_hexadecimal_is_refused(self):
+        with pytest.raises(ValidationError, match="32 hexadecimal characters"):
+            self._make("z" * 32)
+
+    def test_the_client_key_stays_optional(self, without_stored_credentials):
+        credentials = HueBridgeCredentials(
+            HUE_BRIDGE_IP=VALID_IP, HUE_APP_KEY=VALID_APP_KEY
+        )
+
+        assert credentials.hue_client_key is None
+
+
 class TestCredentialSources:
     def test_reads_credentials_from_a_dotenv_file(self, tmp_path, monkeypatch):
         (tmp_path / ".env").write_text(
@@ -123,6 +159,33 @@ class TestCredentialSources:
 
         assert hue._credentials.hue_bridge_ip == OTHER_IP
         assert hue._credentials.hue_app_key == VALID_APP_KEY
+
+    def test_the_stored_client_key_survives_an_explicit_bridge_ip(self, monkeypatch):
+        """Overriding one value must not silently drop streaming credentials."""
+        monkeypatch.setenv("HUE_BRIDGE_IP", VALID_IP)
+        monkeypatch.setenv("HUE_APP_KEY", VALID_APP_KEY)
+        monkeypatch.setenv("HUE_CLIENT_KEY", VALID_CLIENT_KEY)
+
+        credentials = load_credentials(bridge_ip=OTHER_IP)
+
+        assert credentials.hue_bridge_ip == OTHER_IP
+        assert credentials.hue_client_key == VALID_CLIENT_KEY
+
+    def test_an_explicit_client_key_wins_over_the_stored_one(self, monkeypatch):
+        monkeypatch.setenv("HUE_BRIDGE_IP", VALID_IP)
+        monkeypatch.setenv("HUE_APP_KEY", VALID_APP_KEY)
+        monkeypatch.setenv("HUE_CLIENT_KEY", VALID_CLIENT_KEY)
+
+        credentials = load_credentials(client_key=OTHER_CLIENT_KEY)
+
+        assert credentials.hue_client_key == OTHER_CLIENT_KEY
+
+    def test_explicit_credentials_carry_a_client_key_without_an_environment(
+        self, without_stored_credentials
+    ):
+        credentials = load_credentials(VALID_IP, VALID_APP_KEY, VALID_CLIENT_KEY)
+
+        assert credentials.hue_client_key == VALID_CLIENT_KEY
 
 
 class TestMissingCredentials:

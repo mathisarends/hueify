@@ -55,6 +55,7 @@ class ResourceType(StrEnum):
     SECURITY_AREA_MOTION = "security_area_motion"
     MOTION_AREA_CANDIDATE = "motion_area_candidate"
     MOTION_AREA_CONFIGURATION = "motion_area_configuration"
+    AUTH_V1 = "auth_v1"
 
 
 class ResourceReference(HueModel):
@@ -491,6 +492,95 @@ class SceneRecallRequest(HueModel):
     recall: SceneRecall = Field(default_factory=SceneRecall)
 
 
+class EntertainmentConfigurationType(StrEnum):
+    SCREEN = "screen"
+    MONITOR = "monitor"
+    MUSIC = "music"
+    THREE_D_SPACE = "3dspace"
+    OTHER = "other"
+
+
+class StreamingStatus(StrEnum):
+    INACTIVE = "inactive"
+    ACTIVE = "active"
+
+
+class EntertainmentPosition(HueModel):
+    """Where a channel sits in the room, as a -1 to 1 cube around the viewer."""
+
+    x: float = Field(ge=-1, le=1)
+    y: float = Field(ge=-1, le=1)
+    z: float = Field(ge=-1, le=1)
+
+
+class EntertainmentChannelMember(HueModel):
+    service: ResourceReference
+    index: int
+
+
+class EntertainmentChannel(HueModel):
+    """One addressable slot of a streaming frame, and the segments it drives."""
+
+    channel_id: int = Field(ge=0, le=255)
+    position: EntertainmentPosition
+    members: list[EntertainmentChannelMember] = Field(default_factory=list)
+
+
+class EntertainmentServiceLocation(HueModel):
+    service: ResourceReference
+    position: EntertainmentPosition | None = None
+    positions: list[EntertainmentPosition] = Field(default_factory=list)
+    equalization_factor: float | None = None
+
+
+class EntertainmentLocations(HueModel):
+    service_locations: list[EntertainmentServiceLocation] = Field(default_factory=list)
+
+
+class StreamProxyMode(StrEnum):
+    AUTO = "auto"
+    MANUAL = "manual"
+
+
+class StreamProxy(HueModel):
+    """The light the bridge routes the stream through."""
+
+    mode: StreamProxyMode | str | None = None
+    node: ResourceReference | None = None
+
+
+class EntertainmentConfiguration(NamedResource):
+    """An entertainment area: the channels a streaming session can address."""
+
+    type: Literal[ResourceType.ENTERTAINMENT_CONFIGURATION] = (
+        ResourceType.ENTERTAINMENT_CONFIGURATION
+    )
+    id_v1: str | None = None
+    configuration_type: EntertainmentConfigurationType | str | None = None
+    status: StreamingStatus | str | None = None
+    active_streamer: ResourceReference | None = None
+    stream_proxy: StreamProxy | None = None
+    channels: list[EntertainmentChannel] = Field(default_factory=list)
+    locations: EntertainmentLocations | None = None
+    light_services: list[ResourceReference] = Field(default_factory=list)
+
+    @property
+    def is_streaming(self) -> bool:
+        return self.status == StreamingStatus.ACTIVE
+
+
+class StreamAction(StrEnum):
+    START = "start"
+    STOP = "stop"
+
+
+class EntertainmentConfigurationUpdate(HueModel):
+    action: StreamAction | None = None
+    metadata: NamedMetadata | None = None
+    configuration_type: EntertainmentConfigurationType | None = None
+    stream_proxy: StreamProxy | None = None
+
+
 class HueEvent(HueModel):
     id: UUID
     type: ResourceType
@@ -517,9 +607,34 @@ class SceneEvent(SceneUpdate, HueEvent):
     status: SceneStatus | None = None
 
 
+class EntertainmentConfigurationEvent(HueEvent):
+    """Reports that an area started or stopped streaming, and who owns it.
+
+    An area another application takes over arrives here, which is the only
+    notice a streaming session gets that the bridge stopped listening to it.
+    """
+
+    type: Literal[ResourceType.ENTERTAINMENT_CONFIGURATION] = (
+        ResourceType.ENTERTAINMENT_CONFIGURATION
+    )
+    status: StreamingStatus | str | None = None
+    active_streamer: ResourceReference | None = None
+    channels: list[EntertainmentChannel] | None = None
+
+    @property
+    def is_streaming(self) -> bool:
+        return self.status == StreamingStatus.ACTIVE
+
+
 _UNTYPED_EVENT = "other"
 _TYPED_EVENTS = frozenset(
-    {ResourceType.LIGHT, ResourceType.ROOM, ResourceType.ZONE, ResourceType.SCENE}
+    {
+        ResourceType.LIGHT,
+        ResourceType.ROOM,
+        ResourceType.ZONE,
+        ResourceType.SCENE,
+        ResourceType.ENTERTAINMENT_CONFIGURATION,
+    }
 )
 
 
@@ -538,6 +653,9 @@ AnyHueEvent = Annotated[
     | Annotated[RoomEvent, Tag(ResourceType.ROOM)]
     | Annotated[ZoneEvent, Tag(ResourceType.ZONE)]
     | Annotated[SceneEvent, Tag(ResourceType.SCENE)]
+    | Annotated[
+        EntertainmentConfigurationEvent, Tag(ResourceType.ENTERTAINMENT_CONFIGURATION)
+    ]
     | Annotated[HueEvent, Tag(_UNTYPED_EVENT)],
     Discriminator(_event_tag),
 ]

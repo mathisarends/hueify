@@ -13,16 +13,19 @@ def response_with(payload: list) -> MagicMock:
 
 @pytest.mark.asyncio
 async def test_register_app_key_succeeds_once_the_link_button_was_pressed() -> None:
-    success = response_with([{"success": {"username": "abc123"}}])
+    success = response_with(
+        [{"success": {"username": "abc123", "clientkey": "A" * 32}}]
+    )
     with (
         patch("asyncio.sleep", new_callable=AsyncMock) as sleep,
         patch(
             "httpx.AsyncClient.post", new_callable=AsyncMock, return_value=success
         ) as post,
     ):
-        username = await register_app_key("192.168.1.50")
+        app = await register_app_key("192.168.1.50")
 
-    assert username == "abc123"
+    assert app.app_key == "abc123"
+    assert app.client_key == "A" * 32
     sleep.assert_not_awaited()
     assert post.await_args.args[0] == "https://192.168.1.50/api"
     assert post.await_args.kwargs["json"] == {
@@ -43,10 +46,19 @@ async def test_register_app_key_polls_until_the_link_button_is_pressed() -> None
             side_effect=[not_pressed, not_pressed, success],
         ) as post,
     ):
-        username = await register_app_key("192.168.1.50")
+        app = await register_app_key("192.168.1.50")
 
-    assert username == "def456"
+    assert app.app_key == "def456"
     assert post.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_register_app_key_tolerates_a_bridge_without_a_client_key() -> None:
+    success = response_with([{"success": {"username": "abc123"}}])
+    with patch("httpx.AsyncClient.post", new_callable=AsyncMock, return_value=success):
+        app = await register_app_key("192.168.1.50")
+
+    assert app.client_key is None
 
 
 @pytest.mark.asyncio

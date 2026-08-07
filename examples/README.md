@@ -17,6 +17,7 @@ names it expects - adjust them to names from your own Hue app.
 | [live_state.py](live_state.py) | React to bridge changes over the event stream |
 | [server_sent_events.py](server_sent_events.py) | Subscribe to light and scene events |
 | [raw_api.py](raw_api.py) | Drop to raw CLIP v2 payloads for effects and gradients |
+| [entertainment_stream.py](entertainment_stream.py) | Stream frames to an entertainment area over UDP |
 
 ```bash
 uv run examples/basic_usage.py

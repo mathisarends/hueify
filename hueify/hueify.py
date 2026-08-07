@@ -3,6 +3,7 @@ from types import TracebackType
 from typing import Self, overload
 
 from hueify.credentials import load_credentials
+from hueify.entertainment import EntertainmentNamespace
 from hueify.http import HttpClient
 from hueify.models import HueEvent
 from hueify.resources import (
@@ -25,7 +26,8 @@ class Hueify:
 
     Credentials are read from the constructor arguments, the
     ``HUE_BRIDGE_IP``/``HUE_APP_KEY`` environment variables and a ``.env``
-    file, in that order.
+    file, in that order. ``HUE_CLIENT_KEY`` comes along for entertainment
+    streaming, which is the only thing that needs it.
 
     Subscribing to events and starting the stream read better on the client
     itself, so those delegate to ``hue.events``, which owns the connection and
@@ -36,14 +38,18 @@ class Hueify:
         self,
         bridge_ip: str | None = None,
         app_key: str | None = None,
+        client_key: str | None = None,
         reconnect: ReconnectPolicy | None = None,
     ) -> None:
-        self._credentials = load_credentials(bridge_ip, app_key)
+        self._credentials = load_credentials(bridge_ip, app_key, client_key)
         self._http_client = HttpClient(self._credentials)
         self.lights = LightNamespace(self._http_client)
         self.rooms = RoomNamespace(self._http_client)
         self.zones = ZoneNamespace(self._http_client)
         self.scenes = SceneNamespace(self._http_client)
+        self.entertainment = EntertainmentNamespace(
+            self._http_client, self._credentials
+        )
         self.events = EventStream(self._credentials, reconnect)
 
     async def __aenter__(self) -> Self:

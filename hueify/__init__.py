@@ -1,12 +1,25 @@
+from hueify.entertainment import (
+    EntertainmentNamespace,
+    EntertainmentStream,
+    Frame,
+    FrameSource,
+    Tick,
+)
 from hueify.errors import (
+    EntertainmentAuthenticationError,
+    EntertainmentError,
     HueifyError,
     MissingCredentialsError,
+    MissingDependencyError,
     ResourceNotFoundError,
     StreamAuthenticationError,
 )
 from hueify.hueify import Hueify
 from hueify.models import (
     ColorXY,
+    EntertainmentChannel,
+    EntertainmentConfiguration,
+    EntertainmentPosition,
     GroupedLight,
     GroupUpdate,
     HueApiError,
@@ -17,6 +30,7 @@ from hueify.models import (
     Scene,
     SceneRecallRequest,
     SceneUpdate,
+    StreamingStatus,
     Zone,
 )
 from hueify.resources import (
@@ -33,7 +47,16 @@ from hueify.sse import ConnectionStatus, EventStream, ReconnectPolicy
 __all__ = [
     "ColorXY",
     "ConnectionStatus",
+    "EntertainmentAuthenticationError",
+    "EntertainmentChannel",
+    "EntertainmentConfiguration",
+    "EntertainmentError",
+    "EntertainmentNamespace",
+    "EntertainmentPosition",
+    "EntertainmentStream",
     "EventStream",
+    "Frame",
+    "FrameSource",
     "GroupNamespace",
     "GroupUpdate",
     "GroupedLight",
@@ -45,6 +68,7 @@ __all__ = [
     "LightNamespace",
     "LightUpdate",
     "MissingCredentialsError",
+    "MissingDependencyError",
     "ReconnectPolicy",
     "ResourceId",
     "ResourceNotFoundError",
@@ -55,6 +79,8 @@ __all__ = [
     "SceneRecallRequest",
     "SceneUpdate",
     "StreamAuthenticationError",
+    "StreamingStatus",
+    "Tick",
     "Transition",
     "Zone",
     "ZoneNamespace",

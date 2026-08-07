@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from hueify.errors import MissingCredentialsError
 
 _MIN_APP_KEY_LENGTH = 20
+_CLIENT_KEY_LENGTH = 32
 _IP_ADDRESS_PARTS = 4
 _IP_ADDRESS_PART_MIN = 0
 _IP_ADDRESS_PART_MAX = 255
@@ -22,6 +23,7 @@ class HueBridgeCredentials(BaseSettings):
 
     hue_bridge_ip: str = Field(alias="HUE_BRIDGE_IP")
     hue_app_key: str = Field(alias="HUE_APP_KEY")
+    hue_client_key: str | None = Field(default=None, alias="HUE_CLIENT_KEY")
 
     @field_validator("hue_bridge_ip")
     @classmethod
@@ -64,31 +66,58 @@ class HueBridgeCredentials(BaseSettings):
             )
         return value
 
+    @field_validator("hue_client_key")
+    @classmethod
+    def validate_client_key(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not re.fullmatch(r"[0-9a-fA-F]{32}", value.strip()):
+            raise ValueError(
+                f"Hue Client Key must be {_CLIENT_KEY_LENGTH} hexadecimal characters"
+            )
+        return value.strip()
+
 
 def load_credentials(
     bridge_ip: str | None = None,
     app_key: str | None = None,
+    client_key: str | None = None,
 ) -> HueBridgeCredentials:
     """Read credentials from arguments, the environment and a ``.env`` file.
+
+    The client key is optional: only entertainment streaming needs it.
 
     Raises:
         MissingCredentialsError: If bridge IP and application key cannot both
             be resolved.
     """
-    if bridge_ip is not None and app_key is not None:
-        return HueBridgeCredentials(hue_bridge_ip=bridge_ip, hue_app_key=app_key)
+    stored = _stored_credentials(required=bridge_ip is None or app_key is None)
+    if stored is None:
+        return HueBridgeCredentials(
+            hue_bridge_ip=bridge_ip,
+            hue_app_key=app_key,
+            hue_client_key=client_key,
+        )
 
-    try:
-        environment = HueBridgeCredentials()
-    except ValidationError as error:
-        raise MissingCredentialsError(_MISSING_CREDENTIALS_MESSAGE) from error
-
-    if bridge_ip is None and app_key is None:
-        return environment
     return HueBridgeCredentials(
-        hue_bridge_ip=bridge_ip or environment.hue_bridge_ip,
-        hue_app_key=app_key or environment.hue_app_key,
+        hue_bridge_ip=bridge_ip or stored.hue_bridge_ip,
+        hue_app_key=app_key or stored.hue_app_key,
+        hue_client_key=client_key or stored.hue_client_key,
     )
+
+
+def _stored_credentials(required: bool) -> HueBridgeCredentials | None:
+    """Credentials from the environment and ``.env``, or ``None`` if incomplete.
+
+    Raises:
+        MissingCredentialsError: If they are incomplete but needed.
+    """
+    try:
+        return HueBridgeCredentials()
+    except ValidationError as error:
+        if required:
+            raise MissingCredentialsError(_MISSING_CREDENTIALS_MESSAGE) from error
+        return None
 
 
 _MISSING_CREDENTIALS_MESSAGE = (

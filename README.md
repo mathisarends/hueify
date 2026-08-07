@@ -20,29 +20,35 @@ pip install hueify
 - [Reading state](#reading-state)
 - [Rooms, zones and scenes](#rooms-zones-and-scenes)
 - [Event stream](#event-stream)
+- [Entertainment streaming](#entertainment-streaming)
 
 ## Setup
 
 A bridge IP and an application key are needed. `hueify setup` discovers the
-bridge, waits for the link button and prints both:
+bridge, waits for the link button and prints them:
 
 ```bash
 $ hueify setup
 ...
-Setup complete. Hueify reads these two values:
+Setup complete. Hueify reads these values:
 
   HUE_BRIDGE_IP=192.168.1.10
   HUE_APP_KEY=Xf3k…
+  HUE_CLIENT_KEY=a1b2…
 ```
 
-Put both into your environment or a `.env` file and `Hueify()` picks them up.
+Put them into your environment or a `.env` file and `Hueify()` picks them up.
+The client key is only needed for [entertainment streaming](#entertainment-streaming),
+and the bridge hands it out while registering - never again afterwards.
+
 The individual steps are available too, and return their result:
 
 ```python
 from hueify.onboarding import discover_bridges, register_app_key, setup
 
 bridges = await discover_bridges()
-app_key = await register_app_key(bridges[0].internalipaddress)
+app = await register_app_key(bridges[0].internalipaddress)
+app.app_key, app.client_key
 
 credentials = setup()  # the interactive flow, as HueBridgeCredentials
 ```
@@ -300,6 +306,110 @@ reconnecting either way. To wait for a *re*connection later on, use
 Because the bridge stays silent while nothing changes, silence is not a health
 signal - `read_timeout` (90s by default) only bounds how long a dead socket can
 look alive before the stream reconnects.
+
+## Entertainment streaming
+
+The REST API is not built for light shows: every command is an HTTPS request the
+bridge queues, and a beat that arrives 300 ms late is not a beat. An
+entertainment area is the other path - the bridge accepts DTLS datagrams on UDP
+port 2100 and pushes their colors to the lamps at about 25 Hz, acknowledging
+nothing.
+
+The DTLS handshake needs one dependency, so streaming is an optional install:
+
+```bash
+pip install "hueify[entertainment]"
+```
+
+Areas themselves are created in the Hue app, because they carry the room
+geometry a user placed their lamps in. Finding and inspecting them works without
+the extra:
+
+```python
+areas = await hue.entertainment.list()
+area = await hue.entertainment.find_by_name("TV")
+
+[(channel.channel_id, channel.position.x) for channel in area.channels]
+await hue.entertainment.is_streaming(area.id)
+```
+
+Opening a stream takes the area over, and leaving it gives the area back:
+
+```python
+async with hue.entertainment.stream(area) as stream:
+    stream.set_all("#ff8800")
+    await asyncio.sleep(2)
+    stream.set(channel_id=0, color="blue", brightness=0.4)
+    await asyncio.sleep(2)
+```
+
+`set` and `set_all` do not send anything - they write into the next frame, which
+a loop of its own sends on a fixed clock, 50 times a second by default. That
+decoupling is the point: colors may arrive whenever they happen to be ready, and
+the stream still produces an even flow of datagrams, without queueing, dropping
+or drifting. When nothing new arrives it resends the last frame, which is also
+what keeps the area alive - a few seconds of silence and the bridge stops
+listening.
+
+Writes are synchronous and are read between awaits, so a frame is never sent
+half-updated, however many channels one write touches.
+
+### Sources
+
+Hueify owns the delivery, not the light show. Anything that paints frames -
+an audio analyser, a screen grabber, a Spotify integration - is a *source*: an
+object with a `render` method, or a plain function.
+
+```python
+from hueify.entertainment import Frame, Tick
+
+
+class Pulse:
+    def render(self, frame: Frame, tick: Tick) -> None:
+        frame.set_all("#ffffff", brightness=abs(math.sin(tick.elapsed)))
+
+
+async with hue.entertainment.stream(area) as stream:
+    await stream.run(Pulse())
+```
+
+`run` hands every frame to the source on its deadline and returns when the
+stream stops - raising whatever stopped it, including anything the source
+raised, because a source that cannot paint has nothing left to send. `render`
+runs on the sending clock, so it must not block or await; a source with its own
+connection or audio device keeps a background task and lets `render` read the
+state it maintains. Sources own their own lifetime:
+
+```python
+async with SpotifySource(...) as source, hue.entertainment.stream(area) as stream:
+    await stream.run(source)
+```
+
+Both styles can be mixed - `set_all` still applies while a source is running,
+until the source overwrites those channels again.
+
+### What the bridge allows
+
+| Limit | Detail |
+| --- | --- |
+| One streamer | Opening fails while another application owns the area, and a later takeover shows up on the event stream rather than on the socket |
+| ~25 Hz to the lamps | Sending faster than `DEFAULT_RATE` (50) buys nothing; `MAX_RATE` is 60 |
+| 20 channels | The protocol addresses at most `MAX_CHANNELS` per area |
+| No REST while streaming | The lamps of a streaming area ignore light commands until the stream ends |
+
+A stream that stops on its own - because the bridge dropped it, or a source
+failed - leaves the reason in `stream.error`, and `await stream.wait_closed()`
+raises it. `stream.stats` reports frames sent, late frames and the rate.
+
+Because a takeover is not visible on the UDP socket, an application that has to
+notice it subscribes to the [event stream](#event-stream):
+
+```python
+@hue.on(ResourceType.ENTERTAINMENT_CONFIGURATION)
+async def on_area(event: EntertainmentConfigurationEvent) -> None:
+    if not event.is_streaming:
+        print("The bridge stopped listening to us.")
+```
 
 ## Examples
 
