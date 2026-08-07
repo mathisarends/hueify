@@ -13,6 +13,9 @@ dependencies = [
 
 [project.optional-dependencies]
 entertainment = ["cryptography>=44"]
+cli = [
+    "typer>=0.15,<1",
+]
 
 [project.scripts]
 hueify = "hueify.cli:main"
@@ -25,6 +28,7 @@ dev = [
     "ruff>=0.13.1",
     "pre-commit>=4.3.0",
     "pytest-cov>=7.1.0",
+    "typer>=0.15,<1",
 ]
 
 [build-system]
