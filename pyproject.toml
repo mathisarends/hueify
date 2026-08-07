@@ -11,6 +11,9 @@ dependencies = [
     "pydantic-settings>=2.12.0",
 ]
 
+[project.optional-dependencies]
+entertainment = ["cryptography>=44"]
+
 [project.scripts]
 hueify = "hueify.cli:main"
 
