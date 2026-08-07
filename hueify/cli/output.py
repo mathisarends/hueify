@@ -89,7 +89,10 @@ def write_resources(
     table.add_column("State")
     for row in rows:
         table.add_row(*row)
-    Console(no_color=output.no_color).print(table)
+    Console(
+        no_color=output.no_color,
+        force_terminal=False if output.no_color else None,
+    ).print(table)
 
 
 def write_response(

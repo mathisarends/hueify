@@ -2,6 +2,7 @@ from importlib.metadata import version
 
 import typer
 from typer import Context
+from typer.core import TyperGroup
 
 from hueify.cli.apps import (
     entertainment_app,
@@ -12,11 +13,34 @@ from hueify.cli.apps import (
 )
 from hueify.cli.output import OutputOptions, print_json
 
+_GLOBAL_OUTPUT_OPTIONS = frozenset({"--json", "--plain", "--no-color"})
+
+
+class _GlobalOptionsGroup(TyperGroup):
+    """Accept output flags at any level of the command line."""
+
+    def parse_args(self, context: Context, args: list[str]) -> list[str]:
+        try:
+            separator = args.index("--")
+        except ValueError:
+            separator = len(args)
+
+        parsed_args = args[:separator]
+        literal_args = args[separator:]
+        global_args = [arg for arg in parsed_args if arg in _GLOBAL_OUTPUT_OPTIONS]
+        command_args = [arg for arg in parsed_args if arg not in _GLOBAL_OUTPUT_OPTIONS]
+        return super().parse_args(
+            context,
+            [*global_args, *command_args, *literal_args],
+        )
+
+
 app = typer.Typer(
     name="hueify",
     help="Control Philips Hue bridges from the command line.",
     no_args_is_help=True,
     rich_markup_mode="markdown",
+    cls=_GlobalOptionsGroup,
 )
 
 
@@ -45,7 +69,7 @@ def callback(
         help="Show the Hueify version and exit.",
     ),
 ) -> None:
-    """Global flags apply before every Hue command."""
+    """Global flags may appear before or after a Hue command."""
     if show_version:
         typer.echo(version("hueify"))
         raise typer.Exit()

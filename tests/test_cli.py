@@ -88,7 +88,7 @@ def test_main_explains_how_to_install_the_optional_cli_extra(capsys) -> None:
 
 
 def test_the_global_output_modes_are_mutually_exclusive() -> None:
-    result = runner.invoke(app, ["--json", "--plain", "version-info"])
+    result = runner.invoke(app, ["version-info", "--json", "--plain"])
 
     assert result.exit_code == 2
     assert "either --json or --plain" in ANSI_ESCAPE.sub("", result.output)
@@ -140,14 +140,36 @@ def test_resource_list_json_preserves_the_full_model_shape() -> None:
     hue.lights.list = AsyncMock(return_value=SimpleNamespace(data=[light]))
 
     with patch("hueify.cli.operations.Hueify", return_value=hue):
-        result = runner.invoke(app, ["--json", "light", "list"])
-        plain_result = runner.invoke(app, ["--plain", "light", "list"])
+        result = runner.invoke(app, ["light", "list", "--json"])
+        plain_result = runner.invoke(app, ["light", "--plain", "list"])
 
     assert result.exit_code == 0
     assert plain_result.exit_code == 0
     assert str(RESOURCE_ID) in result.output
     assert '"metadata"' in result.output
     assert plain_result.output.endswith("\tDesk\toff\n")
+
+
+def test_no_color_is_accepted_after_the_subcommand() -> None:
+    light = Light(
+        id=RESOURCE_ID,
+        metadata=LightMetadata(name="Desk"),
+        owner=ResourceReference(rid=OWNER_ID, rtype=ResourceType.DEVICE),
+        on=OnState(on=True),
+    )
+    hue = bridge_mock()
+    hue.lights.list = AsyncMock(return_value=SimpleNamespace(data=[light]))
+
+    with patch("hueify.cli.operations.Hueify", return_value=hue):
+        result = runner.invoke(
+            app,
+            ["light", "list", "--no-color"],
+            env={"FORCE_COLOR": "1"},
+        )
+
+    assert result.exit_code == 0
+    assert "\x1b[" not in result.output
+    assert "Desk" in result.output
 
 
 def test_every_resource_app_lists_its_typed_models_in_human_output() -> None:

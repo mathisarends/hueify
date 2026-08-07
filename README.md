@@ -102,13 +102,13 @@ scripts:
 ```bash
 hueify light list                 # human table
 hueify --plain light list         # id<TAB>name<TAB>state
-hueify --json light list | jq .   # complete bridge models
+hueify light list --json | jq .   # complete bridge models
 ```
 
-`--json` and `--plain` are mutually exclusive. Use `--no-color` for plain CI
-logs. Exit codes are `0` for success, `1` for Hueify failures, `2` for invalid
-usage or values, `3` for missing or invalid credentials, and `4` for network
-failures.
+The global output flags may appear before or after a subcommand. `--json` and
+`--plain` are mutually exclusive. Use `--no-color` for plain CI logs. Exit codes
+are `0` for success, `1` for Hueify failures, `2` for invalid usage or values,
+`3` for missing or invalid credentials, and `4` for network failures.
 
 ## Quickstart
 
