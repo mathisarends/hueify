@@ -3,7 +3,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from hueify.credentials import HueBridgeCredentials
 from hueify.http import HttpClient
@@ -23,10 +23,10 @@ def http_client(credentials: HueBridgeCredentials) -> HttpClient:
     return HttpClient(credentials=credentials)
 
 
-def response_with(payload: dict) -> MagicMock:
-    response = MagicMock()
-    response.json.return_value = payload
-    return response
+def response_with(payload: dict) -> httpx.Response:
+    return httpx.Response(
+        200, json=payload, request=httpx.Request("GET", f"https://{VALID_IP}")
+    )
 
 
 def light_response() -> dict:
@@ -122,6 +122,43 @@ async def test_delete_returns_typed_identifiers(http_client: HttpClient) -> None
         result = await http_client.delete("light/id")
 
     assert result.data[0].rtype is ResourceType.LIGHT
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("method", ["get", "post", "put", "delete"])
+@pytest.mark.parametrize(
+    ("status", "body", "error"),
+    [
+        (200, b"not-json", ValidationError),
+        (200, b"null", ValidationError),
+        (200, b'{"data":[{}]}', ValidationError),
+        (500, b"not-json", httpx.HTTPStatusError),
+    ],
+)
+async def test_invalid_responses_are_rejected_before_returning_data(
+    http_client: HttpClient,
+    method: str,
+    status: int,
+    body: bytes,
+    error: type[Exception],
+) -> None:
+    response = httpx.Response(
+        status,
+        content=body,
+        request=httpx.Request(
+            method.upper(), f"https://{VALID_IP}/clip/v2/resource/light"
+        ),
+    )
+    args = []
+    if method == "get":
+        args.append(TypeAdapter(HueApiResponse[Light]))
+    elif method != "delete":
+        args.append(LightUpdate(on=OnState(on=True)))
+
+    with patch.object(http_client._client, method, new_callable=AsyncMock) as request:
+        request.return_value = response
+        with pytest.raises(error):
+            await getattr(http_client, method)("light", *args)
 
 
 @pytest.mark.asyncio

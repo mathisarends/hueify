@@ -44,14 +44,14 @@ class ResourceNamespace[TResource: BaseModel]:
 
     async def find_by_name(self, name: str) -> TResource:
         wanted = _normalized(name)
-        named_resources = [
-            (resource_name, resource)
-            for resource in (await self.list()).data
-            if (resource_name := _resource_name(resource)) is not None
-        ]
-        for resource_name, resource in named_resources:
+        named_resources = []
+        for resource in (await self.list()).data:
+            resource_name = _resource_name(resource)
+            if resource_name is None:
+                continue
             if _normalized(resource_name) == wanted:
                 return resource
+            named_resources.append((resource_name, resource))
 
         ranked_resources = sorted(
             named_resources,

@@ -55,6 +55,8 @@ class EventBus:
             *self._handlers.get(str(event.type), []),
             *self._handlers.get("*", []),
         ]
+        if not handlers:
+            return event
         results = await asyncio.gather(
             *(handler(event) for handler in handlers),
             return_exceptions=True,

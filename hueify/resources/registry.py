@@ -15,7 +15,8 @@ def _resource_tag(value: Any) -> str:
     kind = (
         value.get("type") if isinstance(value, dict) else getattr(value, "type", None)
     )
-    return str(kind) if str(kind) in _RESOURCE_TYPES else "other"
+    tag = str(kind)
+    return tag if tag in _RESOURCE_TYPES else "other"
 
 
 _RESOURCE_TYPES = frozenset(
@@ -113,6 +114,9 @@ AnyHueResource = Annotated[
     Discriminator(_resource_tag),
 ]
 
+_RESOURCE_RESPONSE = TypeAdapter(m.HueApiResponse[AnyHueResource])
+_RAW_RESPONSE = TypeAdapter(m.HueApiResponse[m.HueResource])
+
 
 class JsonPayload(RootModel[dict[str, Any]]):
     """Keep dictionary values, including explicit nulls, in raw requests."""
@@ -128,9 +132,7 @@ class RawNamespace(ResourceNamespace[m.HueResource]):
     def __init__(self, resource_type: str, http_client: HttpClient) -> None:
         if re.fullmatch(r"[a-z][a-z0-9_]*", resource_type) is None:
             raise ValueError("A resource type must be a CLIP resource name")
-        super().__init__(
-            resource_type, TypeAdapter(m.HueApiResponse[m.HueResource]), http_client
-        )
+        super().__init__(resource_type, _RAW_RESPONSE, http_client)
 
     async def create(
         self, data: Mapping[str, Any] | BaseModel
@@ -164,7 +166,6 @@ class ResourceRegistry:
         self._namespaces = {
             namespace.resource_type: namespace for namespace in namespaces
         }
-        self._adapter = TypeAdapter(m.HueApiResponse[AnyHueResource])
 
     @property
     def types(self) -> tuple[str, ...]:
@@ -181,7 +182,7 @@ class ResourceRegistry:
         return RawNamespace(str(resource_type), self._http_client)
 
     async def list(self) -> m.HueApiResponse[AnyHueResource]:
-        return await self._http_client.get("", self._adapter)
+        return await self._http_client.get("", _RESOURCE_RESPONSE)
 
     async def get(self, reference: m.ResourceReference) -> BaseModel:
         return await self[reference.rtype].get_one(reference.rid)

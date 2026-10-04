@@ -4,6 +4,8 @@ from pydantic import BaseModel, TypeAdapter
 from hueify.credentials import HueBridgeCredentials
 from hueify.models import HueApiResponse, ResourceIdentifier
 
+_WRITE_RESPONSE = TypeAdapter(HueApiResponse[ResourceIdentifier])
+
 
 class HttpClient:
     _HUE_API_BASE_PATH = "/clip/v2/resource"
@@ -34,7 +36,7 @@ class HttpClient:
     ) -> HueApiResponse[T]:
         response = await self._client.get(self._url(endpoint), headers=self._headers)
         response.raise_for_status()
-        return response_adapter.validate_python(response.json())
+        return response_adapter.validate_json(response.content)
 
     async def post(
         self, endpoint: str, data: BaseModel
@@ -45,7 +47,7 @@ class HttpClient:
             json=data.model_dump(mode="json", exclude_none=True),
         )
         response.raise_for_status()
-        return self._validate_write_response(response.json())
+        return _WRITE_RESPONSE.validate_json(response.content)
 
     async def put(
         self, endpoint: str, data: BaseModel
@@ -56,12 +58,12 @@ class HttpClient:
             json=data.model_dump(mode="json", exclude_none=True),
         )
         response.raise_for_status()
-        return self._validate_write_response(response.json())
+        return _WRITE_RESPONSE.validate_json(response.content)
 
     async def delete(self, endpoint: str) -> HueApiResponse[ResourceIdentifier]:
         response = await self._client.delete(self._url(endpoint), headers=self._headers)
         response.raise_for_status()
-        return self._validate_write_response(response.json())
+        return _WRITE_RESPONSE.validate_json(response.content)
 
     async def close(self) -> None:
         await self._client.aclose()
@@ -70,8 +72,3 @@ class HttpClient:
         if not endpoint:
             return self._base_url
         return f"{self._base_url}/{endpoint.lstrip('/')}"
-
-    def _validate_write_response(
-        self, response: object
-    ) -> HueApiResponse[ResourceIdentifier]:
-        return TypeAdapter(HueApiResponse[ResourceIdentifier]).validate_python(response)

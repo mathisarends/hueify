@@ -246,3 +246,6 @@ network access, sparse events, unknown firmware fields and raw null handling.
 Existing CLI, SSE reconnect and entertainment tests remain part of the suite.
 Runnable read/event examples are in examples/resource_inventory.py and
 examples/sensors_and_devices.py.
+
+The [performance notes](performance.md) describe the focused optimizations
+and a local benchmark that requires no physical bridge.
