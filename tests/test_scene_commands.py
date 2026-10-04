@@ -7,6 +7,8 @@ from hueify.http import HttpClient
 from hueify.models import (
     HueApiResponse,
     ResourceIdentifier,
+    ResourceReference,
+    SceneCreate,
     SceneMetadata,
     SceneRecallRequest,
     SceneUpdate,
@@ -63,7 +65,11 @@ async def test_activate_can_start_the_scene_as_a_dynamic_palette(
 async def test_create_posts_to_the_scene_collection_endpoint(
     client: AsyncMock,
 ) -> None:
-    update = SceneUpdate(metadata=SceneMetadata(name="Focus"))
+    update = SceneCreate(
+        metadata=SceneMetadata(name="Focus"),
+        group=ResourceReference(rid=SCENE_ID, rtype="room"),
+        actions=[],
+    )
 
     await SceneNamespace(client).create(update)
 

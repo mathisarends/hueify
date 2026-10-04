@@ -7,6 +7,7 @@ from hueify.models import (
     ResourceIdentifier,
     Scene,
     SceneAction,
+    SceneCreate,
     SceneRecall,
     SceneRecallRequest,
     SceneUpdate,
@@ -19,7 +20,9 @@ class SceneNamespace(ResourceNamespace[Scene]):
     def __init__(self, http_client: HttpClient) -> None:
         super().__init__("scene", TypeAdapter(HueApiResponse[Scene]), http_client)
 
-    async def create(self, data: SceneUpdate) -> HueApiResponse[ResourceIdentifier]:
+    async def create(self, data: SceneCreate) -> HueApiResponse[ResourceIdentifier]:
+        if not isinstance(data, SceneCreate):
+            raise TypeError("scene.create expects SceneCreate")
         return await self._create(data)
 
     async def update(

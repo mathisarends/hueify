@@ -1,94 +1,116 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag
+from pydantic import Discriminator, Field, Tag, model_validator
 
-
-class HueModel(BaseModel):
-    """Base for Hue payloads that preserves fields added by bridge firmware."""
-
-    model_config = ConfigDict(extra="allow")
-
-
-class ResourceType(StrEnum):
-    LIGHT = "light"
-    GROUPED_LIGHT = "grouped_light"
-    ROOM = "room"
-    ZONE = "zone"
-    SCENE = "scene"
-    SMART_SCENE = "smart_scene"
-    PUBLIC_IMAGE = "public_image"
-    DEVICE = "device"
-    DEVICE_POWER = "device_power"
-    DEVICE_SOFTWARE_UPDATE = "device_software_update"
-    BRIDGE = "bridge"
-    BRIDGE_HOME = "bridge_home"
-    SERVICE_GROUP = "service_group"
-    MOTION = "motion"
-    CAMERA_MOTION = "camera_motion"
-    TEMPERATURE = "temperature"
-    LIGHT_LEVEL = "light_level"
-    BUTTON = "button"
-    BELL_BUTTON = "bell_button"
-    RELATIVE_ROTARY = "relative_rotary"
-    CONTACT = "contact"
-    TAMPER = "tamper"
-    GROUPED_MOTION = "grouped_motion"
-    GROUPED_LIGHT_LEVEL = "grouped_light_level"
-    ZIGBEE_CONNECTIVITY = "zigbee_connectivity"
-    ZGP_CONNECTIVITY = "zgp_connectivity"
-    WIFI_CONNECTIVITY = "wifi_connectivity"
-    ZIGBEE_DEVICE_DISCOVERY = "zigbee_device_discovery"
-    ENTERTAINMENT = "entertainment"
-    ENTERTAINMENT_CONFIGURATION = "entertainment_configuration"
-    SPEAKER = "speaker"
-    BEHAVIOR_SCRIPT = "behavior_script"
-    BEHAVIOR_INSTANCE = "behavior_instance"
-    GEOFENCE_CLIENT = "geofence_client"
-    GEOLOCATION = "geolocation"
-    HOMEKIT = "homekit"
-    MATTER = "matter"
-    MATTER_FABRIC = "matter_fabric"
-    CONVENIENCE_AREA_MOTION = "convenience_area_motion"
-    SECURITY_AREA_MOTION = "security_area_motion"
-    MOTION_AREA_CANDIDATE = "motion_area_candidate"
-    MOTION_AREA_CONFIGURATION = "motion_area_configuration"
-    AUTH_V1 = "auth_v1"
-
-
-class ResourceReference(HueModel):
-    rid: UUID
-    rtype: ResourceType
-
-
-class ResourceIdentifier(ResourceReference):
-    pass
-
-
-class HueApiError(HueModel):
-    description: str
-
-
-class HueApiResponse[T: BaseModel](HueModel):
-    errors: list[HueApiError] = Field(default_factory=list)
-    data: list[T] = Field(default_factory=list)
-
-
-class NamedMetadata(HueModel):
-    name: str
-
-
-class NamedResource(HueModel):
-    """Base for resources that carry a stable ID and a user-visible name."""
-
-    id: UUID
-    metadata: NamedMetadata
-
-    @property
-    def name(self) -> str:
-        return self.metadata.name
+from hueify._model_base import (
+    HueApiError,
+    HueApiResponse,
+    HueModel,
+    HueResource,
+    NamedMetadata,
+    NamedResource,
+    ResourceIdentifier,
+    ResourceReference,
+    ResourceType,
+)
+from hueify._resource_models import (
+    BehaviorInstance,
+    BehaviorInstanceUpdate,
+    BehaviorScript,
+    BellButton,
+    BellState,
+    Bridge,
+    BridgeHome,
+    Button,
+    ButtonConfiguration,
+    ButtonReport,
+    ButtonState,
+    ButtonUpdate,
+    CameraMotion,
+    Contact,
+    ContactReport,
+    ControlMetadata,
+    ConvenienceAreaMotion,
+    Device,
+    DevicePower,
+    DeviceSoftwareUpdate,
+    DeviceSoftwareUpdateUpdate,
+    DeviceUpdate,
+    DiscoveryAction,
+    EnabledUpdate,
+    Entertainment,
+    EntertainmentSegment,
+    EntertainmentSegments,
+    GeofenceClient,
+    GeofenceClientUpdate,
+    Geolocation,
+    GroupedLightLevel,
+    GroupedMotion,
+    Homekit,
+    HomekitUpdate,
+    IdentifyAction,
+    LightLevel,
+    LightLevelReport,
+    LightLevelState,
+    Matter,
+    MatterAction,
+    MatterFabric,
+    MatterFabricData,
+    MatterUpdate,
+    MetadataUpdate,
+    Motion,
+    MotionAreaCandidate,
+    MotionAreaConfiguration,
+    MotionReport,
+    MotionSensitivity,
+    MotionSensitivityUpdate,
+    MotionState,
+    MotionUpdate,
+    OwnedResource,
+    PowerState,
+    ProductData,
+    RelativeRotary,
+    RelativeRotaryState,
+    RotaryReport,
+    Rotation,
+    SecurityAreaMotion,
+    ServiceGroup,
+    ServiceGroupUpdate,
+    SmartScene,
+    SmartSceneActiveTimeslot,
+    SmartSceneCreate,
+    SmartSceneDay,
+    SmartSceneRecall,
+    SmartSceneStartTime,
+    SmartSceneTime,
+    SmartSceneTimeslot,
+    SmartSceneUpdate,
+    SoftwareInstall,
+    Speaker,
+    SwitchInputConfiguration,
+    SwitchInputConfigurationUpdate,
+    Tamper,
+    TamperReport,
+    Temperature,
+    TemperatureReport,
+    TemperatureState,
+    TimeZone,
+    UserTest,
+    UserTestUpdate,
+    Weekday,
+    WifiConnectivity,
+    WifiSignalStrength,
+    ZgpConnectivity,
+    ZigbeeChannel,
+    ZigbeeChannelValue,
+    ZigbeeConnectivity,
+    ZigbeeConnectivityUpdate,
+    ZigbeeDeviceDiscovery,
+    ZigbeeDeviceDiscoveryUpdate,
+)
 
 
 class OnState(HueModel):
@@ -97,6 +119,11 @@ class OnState(HueModel):
 
 class DimmingState(HueModel):
     brightness: float = Field(ge=0, le=100)
+    min_dim_level: float | None = Field(default=None, ge=0, le=100)
+
+
+class DimmingEventState(DimmingState):
+    brightness: float | None = Field(default=None, ge=0, le=100)
 
 
 class DimmingDeltaAction(StrEnum):
@@ -107,7 +134,7 @@ class DimmingDeltaAction(StrEnum):
 
 class DimmingDelta(HueModel):
     action: DimmingDeltaAction
-    brightness_delta: float = Field(default=0, ge=0, le=100)
+    brightness_delta: float | None = Field(default=None, ge=0, le=100)
 
 
 class ColorTemperatureSchema(HueModel):
@@ -119,6 +146,11 @@ class ColorTemperatureState(HueModel):
     mirek: int | None = Field(default=None, ge=50, le=1000)
     mirek_valid: bool | None = None
     mirek_schema: ColorTemperatureSchema | None = None
+
+
+class ColorTemperatureDelta(HueModel):
+    action: DimmingDeltaAction
+    mirek_delta: int | None = Field(default=None, ge=0, le=347)
 
 
 class ColorXY(HueModel):
@@ -157,6 +189,11 @@ class GradientState(HueModel):
     pixel_count: int | None = None
 
 
+class GradientUpdate(HueModel):
+    points: list[GradientPoint] | None = Field(default=None, min_length=2, max_length=5)
+    mode: str | None = None
+
+
 class EffectsState(HueModel):
     effect: str | None = None
     status: str | None = None
@@ -164,9 +201,43 @@ class EffectsState(HueModel):
     effect_values: list[str] | None = None
 
 
+class EffectParameters(HueModel):
+    color: ColorState | None = None
+    color_temperature: ColorTemperatureState | None = None
+    speed: float | None = Field(default=None, ge=0, le=1)
+
+
+class EffectAction(HueModel):
+    effect: str
+    parameters: EffectParameters | None = None
+
+
+class EffectStatus(HueModel):
+    effect: str | None = None
+    effect_values: list[str] | None = None
+    parameters: EffectParameters | None = None
+
+
+class EffectsV2State(HueModel):
+    action: EffectAction | None = None
+    status: EffectStatus | None = None
+
+
+class EffectsV2Update(HueModel):
+    action: EffectAction
+
+
+class PowerupState(HueModel):
+    preset: Literal["safety", "powerfail", "last_on_state", "custom"]
+    configured: bool | None = None
+    on: HueModel | None = None
+    dimming: HueModel | None = None
+    color: HueModel | None = None
+
+
 class TimedEffectsState(HueModel):
     effect: str | None = None
-    duration: int | None = None
+    duration: int | None = Field(default=None, ge=0, le=21600000)
     status: str | None = None
     status_values: list[str] | None = None
     effect_values: list[str] | None = None
@@ -187,10 +258,18 @@ class AlertState(HueModel):
 
 class SignalingState(HueModel):
     signal: str | None = None
-    duration: int | None = None
-    colors: list[ColorXY] | None = None
+    duration: int | None = Field(default=None, ge=0, le=65534000)
+    color: list[ColorState] | None = Field(default=None, min_length=1, max_length=2)
+    colors: list[ColorState | ColorXY] | None = None
     status: str | None = None
     signal_values: list[str] | None = None
+    estimated_end: int | None = None
+
+
+class SignalingUpdate(HueModel):
+    signal: Literal["no_signal", "on_off", "on_off_color", "alternating"]
+    duration: int | None = Field(default=None, ge=0, le=65534000)
+    color: list[ColorState] | None = Field(default=None, min_length=1, max_length=2)
 
 
 class LightArchetype(StrEnum):
@@ -259,6 +338,14 @@ class LightArchetype(StrEnum):
 
 class LightMetadata(NamedMetadata):
     archetype: LightArchetype | str | None = None
+    function: str | None = None
+    fixed_mired: int | None = None
+
+
+class LightMetadataUpdate(HueModel):
+    name: str | None = None
+    archetype: LightArchetype | str | None = None
+    function: str | None = None
 
 
 class LightStateMixin:
@@ -301,25 +388,35 @@ class Light(NamedResource, LightStateMixin):
     color: ColorState | None = None
     gradient: GradientState | None = None
     effects: EffectsState | None = None
+    effects_v2: EffectsV2State | None = None
     timed_effects: TimedEffectsState | None = None
     dynamics: DynamicsState | None = None
     alert: AlertState | None = None
     signaling: SignalingState | None = None
+    powerup: PowerupState | None = None
+    identify: HueModel | None = None
+    service_id: int | None = None
     mode: str | None = None
 
 
 class LightUpdate(HueModel, LightStateMixin):
+    metadata: LightMetadataUpdate | None = None
+    identify: IdentifyAction | None = None
     on: OnState | None = None
     dimming: DimmingState | None = None
     dimming_delta: DimmingDelta | None = None
     color_temperature: ColorTemperatureState | None = None
+    color_temperature_delta: ColorTemperatureDelta | None = None
     color: ColorState | None = None
-    gradient: GradientState | None = None
+    gradient: GradientUpdate | None = None
     effects: EffectsState | None = None
+    effects_v2: EffectsV2Update | None = None
     timed_effects: TimedEffectsState | None = None
     dynamics: DynamicsState | None = None
     alert: AlertState | None = None
-    signaling: SignalingState | None = None
+    signaling: SignalingUpdate | None = None
+    powerup: PowerupState | None = None
+    mode: str | None = None
 
 
 class GroupArchetype(StrEnum):
@@ -369,6 +466,11 @@ class GroupMetadata(NamedMetadata):
     archetype: GroupArchetype | str
 
 
+class GroupMetadataUpdate(HueModel):
+    name: str | None = Field(default=None, min_length=1, max_length=32)
+    archetype: GroupArchetype | str | None = None
+
+
 class Group(NamedResource):
     metadata: GroupMetadata
     children: list[ResourceReference] = Field(default_factory=list)
@@ -384,8 +486,13 @@ class Zone(Group):
 
 
 class GroupUpdate(HueModel):
-    metadata: GroupMetadata | None = None
+    metadata: GroupMetadataUpdate | GroupMetadata | None = None
     children: list[ResourceReference] | None = None
+
+
+class GroupCreate(GroupUpdate):
+    metadata: GroupMetadata
+    children: list[ResourceReference] = Field(default_factory=list)
 
 
 class GroupedLight(HueModel, LightStateMixin):
@@ -438,8 +545,15 @@ class SceneMetadata(NamedMetadata):
     appdata: str | None = Field(default=None, min_length=1, max_length=16)
 
 
+class SceneMetadataUpdate(HueModel):
+    name: str | None = Field(default=None, min_length=1, max_length=32)
+    image: ImageResourceReference | None = None
+    appdata: str | None = Field(default=None, min_length=1, max_length=16)
+
+
 class ColorPaletteEntry(HueModel):
     color: ColorState
+    dimming: DimmingState | None = None
 
 
 class DimmingPaletteEntry(HueModel):
@@ -448,18 +562,25 @@ class DimmingPaletteEntry(HueModel):
 
 class ColorTemperaturePaletteEntry(HueModel):
     color_temperature: ColorTemperatureState
+    dimming: DimmingState | None = None
 
 
 class EffectsPaletteEntry(HueModel):
-    effects: EffectsState
+    effect: str | None = None
+    effects: EffectsState | None = None
+
+
+class EffectsV2PaletteEntry(HueModel):
+    effect: str
+    parameters: EffectParameters | None = None
 
 
 class ScenePalette(HueModel):
     color: list[ColorPaletteEntry] = Field(default_factory=list)
-    dimming: list[DimmingPaletteEntry] = Field(default_factory=list)
+    dimming: list[DimmingState] = Field(default_factory=list, max_length=1)
     color_temperature: list[ColorTemperaturePaletteEntry] = Field(default_factory=list)
-    effects: list[EffectsPaletteEntry] = Field(default_factory=list)
-    effects_v2: list[EffectsPaletteEntry] = Field(default_factory=list)
+    effects: list[EffectAction] = Field(default_factory=list, max_length=3)
+    effects_v2: list[EffectsV2PaletteEntry] = Field(default_factory=list)
 
 
 class Scene(NamedResource):
@@ -474,18 +595,36 @@ class Scene(NamedResource):
     id_v1: str | None = None
 
 
+class SceneRecall(HueModel):
+    action: SceneAction = SceneAction.ACTIVE
+    duration: int | None = Field(default=None, ge=0)
+    dimming: DimmingState | None = None
+
+
 class SceneUpdate(HueModel):
-    metadata: SceneMetadata | None = None
+    metadata: SceneMetadataUpdate | SceneMetadata | None = None
     actions: list[SceneActionTarget] | None = None
     palette: ScenePalette | None = None
     speed: float | None = Field(default=None, ge=0, le=1)
     auto_dynamic: bool | None = None
+    recall: SceneRecall | None = None
 
 
-class SceneRecall(HueModel):
-    action: SceneAction = SceneAction.ACTIVE
-    duration: int | None = None
-    dimming: DimmingState | None = None
+class SceneCreate(HueModel):
+    metadata: SceneMetadata
+    group: ResourceReference
+    actions: list[SceneActionTarget]
+    palette: ScenePalette | None = None
+    speed: float | None = Field(default=None, ge=0, le=1)
+    auto_dynamic: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_group(self) -> Self:
+        if self.group.rtype not in {ResourceType.ROOM, ResourceType.ZONE}:
+            raise ValueError("A scene belongs to a room or zone")
+        if any(action.target.rtype != ResourceType.LIGHT for action in self.actions):
+            raise ValueError("Scene actions target lights")
+        return self
 
 
 class SceneRecallRequest(HueModel):
@@ -590,6 +729,10 @@ class LightEvent(LightUpdate, HueEvent):
     type: Literal[ResourceType.LIGHT] = ResourceType.LIGHT
     id_v1: str | None = None
     owner: ResourceReference | None = None
+    dimming: DimmingEventState | None = None
+    gradient: GradientState | None = None
+    effects_v2: EffectsV2State | None = None
+    signaling: SignalingState | None = None
 
 
 class RoomEvent(GroupUpdate, HueEvent):
@@ -626,14 +769,202 @@ class EntertainmentConfigurationEvent(HueEvent):
         return self.status == StreamingStatus.ACTIVE
 
 
+class DeviceEvent(Device, HueEvent):
+    services: list[ResourceReference] | None = None
+
+
+class DevicePowerEvent(DevicePower, HueEvent):
+    pass
+
+
+class DeviceSoftwareUpdateEvent(DeviceSoftwareUpdate, HueEvent):
+    problems: list[str] | None = None
+
+
+class BridgeEvent(Bridge, HueEvent):
+    pass
+
+
+class BridgeHomeEvent(BridgeHome, HueEvent):
+    children: list[ResourceReference] | None = None
+    services: list[ResourceReference] | None = None
+
+
+class ServiceGroupEvent(ServiceGroup, HueEvent):
+    services: list[ResourceReference] | None = None
+
+
+class MotionEvent(Motion, HueEvent):
+    pass
+
+
+class CameraMotionEvent(CameraMotion, HueEvent):
+    pass
+
+
+class TemperatureEvent(Temperature, HueEvent):
+    pass
+
+
+class LightLevelEvent(LightLevel, HueEvent):
+    pass
+
+
+class ButtonEvent(Button, HueEvent):
+    pass
+
+
+class BellButtonEvent(BellButton, HueEvent):
+    pass
+
+
+class RelativeRotaryEvent(RelativeRotary, HueEvent):
+    pass
+
+
+class ContactEvent(Contact, HueEvent):
+    pass
+
+
+class TamperEvent(Tamper, HueEvent):
+    tamper_reports: list[TamperReport] | None = None
+
+
+class GroupedMotionEvent(GroupedMotion, HueEvent):
+    pass
+
+
+class GroupedLightLevelEvent(GroupedLightLevel, HueEvent):
+    pass
+
+
+class ZigbeeConnectivityEvent(ZigbeeConnectivity, HueEvent):
+    pass
+
+
+class ZgpConnectivityEvent(ZgpConnectivity, HueEvent):
+    pass
+
+
+class WifiConnectivityEvent(WifiConnectivity, HueEvent):
+    pass
+
+
+class ZigbeeDeviceDiscoveryEvent(ZigbeeDeviceDiscovery, HueEvent):
+    pass
+
+
+class EntertainmentEvent(Entertainment, HueEvent):
+    pass
+
+
+class SpeakerEvent(Speaker, HueEvent):
+    alerts: list[str] | None = None
+
+
+class BehaviorScriptEvent(BehaviorScript, HueEvent):
+    pass
+
+
+class BehaviorInstanceEvent(BehaviorInstance, HueEvent):
+    dependees: list[ResourceReference] | None = None
+
+
+class GeofenceClientEvent(GeofenceClient, HueEvent):
+    pass
+
+
+class GeolocationEvent(Geolocation, HueEvent):
+    pass
+
+
+class HomekitEvent(Homekit, HueEvent):
+    pass
+
+
+class MatterEvent(Matter, HueEvent):
+    pass
+
+
+class MatterFabricEvent(MatterFabric, HueEvent):
+    pass
+
+
+class ConvenienceAreaMotionEvent(ConvenienceAreaMotion, HueEvent):
+    pass
+
+
+class SecurityAreaMotionEvent(SecurityAreaMotion, HueEvent):
+    pass
+
+
+class MotionAreaCandidateEvent(MotionAreaCandidate, HueEvent):
+    motion_sensors: list[ResourceReference] | None = None
+
+
+class MotionAreaConfigurationEvent(MotionAreaConfiguration, HueEvent):
+    motion_sensors: list[ResourceReference] | None = None
+
+
+class SwitchInputConfigurationEvent(SwitchInputConfiguration, HueEvent):
+    pass
+
+
+class SmartSceneEvent(SmartScene, HueEvent):
+    metadata: MetadataUpdate | None = None
+    group: ResourceReference | None = None
+    week_timeslots: list[SmartSceneDay] | None = None
+
+
+class GroupedLightEvent(GroupedLight, HueEvent):
+    dimming: DimmingEventState | None = None
+
+
 _UNTYPED_EVENT = "other"
 _TYPED_EVENTS = frozenset(
     {
-        ResourceType.LIGHT,
-        ResourceType.ROOM,
-        ResourceType.ZONE,
-        ResourceType.SCENE,
-        ResourceType.ENTERTAINMENT_CONFIGURATION,
+        "light",
+        "room",
+        "zone",
+        "scene",
+        "entertainment_configuration",
+        "device",
+        "device_power",
+        "device_software_update",
+        "bridge",
+        "bridge_home",
+        "service_group",
+        "motion",
+        "camera_motion",
+        "temperature",
+        "light_level",
+        "button",
+        "bell_button",
+        "relative_rotary",
+        "contact",
+        "tamper",
+        "grouped_motion",
+        "grouped_light_level",
+        "zigbee_connectivity",
+        "zgp_connectivity",
+        "wifi_connectivity",
+        "zigbee_device_discovery",
+        "entertainment",
+        "speaker",
+        "behavior_script",
+        "behavior_instance",
+        "geofence_client",
+        "geolocation",
+        "homekit",
+        "matter",
+        "matter_fabric",
+        "convenience_area_motion",
+        "security_area_motion",
+        "motion_area_candidate",
+        "motion_area_configuration",
+        "switch_input_configuration",
+        "smart_scene",
+        "grouped_light",
     }
 )
 
@@ -649,13 +980,48 @@ def _event_tag(value: Any) -> str:
 # Resource types hueify models explicitly are parsed into their own event; every
 # other type the bridge reports stays a plain HueEvent instead of failing.
 AnyHueEvent = Annotated[
-    Annotated[LightEvent, Tag(ResourceType.LIGHT)]
-    | Annotated[RoomEvent, Tag(ResourceType.ROOM)]
-    | Annotated[ZoneEvent, Tag(ResourceType.ZONE)]
-    | Annotated[SceneEvent, Tag(ResourceType.SCENE)]
-    | Annotated[
-        EntertainmentConfigurationEvent, Tag(ResourceType.ENTERTAINMENT_CONFIGURATION)
-    ]
+    Annotated[LightEvent, Tag("light")]
+    | Annotated[RoomEvent, Tag("room")]
+    | Annotated[ZoneEvent, Tag("zone")]
+    | Annotated[SceneEvent, Tag("scene")]
+    | Annotated[EntertainmentConfigurationEvent, Tag("entertainment_configuration")]
+    | Annotated[DeviceEvent, Tag("device")]
+    | Annotated[DevicePowerEvent, Tag("device_power")]
+    | Annotated[DeviceSoftwareUpdateEvent, Tag("device_software_update")]
+    | Annotated[BridgeEvent, Tag("bridge")]
+    | Annotated[BridgeHomeEvent, Tag("bridge_home")]
+    | Annotated[ServiceGroupEvent, Tag("service_group")]
+    | Annotated[MotionEvent, Tag("motion")]
+    | Annotated[CameraMotionEvent, Tag("camera_motion")]
+    | Annotated[TemperatureEvent, Tag("temperature")]
+    | Annotated[LightLevelEvent, Tag("light_level")]
+    | Annotated[ButtonEvent, Tag("button")]
+    | Annotated[BellButtonEvent, Tag("bell_button")]
+    | Annotated[RelativeRotaryEvent, Tag("relative_rotary")]
+    | Annotated[ContactEvent, Tag("contact")]
+    | Annotated[TamperEvent, Tag("tamper")]
+    | Annotated[GroupedMotionEvent, Tag("grouped_motion")]
+    | Annotated[GroupedLightLevelEvent, Tag("grouped_light_level")]
+    | Annotated[ZigbeeConnectivityEvent, Tag("zigbee_connectivity")]
+    | Annotated[ZgpConnectivityEvent, Tag("zgp_connectivity")]
+    | Annotated[WifiConnectivityEvent, Tag("wifi_connectivity")]
+    | Annotated[ZigbeeDeviceDiscoveryEvent, Tag("zigbee_device_discovery")]
+    | Annotated[EntertainmentEvent, Tag("entertainment")]
+    | Annotated[SpeakerEvent, Tag("speaker")]
+    | Annotated[BehaviorScriptEvent, Tag("behavior_script")]
+    | Annotated[BehaviorInstanceEvent, Tag("behavior_instance")]
+    | Annotated[GeofenceClientEvent, Tag("geofence_client")]
+    | Annotated[GeolocationEvent, Tag("geolocation")]
+    | Annotated[HomekitEvent, Tag("homekit")]
+    | Annotated[MatterEvent, Tag("matter")]
+    | Annotated[MatterFabricEvent, Tag("matter_fabric")]
+    | Annotated[ConvenienceAreaMotionEvent, Tag("convenience_area_motion")]
+    | Annotated[SecurityAreaMotionEvent, Tag("security_area_motion")]
+    | Annotated[MotionAreaCandidateEvent, Tag("motion_area_candidate")]
+    | Annotated[MotionAreaConfigurationEvent, Tag("motion_area_configuration")]
+    | Annotated[SwitchInputConfigurationEvent, Tag("switch_input_configuration")]
+    | Annotated[SmartSceneEvent, Tag("smart_scene")]
+    | Annotated[GroupedLightEvent, Tag("grouped_light")]
     | Annotated[HueEvent, Tag(_UNTYPED_EVENT)],
     Discriminator(_event_tag),
 ]
@@ -666,3 +1032,226 @@ class HueEventMessage(HueModel):
 
     data: list[AnyHueEvent] = Field(default_factory=list)
     creationtime: datetime | None = None
+
+
+__all__ = [
+    "AlertState",
+    "AnyHueEvent",
+    "BehaviorInstance",
+    "BehaviorInstanceEvent",
+    "BehaviorInstanceUpdate",
+    "BehaviorScript",
+    "BehaviorScriptEvent",
+    "BellButton",
+    "BellButtonEvent",
+    "BellState",
+    "Bridge",
+    "BridgeEvent",
+    "BridgeHome",
+    "BridgeHomeEvent",
+    "Button",
+    "ButtonConfiguration",
+    "ButtonEvent",
+    "ButtonReport",
+    "ButtonState",
+    "ButtonUpdate",
+    "CameraMotion",
+    "CameraMotionEvent",
+    "ColorGamut",
+    "ColorPaletteEntry",
+    "ColorState",
+    "ColorTemperatureDelta",
+    "ColorTemperaturePaletteEntry",
+    "ColorTemperatureSchema",
+    "ColorTemperatureState",
+    "ColorXY",
+    "Contact",
+    "ContactEvent",
+    "ContactReport",
+    "ControlMetadata",
+    "ConvenienceAreaMotion",
+    "ConvenienceAreaMotionEvent",
+    "Device",
+    "DeviceEvent",
+    "DevicePower",
+    "DevicePowerEvent",
+    "DeviceSoftwareUpdate",
+    "DeviceSoftwareUpdateEvent",
+    "DeviceSoftwareUpdateUpdate",
+    "DeviceUpdate",
+    "DimmingDelta",
+    "DimmingDeltaAction",
+    "DimmingEventState",
+    "DimmingPaletteEntry",
+    "DimmingState",
+    "DiscoveryAction",
+    "DynamicsState",
+    "EffectAction",
+    "EffectParameters",
+    "EffectStatus",
+    "EffectsPaletteEntry",
+    "EffectsState",
+    "EffectsV2PaletteEntry",
+    "EffectsV2State",
+    "EffectsV2Update",
+    "EnabledUpdate",
+    "Entertainment",
+    "EntertainmentChannel",
+    "EntertainmentChannelMember",
+    "EntertainmentConfiguration",
+    "EntertainmentConfigurationEvent",
+    "EntertainmentConfigurationType",
+    "EntertainmentConfigurationUpdate",
+    "EntertainmentEvent",
+    "EntertainmentLocations",
+    "EntertainmentPosition",
+    "EntertainmentSegment",
+    "EntertainmentSegments",
+    "EntertainmentServiceLocation",
+    "GamutType",
+    "GeofenceClient",
+    "GeofenceClientEvent",
+    "GeofenceClientUpdate",
+    "Geolocation",
+    "GeolocationEvent",
+    "GradientPoint",
+    "GradientState",
+    "GradientUpdate",
+    "Group",
+    "GroupArchetype",
+    "GroupCreate",
+    "GroupMetadata",
+    "GroupMetadataUpdate",
+    "GroupUpdate",
+    "GroupedLight",
+    "GroupedLightEvent",
+    "GroupedLightLevel",
+    "GroupedLightLevelEvent",
+    "GroupedMotion",
+    "GroupedMotionEvent",
+    "Homekit",
+    "HomekitEvent",
+    "HomekitUpdate",
+    "HueApiError",
+    "HueApiResponse",
+    "HueEvent",
+    "HueEventMessage",
+    "HueModel",
+    "HueResource",
+    "IdentifyAction",
+    "ImageResourceReference",
+    "Light",
+    "LightArchetype",
+    "LightEvent",
+    "LightLevel",
+    "LightLevelEvent",
+    "LightLevelReport",
+    "LightLevelState",
+    "LightMetadata",
+    "LightMetadataUpdate",
+    "LightStateMixin",
+    "LightUpdate",
+    "Matter",
+    "MatterAction",
+    "MatterEvent",
+    "MatterFabric",
+    "MatterFabricData",
+    "MatterFabricEvent",
+    "MatterUpdate",
+    "MetadataUpdate",
+    "Motion",
+    "MotionAreaCandidate",
+    "MotionAreaCandidateEvent",
+    "MotionAreaConfiguration",
+    "MotionAreaConfigurationEvent",
+    "MotionEvent",
+    "MotionReport",
+    "MotionSensitivity",
+    "MotionSensitivityUpdate",
+    "MotionState",
+    "MotionUpdate",
+    "NamedMetadata",
+    "NamedResource",
+    "OnState",
+    "OwnedResource",
+    "PowerState",
+    "PowerupState",
+    "ProductData",
+    "RelativeRotary",
+    "RelativeRotaryEvent",
+    "RelativeRotaryState",
+    "ResourceIdentifier",
+    "ResourceReference",
+    "ResourceType",
+    "Room",
+    "RoomEvent",
+    "RotaryReport",
+    "Rotation",
+    "Scene",
+    "SceneAction",
+    "SceneActionTarget",
+    "SceneCreate",
+    "SceneEvent",
+    "SceneMetadata",
+    "SceneMetadataUpdate",
+    "ScenePalette",
+    "SceneRecall",
+    "SceneRecallRequest",
+    "SceneStatus",
+    "SceneStatusValue",
+    "SceneUpdate",
+    "SecurityAreaMotion",
+    "SecurityAreaMotionEvent",
+    "ServiceGroup",
+    "ServiceGroupEvent",
+    "ServiceGroupUpdate",
+    "SignalingState",
+    "SignalingUpdate",
+    "SmartScene",
+    "SmartSceneActiveTimeslot",
+    "SmartSceneCreate",
+    "SmartSceneDay",
+    "SmartSceneEvent",
+    "SmartSceneRecall",
+    "SmartSceneStartTime",
+    "SmartSceneTime",
+    "SmartSceneTimeslot",
+    "SmartSceneUpdate",
+    "SoftwareInstall",
+    "Speaker",
+    "SpeakerEvent",
+    "StreamAction",
+    "StreamProxy",
+    "StreamProxyMode",
+    "StreamingStatus",
+    "SwitchInputConfiguration",
+    "SwitchInputConfigurationEvent",
+    "SwitchInputConfigurationUpdate",
+    "Tamper",
+    "TamperEvent",
+    "TamperReport",
+    "Temperature",
+    "TemperatureEvent",
+    "TemperatureReport",
+    "TemperatureState",
+    "TimeZone",
+    "TimedEffectsState",
+    "UserTest",
+    "UserTestUpdate",
+    "Weekday",
+    "WifiConnectivity",
+    "WifiConnectivityEvent",
+    "WifiSignalStrength",
+    "ZgpConnectivity",
+    "ZgpConnectivityEvent",
+    "ZigbeeChannel",
+    "ZigbeeChannelValue",
+    "ZigbeeConnectivity",
+    "ZigbeeConnectivityEvent",
+    "ZigbeeConnectivityUpdate",
+    "ZigbeeDeviceDiscovery",
+    "ZigbeeDeviceDiscoveryEvent",
+    "ZigbeeDeviceDiscoveryUpdate",
+    "Zone",
+    "ZoneEvent",
+]

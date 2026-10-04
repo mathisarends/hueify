@@ -6,6 +6,7 @@ from hueify.errors import ResourceNotFoundError
 from hueify.http import HttpClient
 from hueify.models import (
     Group,
+    GroupCreate,
     GroupedLight,
     GroupUpdate,
     HueApiResponse,
@@ -44,7 +45,9 @@ class GroupNamespace[TGroup: Group](LightCommands, ResourceNamespace[TGroup]):
         self._lights = LightNamespace(http_client)
         self._scenes = SceneNamespace(http_client)
 
-    async def create(self, data: GroupUpdate) -> HueApiResponse[ResourceIdentifier]:
+    async def create(self, data: GroupCreate) -> HueApiResponse[ResourceIdentifier]:
+        if not isinstance(data, GroupCreate):
+            raise TypeError(f"{self.resource_type}.create expects GroupCreate")
         return await self._create(data)
 
     async def update(

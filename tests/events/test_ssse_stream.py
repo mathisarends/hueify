@@ -148,13 +148,13 @@ class TestHandleSse:
     @pytest.mark.asyncio
     async def test_dispatches_unmodelled_resource_type_as_a_plain_event(self) -> None:
         stream, bus, _ = make_stream()
-        sse = make_sse([{"data": [make_raw_event("button")]}])
+        sse = make_sse([{"data": [make_raw_event("future_sensor")]}])
 
         await stream._handle_sse(sse)
 
         dispatched = bus.dispatch.await_args.args[0]
         assert type(dispatched) is HueEvent
-        assert dispatched.type == "button"
+        assert dispatched.type == "future_sensor"
 
     @pytest.mark.asyncio
     async def test_drops_a_payload_that_does_not_match_the_event_schema(self) -> None:

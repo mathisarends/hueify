@@ -67,6 +67,8 @@ class HttpClient:
         await self._client.aclose()
 
     def _url(self, endpoint: str) -> str:
+        if not endpoint:
+            return self._base_url
         return f"{self._base_url}/{endpoint.lstrip('/')}"
 
     def _validate_write_response(

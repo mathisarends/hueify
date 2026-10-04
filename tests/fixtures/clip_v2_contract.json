@@ -1,0 +1,423 @@
+{
+  "source": "https://github.com/openhue/openhue-api",
+  "revision": "1ffc817857abf456d5ff2ae50400ef768dbce28e",
+  "resources": [
+    {
+      "resource_type": "behavior_instance",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "behavior_script",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "bell_button",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "bridge",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "bridge_home",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET"
+      ]
+    },
+    {
+      "resource_type": "button",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "camera_motion",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "contact",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "convenience_area_motion",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "device",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT",
+        "DELETE"
+      ]
+    },
+    {
+      "resource_type": "device_power",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET"
+      ]
+    },
+    {
+      "resource_type": "device_software_update",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "entertainment",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "entertainment_configuration",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "geofence_client",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "geolocation",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "grouped_light",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "grouped_light_level",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "grouped_motion",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "homekit",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "light",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "light_level",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "matter",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "matter_fabric",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "motion",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "motion_area_candidate",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "motion_area_configuration",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "relative_rotary",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "room",
+      "collection_methods": [
+        "GET",
+        "POST"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT",
+        "DELETE"
+      ]
+    },
+    {
+      "resource_type": "scene",
+      "collection_methods": [
+        "GET",
+        "POST"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT",
+        "DELETE"
+      ]
+    },
+    {
+      "resource_type": "security_area_motion",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "service_group",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "smart_scene",
+      "collection_methods": [
+        "GET",
+        "POST"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT",
+        "DELETE"
+      ]
+    },
+    {
+      "resource_type": "speaker",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "tamper",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "temperature",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "wifi_connectivity",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "zgp_connectivity",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "zigbee_connectivity",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "zigbee_device_discovery",
+      "collection_methods": [
+        "GET"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT"
+      ]
+    },
+    {
+      "resource_type": "zone",
+      "collection_methods": [
+        "GET",
+        "POST"
+      ],
+      "item_methods": [
+        "GET",
+        "PUT",
+        "DELETE"
+      ]
+    }
+  ]
+}
