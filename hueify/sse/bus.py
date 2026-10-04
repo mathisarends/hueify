@@ -1,11 +1,11 @@
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from typing import Literal, cast, overload
+from typing import cast, overload
 
 from hueify.models import HueEvent, ResourceType
 
-type EventResourceType = ResourceType | Literal["*"]
+type EventResourceType = ResourceType | str
 type EventHandler[T: HueEvent] = Callable[[T], Awaitable[None]]
 
 logger = logging.getLogger(__name__)
@@ -55,6 +55,8 @@ class EventBus:
             *self._handlers.get(str(event.type), []),
             *self._handlers.get("*", []),
         ]
+        if not handlers:
+            return event
         results = await asyncio.gather(
             *(handler(event) for handler in handlers),
             return_exceptions=True,

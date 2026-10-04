@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
 from datetime import timedelta
+from math import isfinite
 
 from hueify.color import hex_to_rgb, kelvin_to_mirek, rgb_to_xy
 from hueify.models import (
     AlertState,
     ColorState,
+    ColorTemperatureDelta,
     ColorTemperatureState,
     ColorXY,
     DimmingDelta,
@@ -15,6 +17,7 @@ from hueify.models import (
     LightUpdate,
     OnState,
     ResourceIdentifier,
+    SignalingUpdate,
 )
 from hueify.resources.base import ResourceId
 
@@ -62,8 +65,8 @@ def _transition_to_milliseconds(transition: Transition) -> int:
         if isinstance(transition, timedelta)
         else float(transition)
     )
-    if seconds < 0:
-        raise ValueError("A transition cannot be negative")
+    if not isfinite(seconds) or seconds < 0:
+        raise ValueError("A transition must be finite and cannot be negative")
     return round(seconds * 1000)
 
 
@@ -167,6 +170,83 @@ class LightCommands(ABC):
         by: float = _DEFAULT_BRIGHTNESS_STEP,
     ) -> HueApiResponse[ResourceIdentifier]:
         return await self._step_brightness(resource_id, DimmingDeltaAction.DOWN, by)
+
+    async def stop_dimming(
+        self, resource_id: ResourceId
+    ) -> HueApiResponse[ResourceIdentifier]:
+        return await self.apply(
+            resource_id,
+            LightUpdate(dimming_delta=DimmingDelta(action=DimmingDeltaAction.STOP)),
+        )
+
+    async def warmer(
+        self, resource_id: ResourceId, by: int = 50
+    ) -> HueApiResponse[ResourceIdentifier]:
+        return await self.apply(
+            resource_id,
+            LightUpdate(
+                color_temperature_delta=ColorTemperatureDelta(
+                    action=DimmingDeltaAction.UP, mirek_delta=by
+                )
+            ),
+        )
+
+    async def cooler(
+        self, resource_id: ResourceId, by: int = 50
+    ) -> HueApiResponse[ResourceIdentifier]:
+        return await self.apply(
+            resource_id,
+            LightUpdate(
+                color_temperature_delta=ColorTemperatureDelta(
+                    action=DimmingDeltaAction.DOWN, mirek_delta=by
+                )
+            ),
+        )
+
+    async def stop_color_temperature(
+        self, resource_id: ResourceId
+    ) -> HueApiResponse[ResourceIdentifier]:
+        return await self.apply(
+            resource_id,
+            LightUpdate(
+                color_temperature_delta=ColorTemperatureDelta(
+                    action=DimmingDeltaAction.STOP
+                )
+            ),
+        )
+
+    async def signal(
+        self,
+        resource_id: ResourceId,
+        signal: str,
+        *,
+        duration: Transition | None = None,
+        colors: list[ColorXY] | None = None,
+    ) -> HueApiResponse[ResourceIdentifier]:
+        if signal not in {"no_signal", "on_off", "on_off_color", "alternating"}:
+            raise ValueError("Unknown signal")
+        if signal != "no_signal" and duration is None:
+            raise ValueError("An active signal needs a duration")
+        required_colors = {
+            "no_signal": 0,
+            "on_off": 0,
+            "on_off_color": 1,
+            "alternating": 2,
+        }[signal]
+        if len(colors or []) != required_colors:
+            raise ValueError(f"{signal} needs {required_colors} colors")
+        return await self.apply(
+            resource_id,
+            LightUpdate(
+                signaling=SignalingUpdate(
+                    signal=signal,
+                    duration=None
+                    if duration is None
+                    else _transition_to_milliseconds(duration),
+                    color=None if not colors else [ColorState(xy=xy) for xy in colors],
+                )
+            ),
+        )
 
     async def set_rgb(
         self,

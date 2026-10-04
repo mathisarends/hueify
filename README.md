@@ -7,6 +7,11 @@ Hueify is a typed async client for the Philips Hue CLIP v2 API. Lights, rooms an
 zones share one command surface, and the raw JSON resources stay reachable
 underneath it.
 
+Device services, sensors, smart scenes, behavior instances, connectivity,
+MotionAware resources and integrations are also exposed through namespaces.
+See the [CLIP v2 coverage and migration guide](docs/clip-v2-coverage.md) for
+every endpoint, its request model, and the limits of the public specification.
+
 ```bash
 pip install hueify
 ```
@@ -18,6 +23,7 @@ pip install hueify
   - [Colors](#colors)
   - [Transitions](#transitions)
 - [Finding resources](#finding-resources)
+- [Devices, sensors and other resources](#devices-sensors-and-other-resources)
 - [Reading state](#reading-state)
 - [Rooms, zones and scenes](#rooms-zones-and-scenes)
 - [Event stream](#event-stream)
@@ -156,8 +162,9 @@ one per lamp - hueify resolves that service for you.
 | `set_state(id, …)` | Send exactly the given fields and nothing else |
 | `identify(id)` | Let the lamp breathe so you can tell which one it is |
 
-Every `set_*` command switches the target on, because asking for a brightness or a
-color implies it. `set_state` does not: it sends what it is given.
+Commands that set brightness, color, effects or gradients switch the target on.
+`set_state` sends only its given fields; power-up configuration, relative steps,
+signaling and commands that stop an effect do not switch the light on.
 
 ```python
 await hue.lights.set_state(desk.id, brightness=30)          # dim without switching on
@@ -230,6 +237,63 @@ response = await hue.lights.get(light.id)
 
 print(response.errors, response.data)
 ```
+
+## Devices, sensors and other resources
+
+The same `list()`, `get(id)` and `get_one(id)` reads are available on every
+resource namespace. Named resources also support `find_by_name()`; services
+without a name are skipped. `hue.resources.list()` calls the CLIP resource root
+and returns a mixed, typed inventory. References can be followed directly:
+
+```python
+inventory = await hue.resources.list()
+light = await hue.lights.find_by_name("Desk")
+device = await hue.resources.get(light.owner)
+
+await hue.devices.rename(device.id, "Desk lamp")
+await hue.devices.identify(device.id)
+
+for sensor in (await hue.temperatures.list()).data:
+    print(sensor.celsius)
+for sensor in (await hue.light_levels.list()).data:
+    print(sensor.lux)
+
+motion = (await hue.motions.list()).data[0]
+await hue.motions.disable(motion.id)
+await hue.motions.set_sensitivity(motion.id, 1)
+```
+
+Use native request models for multi-field updates, for example
+`hue.behavior_instances.update(id, BehaviorInstanceUpdate(enabled=False))`.
+Built-in namespaces expose create and delete only where the pinned public
+specification documents them. A resource unavailable on a particular bridge
+returns its native HTTP error or Hue error envelope.
+
+Lights also expose `set_effect()` / `stop_effect()` using `effects_v2`,
+`set_gradient()`, `set_timed_effect()` / `stop_timed_effect()` and
+`set_powerup_preset()`. All light-command namespaces support `signal()`,
+`warmer()`, `cooler()`, `stop_color_temperature()` and `stop_dimming()`.
+`set_powerup_preset()` configures restart behavior without changing the light's
+current on/off state. Feature availability comes from the light's reported
+capabilities.
+
+```python
+await hue.lights.set_effect(light.id, "candle", speed=0.4)
+await hue.lights.stop_effect(light.id)
+await hue.lights.set_powerup_preset(light.id, "last_on_state")
+await hue.grouped_lights.signal(grouped_light_id, "on_off", duration=5)
+```
+
+For fields or operations absent from the public schema, an explicit raw
+namespace accepts dictionaries, retaining even explicit JSON nulls:
+
+```python
+await hue.resources.of("light").update(light.id, {"future_setting": None})
+```
+
+Raw method availability makes no assertion about what the bridge supports.
+See the [coverage guide](docs/clip-v2-coverage.md) for the full namespace table,
+smart-scene creation, request migrations and outstanding reference checks.
 
 ## Reading state
 
@@ -305,10 +369,12 @@ async with Hueify() as hue:
     await asyncio.Event().wait()
 ```
 
-Events arrive as `LightEvent`, `RoomEvent`, `ZoneEvent` and `SceneEvent` - the
-matching update model plus an ID, so a `LightEvent` reads like a light, including
-the flat accessors. Anything else arrives as the base `HueEvent`. A `"*"` handler
-receives every event, in addition to the type-specific ones.
+Every modeled resource has a corresponding partial event, including
+`MotionEvent`, `TemperatureEvent`, `ButtonEvent` and `SmartSceneEvent`. Fields
+absent from a change remain optional; `LightEvent` also has the flat state
+accessors. Unknown firmware resource types arrive as the base `HueEvent`, with
+their fields retained. A `"*"` handler receives every event alongside the
+type-specific handlers.
 
 `hue.off(resource_type, handler)` removes a handler and `hue.stop_stream()` ends
 the stream. Leaving the context manager closes a started stream along with the

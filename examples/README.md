@@ -16,7 +16,9 @@ names it expects - adjust them to names from your own Hue app.
 | [find_resources.py](find_resources.py) | Names, IDs, envelopes and missing resources |
 | [live_state.py](live_state.py) | React to bridge changes over the event stream |
 | [server_sent_events.py](server_sent_events.py) | Subscribe to light and scene events |
-| [raw_api.py](raw_api.py) | Drop to raw CLIP v2 payloads for effects and gradients |
+| [raw_api.py](raw_api.py) | Combine typed feature updates in one CLIP v2 payload |
+| [resource_inventory.py](resource_inventory.py) | Discover all resource types and resolve owner references |
+| [sensors_and_devices.py](sensors_and_devices.py) | Read devices, batteries, temperature and lux; listen to motion events |
 | [entertainment_stream.py](entertainment_stream.py) | Stream frames to an entertainment area over UDP |
 
 ```bash
