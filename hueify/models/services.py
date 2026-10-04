@@ -11,7 +11,7 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from hueify._model_base import HueModel, HueResource, ResourceReference, ResourceType
+from hueify.models.base import HueModel, HueResource, ResourceReference, ResourceType
 
 
 class MetadataUpdate(HueModel):

@@ -179,6 +179,11 @@ Light levels convert the bridge's logarithmic units to lux.
 
 ## Partial events
 
+Public model imports go through `hueify.models.__init__`, for example
+`from hueify.models import Light, MotionEvent, SmartSceneCreate`. The models
+package separates base types, lighting, services and events into ordinary
+modules and re-exports them from that public entry point.
+
 Every modeled resource has its own event class, such as MotionEvent,
 ButtonEvent, DeviceEvent, SmartSceneEvent and GroupedLightEvent. Event fields
 may be absent. Lists such as device services stay None when absent, distinct
