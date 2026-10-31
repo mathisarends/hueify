@@ -91,33 +91,21 @@ def load_credentials(
         MissingCredentialsError: If bridge IP and application key cannot both
             be resolved.
     """
-    stored = _stored_credentials(required=bridge_ip is None or app_key is None)
-    if stored is None:
-        return HueBridgeCredentials(
-            hue_bridge_ip=bridge_ip,
-            hue_app_key=app_key,
-            hue_client_key=client_key,
+    overrides = {
+        name: value
+        for name, value in (
+            ("HUE_BRIDGE_IP", bridge_ip),
+            ("HUE_APP_KEY", app_key),
+            ("HUE_CLIENT_KEY", client_key),
         )
-
-    return HueBridgeCredentials(
-        hue_bridge_ip=bridge_ip or stored.hue_bridge_ip,
-        hue_app_key=app_key or stored.hue_app_key,
-        hue_client_key=client_key or stored.hue_client_key,
-    )
-
-
-def _stored_credentials(required: bool) -> HueBridgeCredentials | None:
-    """Credentials from the environment and ``.env``, or ``None`` if incomplete.
-
-    Raises:
-        MissingCredentialsError: If they are incomplete but needed.
-    """
+        if value is not None
+    }
     try:
-        return HueBridgeCredentials()
+        return HueBridgeCredentials(**overrides)
     except ValidationError as error:
-        if required:
+        if any(issue["type"] == "missing" for issue in error.errors()):
             raise MissingCredentialsError(_MISSING_CREDENTIALS_MESSAGE) from error
-        return None
+        raise
 
 
 _MISSING_CREDENTIALS_MESSAGE = (
