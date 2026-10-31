@@ -1,94 +1,20 @@
-from datetime import datetime
+"""Lighting, groups, scenes, and entertainment-area payloads."""
+
 from enum import StrEnum
-from typing import Annotated, Any, Literal
+from typing import Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Discriminator, Field, Tag
+from pydantic import Field, model_validator
 
-
-class HueModel(BaseModel):
-    """Base for Hue payloads that preserves fields added by bridge firmware."""
-
-    model_config = ConfigDict(extra="allow")
-
-
-class ResourceType(StrEnum):
-    LIGHT = "light"
-    GROUPED_LIGHT = "grouped_light"
-    ROOM = "room"
-    ZONE = "zone"
-    SCENE = "scene"
-    SMART_SCENE = "smart_scene"
-    PUBLIC_IMAGE = "public_image"
-    DEVICE = "device"
-    DEVICE_POWER = "device_power"
-    DEVICE_SOFTWARE_UPDATE = "device_software_update"
-    BRIDGE = "bridge"
-    BRIDGE_HOME = "bridge_home"
-    SERVICE_GROUP = "service_group"
-    MOTION = "motion"
-    CAMERA_MOTION = "camera_motion"
-    TEMPERATURE = "temperature"
-    LIGHT_LEVEL = "light_level"
-    BUTTON = "button"
-    BELL_BUTTON = "bell_button"
-    RELATIVE_ROTARY = "relative_rotary"
-    CONTACT = "contact"
-    TAMPER = "tamper"
-    GROUPED_MOTION = "grouped_motion"
-    GROUPED_LIGHT_LEVEL = "grouped_light_level"
-    ZIGBEE_CONNECTIVITY = "zigbee_connectivity"
-    ZGP_CONNECTIVITY = "zgp_connectivity"
-    WIFI_CONNECTIVITY = "wifi_connectivity"
-    ZIGBEE_DEVICE_DISCOVERY = "zigbee_device_discovery"
-    ENTERTAINMENT = "entertainment"
-    ENTERTAINMENT_CONFIGURATION = "entertainment_configuration"
-    SPEAKER = "speaker"
-    BEHAVIOR_SCRIPT = "behavior_script"
-    BEHAVIOR_INSTANCE = "behavior_instance"
-    GEOFENCE_CLIENT = "geofence_client"
-    GEOLOCATION = "geolocation"
-    HOMEKIT = "homekit"
-    MATTER = "matter"
-    MATTER_FABRIC = "matter_fabric"
-    CONVENIENCE_AREA_MOTION = "convenience_area_motion"
-    SECURITY_AREA_MOTION = "security_area_motion"
-    MOTION_AREA_CANDIDATE = "motion_area_candidate"
-    MOTION_AREA_CONFIGURATION = "motion_area_configuration"
-    AUTH_V1 = "auth_v1"
-
-
-class ResourceReference(HueModel):
-    rid: UUID
-    rtype: ResourceType
-
-
-class ResourceIdentifier(ResourceReference):
-    pass
-
-
-class HueApiError(HueModel):
-    description: str
-
-
-class HueApiResponse[T: BaseModel](HueModel):
-    errors: list[HueApiError] = Field(default_factory=list)
-    data: list[T] = Field(default_factory=list)
-
-
-class NamedMetadata(HueModel):
-    name: str
-
-
-class NamedResource(HueModel):
-    """Base for resources that carry a stable ID and a user-visible name."""
-
-    id: UUID
-    metadata: NamedMetadata
-
-    @property
-    def name(self) -> str:
-        return self.metadata.name
+from hueify.models.base import (
+    HueModel,
+    HueResource,
+    IdentifyAction,
+    NamedMetadata,
+    NamedResource,
+    ResourceReference,
+    ResourceType,
+)
 
 
 class OnState(HueModel):
@@ -97,6 +23,12 @@ class OnState(HueModel):
 
 class DimmingState(HueModel):
     brightness: float = Field(ge=0, le=100)
+    min_dim_level: float | None = Field(default=None, ge=0, le=100)
+
+
+class DimmingEventState(HueModel):
+    brightness: float | None = Field(default=None, ge=0, le=100)
+    min_dim_level: float | None = Field(default=None, ge=0, le=100)
 
 
 class DimmingDeltaAction(StrEnum):
@@ -107,7 +39,7 @@ class DimmingDeltaAction(StrEnum):
 
 class DimmingDelta(HueModel):
     action: DimmingDeltaAction
-    brightness_delta: float = Field(default=0, ge=0, le=100)
+    brightness_delta: float | None = Field(default=None, ge=0, le=100)
 
 
 class ColorTemperatureSchema(HueModel):
@@ -119,6 +51,11 @@ class ColorTemperatureState(HueModel):
     mirek: int | None = Field(default=None, ge=50, le=1000)
     mirek_valid: bool | None = None
     mirek_schema: ColorTemperatureSchema | None = None
+
+
+class ColorTemperatureDelta(HueModel):
+    action: DimmingDeltaAction
+    mirek_delta: int | None = Field(default=None, ge=0, le=347)
 
 
 class ColorXY(HueModel):
@@ -157,6 +94,19 @@ class GradientState(HueModel):
     pixel_count: int | None = None
 
 
+class GradientUpdate(HueModel):
+    points: list[GradientPoint] | None = Field(default=None, min_length=2, max_length=5)
+    mode: str | None = None
+
+
+class GradientEventState(HueModel):
+    points: list[GradientPoint] | None = None
+    mode: str | None = None
+    points_capable: int | None = None
+    mode_values: list[str] | None = None
+    pixel_count: int | None = None
+
+
 class EffectsState(HueModel):
     effect: str | None = None
     status: str | None = None
@@ -164,9 +114,51 @@ class EffectsState(HueModel):
     effect_values: list[str] | None = None
 
 
+class EffectParameters(HueModel):
+    color: ColorState | None = None
+    color_temperature: ColorTemperatureState | None = None
+    speed: float | None = Field(default=None, ge=0, le=1)
+
+
+class EffectAction(HueModel):
+    effect: str
+    parameters: EffectParameters | None = None
+
+
+class EffectStatus(HueModel):
+    effect: str | None = None
+    effect_values: list[str] | None = None
+    parameters: EffectParameters | None = None
+
+
+class EffectsV2State(HueModel):
+    action: EffectAction | None = None
+    status: EffectStatus | None = None
+
+
+class EffectsV2Update(HueModel):
+    action: EffectAction
+
+
+class PowerupState(HueModel):
+    preset: Literal["safety", "powerfail", "last_on_state", "custom"]
+    configured: bool | None = None
+    on: HueModel | None = None
+    dimming: HueModel | None = None
+    color: HueModel | None = None
+
+
+class PowerupEventState(HueModel):
+    preset: Literal["safety", "powerfail", "last_on_state", "custom"] | None = None
+    configured: bool | None = None
+    on: HueModel | None = None
+    dimming: HueModel | None = None
+    color: HueModel | None = None
+
+
 class TimedEffectsState(HueModel):
     effect: str | None = None
-    duration: int | None = None
+    duration: int | None = Field(default=None, ge=0, le=21600000)
     status: str | None = None
     status_values: list[str] | None = None
     effect_values: list[str] | None = None
@@ -187,10 +179,18 @@ class AlertState(HueModel):
 
 class SignalingState(HueModel):
     signal: str | None = None
-    duration: int | None = None
-    colors: list[ColorXY] | None = None
+    duration: int | None = Field(default=None, ge=0, le=65534000)
+    color: list[ColorState] | None = Field(default=None, min_length=1, max_length=2)
+    colors: list[ColorState | ColorXY] | None = None
     status: str | None = None
     signal_values: list[str] | None = None
+    estimated_end: int | None = None
+
+
+class SignalingUpdate(HueModel):
+    signal: Literal["no_signal", "on_off", "on_off_color", "alternating"]
+    duration: int | None = Field(default=None, ge=0, le=65534000)
+    color: list[ColorState] | None = Field(default=None, min_length=1, max_length=2)
 
 
 class LightArchetype(StrEnum):
@@ -259,6 +259,14 @@ class LightArchetype(StrEnum):
 
 class LightMetadata(NamedMetadata):
     archetype: LightArchetype | str | None = None
+    function: str | None = None
+    fixed_mired: int | None = None
+
+
+class LightMetadataUpdate(HueModel):
+    name: str | None = None
+    archetype: LightArchetype | str | None = None
+    function: str | None = None
 
 
 class LightStateMixin:
@@ -301,25 +309,35 @@ class Light(NamedResource, LightStateMixin):
     color: ColorState | None = None
     gradient: GradientState | None = None
     effects: EffectsState | None = None
+    effects_v2: EffectsV2State | None = None
     timed_effects: TimedEffectsState | None = None
     dynamics: DynamicsState | None = None
     alert: AlertState | None = None
     signaling: SignalingState | None = None
+    powerup: PowerupState | None = None
+    identify: HueModel | None = None
+    service_id: int | None = None
     mode: str | None = None
 
 
 class LightUpdate(HueModel, LightStateMixin):
+    metadata: LightMetadataUpdate | None = None
+    identify: IdentifyAction | None = None
     on: OnState | None = None
     dimming: DimmingState | None = None
     dimming_delta: DimmingDelta | None = None
     color_temperature: ColorTemperatureState | None = None
+    color_temperature_delta: ColorTemperatureDelta | None = None
     color: ColorState | None = None
-    gradient: GradientState | None = None
+    gradient: GradientUpdate | None = None
     effects: EffectsState | None = None
+    effects_v2: EffectsV2Update | None = None
     timed_effects: TimedEffectsState | None = None
     dynamics: DynamicsState | None = None
     alert: AlertState | None = None
-    signaling: SignalingState | None = None
+    signaling: SignalingUpdate | None = None
+    powerup: PowerupState | None = None
+    mode: str | None = None
 
 
 class GroupArchetype(StrEnum):
@@ -369,6 +387,11 @@ class GroupMetadata(NamedMetadata):
     archetype: GroupArchetype | str
 
 
+class GroupMetadataUpdate(HueModel):
+    name: str | None = Field(default=None, min_length=1, max_length=32)
+    archetype: GroupArchetype | str | None = None
+
+
 class Group(NamedResource):
     metadata: GroupMetadata
     children: list[ResourceReference] = Field(default_factory=list)
@@ -384,11 +407,16 @@ class Zone(Group):
 
 
 class GroupUpdate(HueModel):
-    metadata: GroupMetadata | None = None
+    metadata: GroupMetadataUpdate | GroupMetadata | None = None
     children: list[ResourceReference] | None = None
 
 
-class GroupedLight(HueModel, LightStateMixin):
+class GroupCreate(GroupUpdate):
+    metadata: GroupMetadata
+    children: list[ResourceReference] = Field(default_factory=list)
+
+
+class GroupedLight(HueResource, LightStateMixin):
     """Aggregated light service a room or zone is controlled through."""
 
     id: UUID
@@ -438,8 +466,15 @@ class SceneMetadata(NamedMetadata):
     appdata: str | None = Field(default=None, min_length=1, max_length=16)
 
 
+class SceneMetadataUpdate(HueModel):
+    name: str | None = Field(default=None, min_length=1, max_length=32)
+    image: ImageResourceReference | None = None
+    appdata: str | None = Field(default=None, min_length=1, max_length=16)
+
+
 class ColorPaletteEntry(HueModel):
     color: ColorState
+    dimming: DimmingState | None = None
 
 
 class DimmingPaletteEntry(HueModel):
@@ -448,18 +483,25 @@ class DimmingPaletteEntry(HueModel):
 
 class ColorTemperaturePaletteEntry(HueModel):
     color_temperature: ColorTemperatureState
+    dimming: DimmingState | None = None
 
 
 class EffectsPaletteEntry(HueModel):
-    effects: EffectsState
+    effect: str | None = None
+    effects: EffectsState | None = None
+
+
+class EffectsV2PaletteEntry(HueModel):
+    effect: str
+    parameters: EffectParameters | None = None
 
 
 class ScenePalette(HueModel):
     color: list[ColorPaletteEntry] = Field(default_factory=list)
-    dimming: list[DimmingPaletteEntry] = Field(default_factory=list)
+    dimming: list[DimmingState] = Field(default_factory=list, max_length=1)
     color_temperature: list[ColorTemperaturePaletteEntry] = Field(default_factory=list)
-    effects: list[EffectsPaletteEntry] = Field(default_factory=list)
-    effects_v2: list[EffectsPaletteEntry] = Field(default_factory=list)
+    effects: list[EffectAction] = Field(default_factory=list, max_length=3)
+    effects_v2: list[EffectsV2PaletteEntry] = Field(default_factory=list)
 
 
 class Scene(NamedResource):
@@ -474,18 +516,36 @@ class Scene(NamedResource):
     id_v1: str | None = None
 
 
+class SceneRecall(HueModel):
+    action: SceneAction = SceneAction.ACTIVE
+    duration: int | None = Field(default=None, ge=0)
+    dimming: DimmingState | None = None
+
+
 class SceneUpdate(HueModel):
-    metadata: SceneMetadata | None = None
+    metadata: SceneMetadataUpdate | SceneMetadata | None = None
     actions: list[SceneActionTarget] | None = None
     palette: ScenePalette | None = None
     speed: float | None = Field(default=None, ge=0, le=1)
     auto_dynamic: bool | None = None
+    recall: SceneRecall | None = None
 
 
-class SceneRecall(HueModel):
-    action: SceneAction = SceneAction.ACTIVE
-    duration: int | None = None
-    dimming: DimmingState | None = None
+class SceneCreate(HueModel):
+    metadata: SceneMetadata
+    group: ResourceReference
+    actions: list[SceneActionTarget]
+    palette: ScenePalette | None = None
+    speed: float | None = Field(default=None, ge=0, le=1)
+    auto_dynamic: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_group(self) -> Self:
+        if self.group.rtype not in {ResourceType.ROOM, ResourceType.ZONE}:
+            raise ValueError("A scene belongs to a room or zone")
+        if any(action.target.rtype != ResourceType.LIGHT for action in self.actions):
+            raise ValueError("Scene actions target lights")
+        return self
 
 
 class SceneRecallRequest(HueModel):
@@ -579,93 +639,3 @@ class EntertainmentConfigurationUpdate(HueModel):
     metadata: NamedMetadata | None = None
     configuration_type: EntertainmentConfigurationType | None = None
     stream_proxy: StreamProxy | None = None
-
-
-class HueEvent(HueModel):
-    id: UUID
-    type: ResourceType | str
-    # Container metadata accompanies each resource without replacing its type.
-    operation: str | None = None
-    creationtime: datetime | None = None
-
-
-class LightEvent(LightUpdate, HueEvent):
-    type: Literal[ResourceType.LIGHT] = ResourceType.LIGHT
-    id_v1: str | None = None
-    owner: ResourceReference | None = None
-
-
-class RoomEvent(GroupUpdate, HueEvent):
-    type: Literal[ResourceType.ROOM] = ResourceType.ROOM
-    services: list[ResourceReference] | None = None
-
-
-class ZoneEvent(GroupUpdate, HueEvent):
-    type: Literal[ResourceType.ZONE] = ResourceType.ZONE
-    services: list[ResourceReference] | None = None
-
-
-class SceneEvent(SceneUpdate, HueEvent):
-    type: Literal[ResourceType.SCENE] = ResourceType.SCENE
-    status: SceneStatus | None = None
-
-
-class EntertainmentConfigurationEvent(HueEvent):
-    """Reports that an area started or stopped streaming, and who owns it.
-
-    An area another application takes over arrives here, which is the only
-    notice a streaming session gets that the bridge stopped listening to it.
-    """
-
-    type: Literal[ResourceType.ENTERTAINMENT_CONFIGURATION] = (
-        ResourceType.ENTERTAINMENT_CONFIGURATION
-    )
-    status: StreamingStatus | str | None = None
-    active_streamer: ResourceReference | None = None
-    channels: list[EntertainmentChannel] | None = None
-
-    @property
-    def is_streaming(self) -> bool:
-        return self.status == StreamingStatus.ACTIVE
-
-
-_UNTYPED_EVENT = "other"
-_TYPED_EVENTS = frozenset(
-    {
-        ResourceType.LIGHT,
-        ResourceType.ROOM,
-        ResourceType.ZONE,
-        ResourceType.SCENE,
-        ResourceType.ENTERTAINMENT_CONFIGURATION,
-    }
-)
-
-
-def _event_tag(value: Any) -> str:
-    resource_type = (
-        value.get("type") if isinstance(value, dict) else getattr(value, "type", None)
-    )
-    tag = str(resource_type)
-    return tag if tag in _TYPED_EVENTS else _UNTYPED_EVENT
-
-
-# Resource types hueify models explicitly are parsed into their own event; every
-# other type the bridge reports stays a plain HueEvent instead of failing.
-AnyHueEvent = Annotated[
-    Annotated[LightEvent, Tag(ResourceType.LIGHT)]
-    | Annotated[RoomEvent, Tag(ResourceType.ROOM)]
-    | Annotated[ZoneEvent, Tag(ResourceType.ZONE)]
-    | Annotated[SceneEvent, Tag(ResourceType.SCENE)]
-    | Annotated[
-        EntertainmentConfigurationEvent, Tag(ResourceType.ENTERTAINMENT_CONFIGURATION)
-    ]
-    | Annotated[HueEvent, Tag(_UNTYPED_EVENT)],
-    Discriminator(_event_tag),
-]
-
-
-class HueEventMessage(HueModel):
-    """One container of an event stream payload, holding the changed resources."""
-
-    data: list[AnyHueEvent] = Field(default_factory=list)
-    creationtime: datetime | None = None

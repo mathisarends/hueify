@@ -1,11 +1,10 @@
 from uuid import UUID
 
-from pydantic import TypeAdapter
-
 from hueify.errors import ResourceNotFoundError
 from hueify.http import HttpClient
 from hueify.models import (
     Group,
+    GroupCreate,
     GroupedLight,
     GroupUpdate,
     HueApiResponse,
@@ -17,14 +16,16 @@ from hueify.models import (
     Scene,
     Zone,
 )
-from hueify.resources.base import ResourceId, ResourceNamespace
+from hueify.resources.base import ResourceId, UpdateNamespace
 from hueify.resources.controls import LightCommands, Transition
 from hueify.resources.grouped_lights import GroupedLightNamespace
 from hueify.resources.lights import LightNamespace
 from hueify.resources.scenes import SceneNamespace
 
 
-class GroupNamespace[TGroup: Group](LightCommands, ResourceNamespace[TGroup]):
+class GroupNamespace[TGroup: Group](
+    LightCommands, UpdateNamespace[TGroup, GroupUpdate]
+):
     """Shared behaviour of the room and zone endpoints.
 
     Light commands address the group's ``grouped_light`` service, so a room
@@ -34,21 +35,23 @@ class GroupNamespace[TGroup: Group](LightCommands, ResourceNamespace[TGroup]):
     def __init__(
         self,
         resource_type: str,
-        response_adapter: TypeAdapter[HueApiResponse[TGroup]],
+        resource_model: type[TGroup],
         http_client: HttpClient,
     ) -> None:
-        super().__init__(resource_type, response_adapter, http_client)
+        super().__init__(resource_type, resource_model, GroupUpdate, http_client)
         self._lights = LightNamespace(http_client)
         self._scenes = SceneNamespace(http_client)
         self._grouped_lights = GroupedLightNamespace(http_client)
 
-    async def create(self, data: GroupUpdate) -> HueApiResponse[ResourceIdentifier]:
+    async def create(self, data: GroupCreate) -> HueApiResponse[ResourceIdentifier]:
+        if not isinstance(data, GroupCreate):
+            raise TypeError(f"{self.resource_type}.create expects GroupCreate")
         return await self._create(data)
 
     async def update(
         self, group_id: ResourceId, data: GroupUpdate
     ) -> HueApiResponse[ResourceIdentifier]:
-        return await self._update(group_id, data)
+        return await super().update(group_id, data)
 
     async def delete(self, group_id: ResourceId) -> HueApiResponse[ResourceIdentifier]:
         return await self._delete(group_id)
@@ -86,6 +89,8 @@ class GroupNamespace[TGroup: Group](LightCommands, ResourceNamespace[TGroup]):
     async def apply(
         self, group_id: ResourceId, update: LightUpdate
     ) -> HueApiResponse[ResourceIdentifier]:
+        if not isinstance(update, LightUpdate):
+            raise TypeError(f"{self.resource_type}.apply expects LightUpdate")
         grouped_light_id = await self.grouped_light_id(group_id)
         return await self._grouped_lights.apply(grouped_light_id, update)
 
@@ -104,9 +109,9 @@ class GroupNamespace[TGroup: Group](LightCommands, ResourceNamespace[TGroup]):
 
 class RoomNamespace(GroupNamespace[Room]):
     def __init__(self, http_client: HttpClient) -> None:
-        super().__init__("room", TypeAdapter(HueApiResponse[Room]), http_client)
+        super().__init__("room", Room, http_client)
 
 
 class ZoneNamespace(GroupNamespace[Zone]):
     def __init__(self, http_client: HttpClient) -> None:
-        super().__init__("zone", TypeAdapter(HueApiResponse[Zone]), http_client)
+        super().__init__("zone", Zone, http_client)

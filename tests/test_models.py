@@ -217,14 +217,14 @@ def test_event_message_keeps_unmodelled_resource_types_generic() -> None:
     message = HueEventMessage.model_validate(
         _make_message(
             {"id": str(uuid4()), "type": "light"},
-            {"id": str(uuid4()), "type": "motion", "motion": {"motion": True}},
+            {"id": str(uuid4()), "type": "future_sensor", "motion": {"motion": True}},
         )
     )
 
     light, motion = message.data
     assert isinstance(light, LightEvent)
     assert type(motion) is HueEvent
-    assert motion.type == "motion"
+    assert motion.type == "future_sensor"
     assert motion.model_extra == {"motion": {"motion": True}}
 
 

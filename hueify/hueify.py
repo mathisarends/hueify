@@ -2,15 +2,31 @@ from collections.abc import Callable
 from types import TracebackType
 from typing import Self, overload
 
+from pydantic import TypeAdapter
+
+from hueify import models as m
 from hueify.credentials import load_credentials
 from hueify.entertainment import EntertainmentNamespace
 from hueify.http import HttpClient
 from hueify.models import HueEvent
 from hueify.resources import (
+    BehaviorInstanceNamespace,
+    DeviceNamespace,
+    DeviceSoftwareUpdateNamespace,
+    EnabledNamespace,
+    GeofenceClientNamespace,
     GroupedLightNamespace,
+    HomekitNamespace,
     LightNamespace,
+    MatterNamespace,
+    MotionNamespace,
+    ResourceNamespace,
+    ResourceRegistry,
     RoomNamespace,
     SceneNamespace,
+    SmartSceneNamespace,
+    UpdateNamespace,
+    ZigbeeDeviceDiscoveryNamespace,
     ZoneNamespace,
 )
 from hueify.sse import (
@@ -57,6 +73,128 @@ class Hueify:
         self.scenes = SceneNamespace(self._http_client)
         self.entertainment = EntertainmentNamespace(
             self._http_client, self._credentials
+        )
+        self.smart_scenes = SmartSceneNamespace(self._http_client)
+        self.devices = DeviceNamespace(self._http_client)
+        self.device_power = self._read_namespace("device_power", m.DevicePower)
+        self.device_software_updates = DeviceSoftwareUpdateNamespace(self._http_client)
+        self.bridges = UpdateNamespace(
+            "bridge", m.Bridge, m.ResourceUpdate, self._http_client
+        )
+        self.bridge_homes = self._read_namespace("bridge_home", m.BridgeHome)
+        self.service_groups = UpdateNamespace(
+            "service_group", m.ServiceGroup, m.ServiceGroupUpdate, self._http_client
+        )
+        self.motions = MotionNamespace(self._http_client)
+        self.camera_motions = EnabledNamespace(
+            "camera_motion", m.CameraMotion, m.EnabledUpdate, self._http_client
+        )
+        self.temperatures = EnabledNamespace(
+            "temperature", m.Temperature, m.EnabledUpdate, self._http_client
+        )
+        self.light_levels = EnabledNamespace(
+            "light_level", m.LightLevel, m.EnabledUpdate, self._http_client
+        )
+        self.buttons = UpdateNamespace(
+            "button", m.Button, m.ButtonUpdate, self._http_client
+        )
+        self.bell_buttons = UpdateNamespace(
+            "bell_button", m.BellButton, m.ResourceUpdate, self._http_client
+        )
+        self.relative_rotaries = UpdateNamespace(
+            "relative_rotary", m.RelativeRotary, m.ResourceUpdate, self._http_client
+        )
+        self.contacts = EnabledNamespace(
+            "contact", m.Contact, m.EnabledUpdate, self._http_client
+        )
+        self.tampers = UpdateNamespace(
+            "tamper", m.Tamper, m.ResourceUpdate, self._http_client
+        )
+        self.grouped_motions = UpdateNamespace(
+            "grouped_motion", m.GroupedMotion, m.ResourceUpdate, self._http_client
+        )
+        self.grouped_light_levels = UpdateNamespace(
+            "grouped_light_level",
+            m.GroupedLightLevel,
+            m.ResourceUpdate,
+            self._http_client,
+        )
+        self.zigbee_connectivity = UpdateNamespace(
+            "zigbee_connectivity",
+            m.ZigbeeConnectivity,
+            m.ZigbeeConnectivityUpdate,
+            self._http_client,
+        )
+        self.zgp_connectivity = UpdateNamespace(
+            "zgp_connectivity", m.ZgpConnectivity, m.ResourceUpdate, self._http_client
+        )
+        self.wifi_connectivity = UpdateNamespace(
+            "wifi_connectivity", m.WifiConnectivity, m.ResourceUpdate, self._http_client
+        )
+        self.zigbee_device_discovery = ZigbeeDeviceDiscoveryNamespace(self._http_client)
+        self.entertainment_services = UpdateNamespace(
+            "entertainment", m.Entertainment, m.ResourceUpdate, self._http_client
+        )
+        self.speakers = UpdateNamespace(
+            "speaker", m.Speaker, m.ResourceUpdate, self._http_client
+        )
+        self.behavior_scripts = UpdateNamespace(
+            "behavior_script", m.BehaviorScript, m.ResourceUpdate, self._http_client
+        )
+        self.behavior_instances = BehaviorInstanceNamespace(self._http_client)
+        self.geofence_clients = GeofenceClientNamespace(self._http_client)
+        self.geolocations = UpdateNamespace(
+            "geolocation", m.Geolocation, m.ResourceUpdate, self._http_client
+        )
+        self.homekit = HomekitNamespace(self._http_client)
+        self.matter = MatterNamespace(self._http_client)
+        self.matter_fabrics = UpdateNamespace(
+            "matter_fabric", m.MatterFabric, m.ResourceUpdate, self._http_client
+        )
+        self.convenience_area_motions = EnabledNamespace(
+            "convenience_area_motion",
+            m.ConvenienceAreaMotion,
+            m.EnabledUpdate,
+            self._http_client,
+        )
+        self.security_area_motions = EnabledNamespace(
+            "security_area_motion",
+            m.SecurityAreaMotion,
+            m.EnabledUpdate,
+            self._http_client,
+        )
+        self.motion_area_candidates = UpdateNamespace(
+            "motion_area_candidate",
+            m.MotionAreaCandidate,
+            m.ResourceUpdate,
+            self._http_client,
+        )
+        self.motion_area_configurations = EnabledNamespace(
+            "motion_area_configuration",
+            m.MotionAreaConfiguration,
+            m.EnabledUpdate,
+            self._http_client,
+        )
+        self.switch_input_configurations = UpdateNamespace(
+            "switch_input_configuration",
+            m.SwitchInputConfiguration,
+            m.SwitchInputConfigurationUpdate,
+            self._http_client,
+        )
+        self.resources = ResourceRegistry(
+            self._http_client,
+            (
+                value
+                for value in vars(self).values()
+                if isinstance(value, ResourceNamespace)
+            ),
+        )
+
+    def _read_namespace[T: m.HueResource](
+        self, kind: str, model: type[T]
+    ) -> ResourceNamespace[T]:
+        return ResourceNamespace(
+            kind, TypeAdapter(m.HueApiResponse[model]), self._http_client
         )
 
     async def __aenter__(self) -> Self:

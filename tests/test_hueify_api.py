@@ -32,7 +32,7 @@ def _patched_stream(hue: Hueify) -> AsyncMock:
 
 
 @pytest.mark.asyncio
-async def test_exposes_supported_resource_namespaces() -> None:
+async def test_exposes_lighting_and_extended_resource_namespaces() -> None:
     hue = Hueify(bridge_ip=VALID_IP, app_key=VALID_APP_KEY)
     try:
         assert isinstance(hue.lights, LightNamespace)
@@ -41,7 +41,8 @@ async def test_exposes_supported_resource_namespaces() -> None:
         assert isinstance(hue.scenes, SceneNamespace)
         assert isinstance(hue.events, EventStream)
         assert isinstance(hue.grouped_lights, GroupedLightNamespace)
-        assert not hasattr(hue, "geolocations")
+        assert hue.grouped_lights.resource_type == "grouped_light"
+        assert hue.geolocations.resource_type == "geolocation"
     finally:
         await hue.close()
 

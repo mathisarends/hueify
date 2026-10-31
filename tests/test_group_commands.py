@@ -6,6 +6,7 @@ import pytest
 from hueify.errors import ResourceNotFoundError
 from hueify.http import HttpClient
 from hueify.models import (
+    GroupCreate,
     GroupedLight,
     GroupMetadata,
     GroupUpdate,
@@ -231,7 +232,7 @@ async def test_groups_are_found_by_their_user_visible_name() -> None:
 @pytest.mark.asyncio
 async def test_create_posts_to_the_group_collection_endpoint() -> None:
     client = bridge()
-    update = GroupUpdate(metadata=GroupMetadata(name="Attic", archetype="attic"))
+    update = GroupCreate(metadata=GroupMetadata(name="Attic", archetype="attic"))
 
     await RoomNamespace(client).create(update)
 

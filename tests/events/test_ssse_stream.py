@@ -11,7 +11,13 @@ from httpx_sse import SSEError
 
 from hueify.credentials import HueBridgeCredentials
 from hueify.errors import StreamAuthenticationError
-from hueify.models import HueEvent, LightEvent
+from hueify.models import (
+    GroupedLightEvent,
+    HueEvent,
+    LightEvent,
+    MotionEvent,
+    SmartSceneEvent,
+)
 from hueify.sse.bus import EventBus
 from hueify.sse.connection import StreamConnection
 from hueify.sse.retry import ReconnectPolicy
@@ -108,9 +114,20 @@ def patched_bridge(
 class TestHandleSse:
     @pytest.mark.asyncio
     @pytest.mark.parametrize("operation", ["add", "update", "delete", "future_action"])
-    async def test_resource_events_retain_container_operation_and_time(self, operation):
+    @pytest.mark.parametrize(
+        "kind, event_model",
+        [
+            ("light", LightEvent),
+            ("grouped_light", GroupedLightEvent),
+            ("motion", MotionEvent),
+            ("smart_scene", SmartSceneEvent),
+        ],
+    )
+    async def test_resource_events_retain_container_operation_and_time(
+        self, operation: str, kind: str, event_model: type[HueEvent]
+    ) -> None:
         stream, bus, _ = make_stream()
-        raw = make_raw_event()
+        raw = make_raw_event(kind)
         await stream._handle_sse(
             make_sse(
                 [
@@ -124,8 +141,8 @@ class TestHandleSse:
             )
         )
         changed, future = (call.args[0] for call in bus.dispatch.await_args_list)
-        assert isinstance(changed, LightEvent)
-        assert changed.type == "light"
+        assert isinstance(changed, event_model)
+        assert changed.type == kind
         assert changed.operation == operation
         assert changed.creationtime == datetime(2026, 10, 31, 12, tzinfo=UTC)
         assert str(changed.id) == raw["id"]
@@ -201,13 +218,13 @@ class TestHandleSse:
     @pytest.mark.asyncio
     async def test_dispatches_unmodelled_resource_type_as_a_plain_event(self) -> None:
         stream, bus, _ = make_stream()
-        sse = make_sse([{"data": [make_raw_event("button")]}])
+        sse = make_sse([{"data": [make_raw_event("future_sensor")]}])
 
         await stream._handle_sse(sse)
 
         dispatched = bus.dispatch.await_args.args[0]
         assert type(dispatched) is HueEvent
-        assert dispatched.type == "button"
+        assert dispatched.type == "future_sensor"
 
     @pytest.mark.asyncio
     async def test_drops_a_payload_that_does_not_match_the_event_schema(self) -> None:
