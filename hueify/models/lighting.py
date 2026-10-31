@@ -8,13 +8,12 @@ from pydantic import Field, model_validator
 
 from hueify.models.base import (
     HueModel,
+    HueResource,
+    IdentifyAction,
     NamedMetadata,
     NamedResource,
     ResourceReference,
     ResourceType,
-)
-from hueify.models.services import (
-    IdentifyAction,
 )
 
 
@@ -27,8 +26,9 @@ class DimmingState(HueModel):
     min_dim_level: float | None = Field(default=None, ge=0, le=100)
 
 
-class DimmingEventState(DimmingState):
+class DimmingEventState(HueModel):
     brightness: float | None = Field(default=None, ge=0, le=100)
+    min_dim_level: float | None = Field(default=None, ge=0, le=100)
 
 
 class DimmingDeltaAction(StrEnum):
@@ -99,6 +99,14 @@ class GradientUpdate(HueModel):
     mode: str | None = None
 
 
+class GradientEventState(HueModel):
+    points: list[GradientPoint] | None = None
+    mode: str | None = None
+    points_capable: int | None = None
+    mode_values: list[str] | None = None
+    pixel_count: int | None = None
+
+
 class EffectsState(HueModel):
     effect: str | None = None
     status: str | None = None
@@ -134,6 +142,14 @@ class EffectsV2Update(HueModel):
 
 class PowerupState(HueModel):
     preset: Literal["safety", "powerfail", "last_on_state", "custom"]
+    configured: bool | None = None
+    on: HueModel | None = None
+    dimming: HueModel | None = None
+    color: HueModel | None = None
+
+
+class PowerupEventState(HueModel):
+    preset: Literal["safety", "powerfail", "last_on_state", "custom"] | None = None
     configured: bool | None = None
     on: HueModel | None = None
     dimming: HueModel | None = None
@@ -400,7 +416,7 @@ class GroupCreate(GroupUpdate):
     children: list[ResourceReference] = Field(default_factory=list)
 
 
-class GroupedLight(HueModel, LightStateMixin):
+class GroupedLight(HueResource, LightStateMixin):
     """Aggregated light service a room or zone is controlled through."""
 
     id: UUID

@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Self
+from typing import Literal, Self
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -9,6 +9,13 @@ class HueModel(BaseModel):
     """Base for Hue payloads that preserves fields added by bridge firmware."""
 
     model_config = ConfigDict(extra="allow")
+
+
+class ResourceUpdate(HueModel):
+    """Explicit partial write for resources with an unspecified public schema.
+
+    Firmware fields are accepted without treating a read snapshot as a request.
+    """
 
 
 class ResourceType(StrEnum):
@@ -90,6 +97,15 @@ class NamedMetadata(HueModel):
     name: str
 
 
+class MetadataUpdate(HueModel):
+    name: str | None = Field(default=None, min_length=1, max_length=32)
+    archetype: str | None = None
+
+
+class IdentifyAction(HueModel):
+    action: Literal["identify"] = "identify"
+
+
 class HueResource(HueModel):
     """A CLIP resource, including resource types from newer firmware."""
 
@@ -98,10 +114,9 @@ class HueResource(HueModel):
     id_v1: str | None = None
 
 
-class NamedResource(HueModel):
+class NamedResource(HueResource):
     """Base for resources that carry a stable ID and a user-visible name."""
 
-    id: UUID
     metadata: NamedMetadata
 
     @property

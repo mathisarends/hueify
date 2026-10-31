@@ -11,16 +11,14 @@ from uuid import UUID
 
 from pydantic import Field, model_validator
 
-from hueify.models.base import HueModel, HueResource, ResourceReference, ResourceType
-
-
-class MetadataUpdate(HueModel):
-    name: str | None = Field(default=None, min_length=1, max_length=32)
-    archetype: str | None = None
-
-
-class IdentifyAction(HueModel):
-    action: Literal["identify"] = "identify"
+from hueify.models.base import (
+    HueModel,
+    HueResource,
+    IdentifyAction,
+    MetadataUpdate,
+    ResourceReference,
+    ResourceType,
+)
 
 
 class UserTest(HueModel):
@@ -151,15 +149,19 @@ class MotionSensitivityUpdate(HueModel):
     sensitivity: int = Field(ge=0)
 
 
-class Motion(OwnedResource):
-    type: Literal[ResourceType.MOTION] = ResourceType.MOTION
-    enabled: bool | None = None
-    motion: MotionState | None = None
-    sensitivity: MotionSensitivity | None = None
+class MotionStateMixin:
+    motion: MotionState | None
 
     @property
     def detected(self) -> bool | None:
         return self.motion.detected if self.motion else None
+
+
+class Motion(OwnedResource, MotionStateMixin):
+    type: Literal[ResourceType.MOTION] = ResourceType.MOTION
+    enabled: bool | None = None
+    motion: MotionState | None = None
+    sensitivity: MotionSensitivity | None = None
 
 
 class MotionUpdate(EnabledUpdate):
@@ -188,10 +190,8 @@ class TemperatureState(HueModel):
     temperature_report: TemperatureReport | None = None
 
 
-class Temperature(OwnedResource):
-    type: Literal[ResourceType.TEMPERATURE] = ResourceType.TEMPERATURE
-    enabled: bool | None = None
-    temperature: TemperatureState | None = None
+class TemperatureStateMixin:
+    temperature: TemperatureState | None
 
     @property
     def celsius(self) -> float | None:
@@ -202,6 +202,12 @@ class Temperature(OwnedResource):
         if self.temperature.temperature_valid is False:
             return None
         return self.temperature.temperature
+
+
+class Temperature(OwnedResource, TemperatureStateMixin):
+    type: Literal[ResourceType.TEMPERATURE] = ResourceType.TEMPERATURE
+    enabled: bool | None = None
+    temperature: TemperatureState | None = None
 
 
 class LightLevelReport(HueModel):
@@ -225,14 +231,18 @@ class LightLevelState(HueModel):
         return 10 ** ((value - 1) / 10000) if value is not None else None
 
 
-class LightLevel(OwnedResource):
-    type: Literal[ResourceType.LIGHT_LEVEL] = ResourceType.LIGHT_LEVEL
-    enabled: bool | None = None
-    light: LightLevelState | None = None
+class LightLevelStateMixin:
+    light: LightLevelState | None
 
     @property
     def lux(self) -> float | None:
         return self.light.lux if self.light else None
+
+
+class LightLevel(OwnedResource, LightLevelStateMixin):
+    type: Literal[ResourceType.LIGHT_LEVEL] = ResourceType.LIGHT_LEVEL
+    enabled: bool | None = None
+    light: LightLevelState | None = None
 
 
 class GroupedLightLevel(OwnedResource):

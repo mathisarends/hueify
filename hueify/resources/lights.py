@@ -1,8 +1,6 @@
 from collections.abc import Sequence
 from typing import Literal
 
-from pydantic import TypeAdapter
-
 from hueify.color import kelvin_to_mirek
 from hueify.http import HttpClient
 from hueify.models import (
@@ -22,7 +20,7 @@ from hueify.models import (
     ResourceIdentifier,
     TimedEffectsState,
 )
-from hueify.resources.base import ResourceId, ResourceNamespace
+from hueify.resources.base import ResourceId, UpdateNamespace
 from hueify.resources.controls import (
     LightCommands,
     Transition,
@@ -30,19 +28,19 @@ from hueify.resources.controls import (
 )
 
 
-class LightNamespace(LightCommands, ResourceNamespace[Light]):
+class LightNamespace(LightCommands, UpdateNamespace[Light, LightUpdate]):
     def __init__(self, http_client: HttpClient) -> None:
-        super().__init__("light", TypeAdapter(HueApiResponse[Light]), http_client)
+        super().__init__("light", Light, LightUpdate, http_client)
 
     async def update(
         self, light_id: ResourceId, data: LightUpdate
     ) -> HueApiResponse[ResourceIdentifier]:
-        return await self._update(light_id, data)
+        return await super().update(light_id, data)
 
     async def apply(
         self, light_id: ResourceId, update: LightUpdate
     ) -> HueApiResponse[ResourceIdentifier]:
-        return await self._update(light_id, update)
+        return await self.update(light_id, update)
 
     async def is_on(self, light_id: ResourceId) -> bool:
         return (await self.get_one(light_id)).on.on

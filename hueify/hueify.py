@@ -36,6 +36,7 @@ from hueify.sse import (
     EventStream,
     ReconnectPolicy,
 )
+from hueify.sse.queue import DEFAULT_EVENT_QUEUE_SIZE
 
 
 class Hueify:
@@ -57,23 +58,28 @@ class Hueify:
         app_key: str | None = None,
         client_key: str | None = None,
         reconnect: ReconnectPolicy | None = None,
+        *,
+        event_queue_size: int = DEFAULT_EVENT_QUEUE_SIZE,
     ) -> None:
         self._credentials = load_credentials(bridge_ip, app_key, client_key)
+        self.events = EventStream(
+            self._credentials, reconnect, queue_size=event_queue_size
+        )
         self._http_client = HttpClient(self._credentials)
         self.lights = LightNamespace(self._http_client)
+        self.grouped_lights = GroupedLightNamespace(self._http_client)
         self.rooms = RoomNamespace(self._http_client)
         self.zones = ZoneNamespace(self._http_client)
         self.scenes = SceneNamespace(self._http_client)
         self.entertainment = EntertainmentNamespace(
             self._http_client, self._credentials
         )
-        self.grouped_lights = GroupedLightNamespace(self._http_client)
         self.smart_scenes = SmartSceneNamespace(self._http_client)
         self.devices = DeviceNamespace(self._http_client)
         self.device_power = self._read_namespace("device_power", m.DevicePower)
         self.device_software_updates = DeviceSoftwareUpdateNamespace(self._http_client)
         self.bridges = UpdateNamespace(
-            "bridge", m.Bridge, m.HueModel, self._http_client
+            "bridge", m.Bridge, m.ResourceUpdate, self._http_client
         )
         self.bridge_homes = self._read_namespace("bridge_home", m.BridgeHome)
         self.service_groups = UpdateNamespace(
@@ -93,22 +99,25 @@ class Hueify:
             "button", m.Button, m.ButtonUpdate, self._http_client
         )
         self.bell_buttons = UpdateNamespace(
-            "bell_button", m.BellButton, m.HueModel, self._http_client
+            "bell_button", m.BellButton, m.ResourceUpdate, self._http_client
         )
         self.relative_rotaries = UpdateNamespace(
-            "relative_rotary", m.RelativeRotary, m.HueModel, self._http_client
+            "relative_rotary", m.RelativeRotary, m.ResourceUpdate, self._http_client
         )
         self.contacts = EnabledNamespace(
             "contact", m.Contact, m.EnabledUpdate, self._http_client
         )
         self.tampers = UpdateNamespace(
-            "tamper", m.Tamper, m.HueModel, self._http_client
+            "tamper", m.Tamper, m.ResourceUpdate, self._http_client
         )
         self.grouped_motions = UpdateNamespace(
-            "grouped_motion", m.GroupedMotion, m.HueModel, self._http_client
+            "grouped_motion", m.GroupedMotion, m.ResourceUpdate, self._http_client
         )
         self.grouped_light_levels = UpdateNamespace(
-            "grouped_light_level", m.GroupedLightLevel, m.HueModel, self._http_client
+            "grouped_light_level",
+            m.GroupedLightLevel,
+            m.ResourceUpdate,
+            self._http_client,
         )
         self.zigbee_connectivity = UpdateNamespace(
             "zigbee_connectivity",
@@ -117,30 +126,30 @@ class Hueify:
             self._http_client,
         )
         self.zgp_connectivity = UpdateNamespace(
-            "zgp_connectivity", m.ZgpConnectivity, m.HueModel, self._http_client
+            "zgp_connectivity", m.ZgpConnectivity, m.ResourceUpdate, self._http_client
         )
         self.wifi_connectivity = UpdateNamespace(
-            "wifi_connectivity", m.WifiConnectivity, m.HueModel, self._http_client
+            "wifi_connectivity", m.WifiConnectivity, m.ResourceUpdate, self._http_client
         )
         self.zigbee_device_discovery = ZigbeeDeviceDiscoveryNamespace(self._http_client)
         self.entertainment_services = UpdateNamespace(
-            "entertainment", m.Entertainment, m.HueModel, self._http_client
+            "entertainment", m.Entertainment, m.ResourceUpdate, self._http_client
         )
         self.speakers = UpdateNamespace(
-            "speaker", m.Speaker, m.HueModel, self._http_client
+            "speaker", m.Speaker, m.ResourceUpdate, self._http_client
         )
         self.behavior_scripts = UpdateNamespace(
-            "behavior_script", m.BehaviorScript, m.HueModel, self._http_client
+            "behavior_script", m.BehaviorScript, m.ResourceUpdate, self._http_client
         )
         self.behavior_instances = BehaviorInstanceNamespace(self._http_client)
         self.geofence_clients = GeofenceClientNamespace(self._http_client)
         self.geolocations = UpdateNamespace(
-            "geolocation", m.Geolocation, m.HueModel, self._http_client
+            "geolocation", m.Geolocation, m.ResourceUpdate, self._http_client
         )
         self.homekit = HomekitNamespace(self._http_client)
         self.matter = MatterNamespace(self._http_client)
         self.matter_fabrics = UpdateNamespace(
-            "matter_fabric", m.MatterFabric, m.HueModel, self._http_client
+            "matter_fabric", m.MatterFabric, m.ResourceUpdate, self._http_client
         )
         self.convenience_area_motions = EnabledNamespace(
             "convenience_area_motion",
@@ -157,7 +166,7 @@ class Hueify:
         self.motion_area_candidates = UpdateNamespace(
             "motion_area_candidate",
             m.MotionAreaCandidate,
-            m.HueModel,
+            m.ResourceUpdate,
             self._http_client,
         )
         self.motion_area_configurations = EnabledNamespace(
@@ -180,7 +189,6 @@ class Hueify:
                 if isinstance(value, ResourceNamespace)
             ),
         )
-        self.events = EventStream(self._credentials, reconnect)
 
     def _read_namespace[T: m.HueResource](
         self, kind: str, model: type[T]

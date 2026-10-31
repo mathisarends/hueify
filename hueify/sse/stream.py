@@ -1,19 +1,30 @@
 import logging
+from datetime import datetime
+from typing import Any
 
 import httpx
 from httpx_sse import ServerSentEvent, SSEError, aconnect_sse
-from pydantic import TypeAdapter, ValidationError
+from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 
 from hueify.credentials import HueBridgeCredentials
 from hueify.errors import StreamAuthenticationError
-from hueify.models import HueEvent, HueEventMessage
+from hueify.models import AnyHueEvent, HueEvent
 from hueify.sse.bus import EventBus
 from hueify.sse.connection import StreamConnection
+from hueify.sse.queue import EventQueue
 from hueify.sse.retry import ReconnectPolicy
 
 logger = logging.getLogger(__name__)
 
-_EVENT_MESSAGES = TypeAdapter(list[HueEventMessage])
+_EVENT_MESSAGES = TypeAdapter(list[Any])
+_EVENT = TypeAdapter(AnyHueEvent)
+
+
+class _EventContainer(BaseModel):
+    data: list[Any] = Field(default_factory=list)
+    type: str | None = None
+    creationtime: datetime | None = None
+
 
 _REJECTED_KEY_STATUS = frozenset({401, 403})
 
@@ -28,7 +39,7 @@ class ServerSentEventStream:
     def __init__(
         self,
         credentials: HueBridgeCredentials,
-        event_bus: EventBus,
+        event_bus: EventBus | EventQueue,
         connection: StreamConnection,
         policy: ReconnectPolicy,
     ) -> None:
@@ -69,8 +80,10 @@ class ServerSentEventStream:
                     self._connection.record_event()
                     self._last_event_id = sse.id or self._last_event_id
                     await self._handle_sse(sse)
-        except Exception:
-            if not received_event:
+        except httpx.HTTPStatusError as error:
+            # A rejected resume request may need a fresh subscription. Network
+            # failures and server outages do not invalidate the last event ID.
+            if not received_event and error.response.status_code == 400:
                 self._last_event_id = None
             raise
 
@@ -92,8 +105,20 @@ class ServerSentEventStream:
             logger.warning(f"Failed to parse SSE payload: {error}")
             return
 
-        for message in messages:
-            for event in message.data:
+        for raw_message in messages:
+            try:
+                message = _EventContainer.model_validate(raw_message)
+            except ValidationError as error:
+                logger.warning("Failed to parse SSE container: %s", error)
+                continue
+            for raw_event in message.data:
+                try:
+                    event = _EVENT.validate_python(raw_event)
+                except ValidationError as error:
+                    logger.warning("Failed to parse SSE event: %s", error)
+                    continue
+                event.operation = message.type
+                event.creationtime = message.creationtime
                 await self._dispatch(event)
 
     async def _dispatch(self, event: HueEvent) -> None:

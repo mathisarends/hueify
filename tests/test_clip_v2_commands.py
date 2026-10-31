@@ -407,14 +407,58 @@ async def test_using_a_snapshot_as_an_update_is_rejected(bridge) -> None:
     assert not requests
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("namespace", ["lights", "grouped_lights", "rooms", "zones"])
+async def test_apply_rejects_snapshots_before_resolving_or_writing(
+    bridge, namespace: str
+) -> None:
+    hue, requests, _ = bridge
+    with pytest.raises(TypeError, match="LightUpdate"):
+        await getattr(hue, namespace).apply(RESOURCE_ID, m.Device(id=RESOURCE_ID))
+    assert not requests
+
+
+@pytest.mark.asyncio
+async def test_scene_recall_rejects_snapshot_payloads_before_writing(bridge) -> None:
+    hue, requests, _ = bridge
+    with pytest.raises(TypeError, match="SceneRecallRequest"):
+        await hue.scenes.recall(RESOURCE_ID, m.SceneUpdate())
+    assert not requests
+
+
 @pytest.mark.parametrize("kind", [*KINDS, "switch_input_configuration"])
 def test_every_namespace_has_a_typed_partial_event(kind: str) -> None:
-    event = m.HueEventMessage.model_validate(
-        {"data": [{"id": str(RESOURCE_ID), "type": kind, "future_change": 1}]}
-    ).data[0]
+    payload = {"id": str(RESOURCE_ID), "type": kind, "future_change": 1}
+    event = m.HueEventMessage.model_validate({"data": [payload]}).data[0]
     assert type(event) is not m.HueEvent
     assert event.type == kind
-    assert event.model_dump(mode="json")["future_change"] == 1
+    assert event.model_dump(mode="json", exclude_none=True) == payload
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "kind",
+    [
+        "light",
+        "grouped_light",
+        "room",
+        "zone",
+        "scene",
+        "motion",
+        "bridge",
+        "entertainment_configuration",
+    ],
+)
+async def test_events_are_read_changes_and_cannot_be_sent_as_updates(
+    bridge, kind: str
+) -> None:
+    hue, requests, _ = bridge
+    event = m.HueEventMessage.model_validate(
+        {"data": [{"id": str(RESOURCE_ID), "type": kind}]}
+    ).data[0]
+    with pytest.raises(TypeError, match="update expects"):
+        await hue.resources[kind].update(RESOURCE_ID, event)
+    assert not requests
 
 
 def test_sensor_reports_prefer_current_reports_and_ignore_invalid_legacy_values() -> (
@@ -507,6 +551,7 @@ def test_palette_matches_bridge_shapes_for_dimming_and_effects() -> None:
             },
         ),
         ("light", {"gradient": {"points_capable": 3}}),
+        ("light", {"powerup": {"configured": True}}),
         ("light", {"signaling": {"signal_values": ["on_off"]}}),
         ("light", {"dimming": {"min_dim_level": 0.2}}),
         ("grouped_light", {"dimming": {"min_dim_level": 0.2}}),
@@ -520,6 +565,37 @@ def test_nested_partial_events_do_not_require_snapshot_fields(
     ).data[0]
     assert type(event) is not m.HueEvent
     assert set(patch) <= event.model_fields_set
+
+
+@pytest.mark.parametrize("points", [None, []])
+def test_gradient_events_distinguish_missing_points_from_an_empty_palette(
+    points: list | None,
+) -> None:
+    gradient = {"mode": "interpolated_palette"}
+    if points is not None:
+        gradient["points"] = points
+    event = m.LightEvent(id=RESOURCE_ID, gradient=gradient)
+
+    assert event.gradient.points == points
+    assert event.gradient.model_dump(exclude_unset=True) == gradient
+
+
+@pytest.mark.parametrize(
+    "event, field, expected",
+    [
+        (m.MotionEvent(id=RESOURCE_ID, motion={"motion": True}), "detected", True),
+        (
+            m.TemperatureEvent(id=RESOURCE_ID, temperature={"temperature": 21.5}),
+            "celsius",
+            21.5,
+        ),
+        (m.LightLevelEvent(id=RESOURCE_ID, light={"light_level": 20001}), "lux", 100),
+    ],
+)
+def test_partial_sensor_events_keep_the_snapshot_accessors(
+    event: m.HueEvent, field: str, expected: float | bool
+) -> None:
+    assert getattr(event, field) == pytest.approx(expected)
 
 
 @pytest.mark.asyncio

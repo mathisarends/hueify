@@ -6,10 +6,10 @@ from uuid import UUID
 
 import httpx
 import pytest
-from pydantic import ValidationError
+from pydantic import TypeAdapter, ValidationError
 
 from hueify import models as m
-from hueify.errors import ResourceNotFoundError
+from hueify.errors import AmbiguousResourceError, ResourceNotFoundError
 
 RESOURCE_ID = UUID("00000000-0000-0000-0000-000000000001")
 OWNER_ID = UUID("00000000-0000-0000-0000-000000000002")
@@ -65,6 +65,7 @@ async def test_list_and_get_use_specification_paths_and_preserve_response(
     fetched = await namespace.get_one(RESOURCE_ID)
 
     assert fetched == listed.data[0]
+    assert isinstance(fetched, m.HueResource)
     assert fetched.type == kind
     assert type(fetched) is not m.HueResource
     assert fetched.model_dump(mode="json")["new_firmware_field"] == {"kept": True}
@@ -120,6 +121,31 @@ async def test_native_updates_use_item_paths_and_keep_bridge_errors(
     assert requests[0].url.path == f"/clip/v2/resource/{kind}/{RESOURCE_ID}"
     assert json.loads(requests[0].content) == {}
     assert result.errors[0].description == "feature unavailable on this device"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", PUT_KINDS)
+async def test_snapshots_cannot_be_sent_as_native_updates(bridge, kind: str) -> None:
+    hue, requests, _ = bridge
+    snapshot = TypeAdapter(m.AnyHueResource).validate_python(resource_payload(kind))
+
+    with pytest.raises(TypeError, match="update expects"):
+        await hue.resources[kind].update(RESOURCE_ID, snapshot)
+
+    assert not requests
+
+
+@pytest.mark.asyncio
+async def test_unspecified_update_schemas_require_an_explicit_request(bridge) -> None:
+    hue, requests, responses = bridge
+    with pytest.raises(TypeError, match="ResourceUpdate"):
+        await hue.bridges.update(RESOURCE_ID, m.HueModel(future_setting=True))
+    assert not requests
+
+    responses.append(write_response("bridge"))
+    await hue.bridges.update(RESOURCE_ID, m.ResourceUpdate(future_setting=True))
+
+    assert json.loads(requests[0].content) == {"future_setting": True}
 
 
 @pytest.mark.asyncio
@@ -240,6 +266,54 @@ async def test_geofence_names_are_found_without_metadata(bridge) -> None:
         {"data": [{**resource_payload("geofence_client"), "name": "My phone"}]}
     )
     assert (await hue.geofence_clients.find_by_name(" my PHONE ")).id == RESOURCE_ID
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["device", "geofence_client", "future_sensor"])
+@pytest.mark.parametrize(
+    "query, names", [("DESK", ["Desk", " desk "]), ("Des", ["Desk", "Desi"])]
+)
+async def test_named_services_and_raw_resources_reject_ambiguous_names(
+    bridge, kind: str, query: str, names: list[str]
+) -> None:
+    hue, _, responses = bridge
+    ids = [RESOURCE_ID, OWNER_ID]
+    resources = []
+    for resource_id, name in zip(ids, names, strict=True):
+        payload = {**resource_payload(kind), "id": str(resource_id)}
+        payload.update(
+            {"name": name}
+            if kind == "geofence_client"
+            else {"metadata": {"name": name}}
+        )
+        resources.append(payload)
+    responses.append({"data": resources})
+
+    with pytest.raises(AmbiguousResourceError) as caught:
+        await hue.resources[kind].find_by_name(query)
+
+    assert all(str(resource_id) in str(caught.value) for resource_id in ids)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["device", "geofence_client", "future_sensor"])
+async def test_exact_only_lookup_also_applies_to_services_and_raw_resources(
+    bridge, kind: str
+) -> None:
+    hue, _, responses = bridge
+    payload = resource_payload(kind)
+    payload.update(
+        {"name": "Desk"}
+        if kind == "geofence_client"
+        else {"metadata": {"name": "Desk"}}
+    )
+    responses.extend([{"data": [payload]}] * 2)
+
+    with pytest.raises(ResourceNotFoundError):
+        await hue.resources[kind].find_by_name("Des", fuzzy=False)
+    found = await hue.resources[kind].find_by_name(" DESK ", fuzzy=False)
+
+    assert found.id == RESOURCE_ID
 
 
 @pytest.mark.asyncio

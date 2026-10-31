@@ -12,7 +12,7 @@ from hueify.cli.operations import (
     turn_off,
     turn_on,
 )
-from hueify.cli.output import write_response
+from hueify.cli.output import OutputOptions, write_response
 
 
 def add_control_commands(command_app: typer.Typer, group: ControlGroup) -> None:
@@ -34,6 +34,7 @@ def add_control_commands(command_app: typer.Typer, group: ControlGroup) -> None:
             turn_on(
                 group,
                 target,
+                fuzzy=OutputOptions.from_context(context).fuzzy,
                 brightness=brightness,
                 transition=transition,
             )
@@ -49,7 +50,14 @@ def add_control_commands(command_app: typer.Typer, group: ControlGroup) -> None:
         ),
     ) -> None:
         """Turn a light, room, or zone off."""
-        response = run(turn_off(group, target, transition=transition))
+        response = run(
+            turn_off(
+                group,
+                target,
+                transition=transition,
+                fuzzy=OutputOptions.from_context(context).fuzzy,
+            )
+        )
         write_response(context, response)
 
     @command_app.command("toggle")
@@ -61,7 +69,14 @@ def add_control_commands(command_app: typer.Typer, group: ControlGroup) -> None:
         ),
     ) -> None:
         """Toggle a light, room, or zone."""
-        response = run(toggle(group, target, transition=transition))
+        response = run(
+            toggle(
+                group,
+                target,
+                transition=transition,
+                fuzzy=OutputOptions.from_context(context).fuzzy,
+            )
+        )
         write_response(context, response)
 
     @command_app.command("brightness")
@@ -74,7 +89,15 @@ def add_control_commands(command_app: typer.Typer, group: ControlGroup) -> None:
         ),
     ) -> None:
         """Set brightness; zero turns the target off."""
-        response = run(set_brightness(group, target, percent, transition=transition))
+        response = run(
+            set_brightness(
+                group,
+                target,
+                percent,
+                transition=transition,
+                fuzzy=OutputOptions.from_context(context).fuzzy,
+            )
+        )
         write_response(context, response)
 
     @command_app.command("color")
@@ -95,6 +118,7 @@ def add_control_commands(command_app: typer.Typer, group: ControlGroup) -> None:
                 group,
                 target,
                 hex_color,
+                fuzzy=OutputOptions.from_context(context).fuzzy,
                 brightness=brightness,
                 transition=transition,
             )
@@ -119,6 +143,7 @@ def add_control_commands(command_app: typer.Typer, group: ControlGroup) -> None:
                 group,
                 target,
                 kelvin,
+                fuzzy=OutputOptions.from_context(context).fuzzy,
                 brightness=brightness,
                 transition=transition,
             )
@@ -131,5 +156,7 @@ def add_control_commands(command_app: typer.Typer, group: ControlGroup) -> None:
         target: str = typer.Argument(help="A resource UUID or name."),
     ) -> None:
         """Make the target breathe so it can be identified."""
-        response = run(identify(group, target))
+        response = run(
+            identify(group, target, fuzzy=OutputOptions.from_context(context).fuzzy)
+        )
         write_response(context, response)

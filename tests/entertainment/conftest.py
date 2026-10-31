@@ -53,10 +53,15 @@ class FakeBridge(asyncio.DatagramProtocol):
         client_key: str = CLIENT_KEY,
         hellos_to_drop: int = 0,
         alert_after_handshake: int | None = None,
+        finished_to_drop: int = 0,
     ) -> None:
         self._psk = bytes.fromhex(client_key)
         self._hellos_to_drop = hellos_to_drop
         self._alert_after_handshake = alert_after_handshake
+        self._finished_to_drop = finished_to_drop
+        self.finished_sent = 0
+        self._received_sequences: set[int] = set()
+        self._finished_message: bytes | None = None
 
         self.frames: list[bytes] = []
         self.identity: bytes | None = None
@@ -122,6 +127,13 @@ class FakeBridge(asyncio.DatagramProtocol):
     # -- The handshake --
 
     def _handle_handshake(self, message_type: int, body: bytes, raw: bytes) -> None:
+        if message_type != HandshakeType.CLIENT_HELLO:
+            sequence = int.from_bytes(raw[4:6], "big")
+            if sequence in self._received_sequences:
+                if message_type == HandshakeType.FINISHED and self._finished_message:
+                    self._send_record(ContentType.HANDSHAKE, self._finished_message)
+                return
+            self._received_sequences.add(sequence)
         if message_type == HandshakeType.CLIENT_HELLO:
             self._handle_client_hello(body, raw)
         elif message_type == HandshakeType.CLIENT_KEY_EXCHANGE:
@@ -207,6 +219,15 @@ class FakeBridge(asyncio.DatagramProtocol):
 
     def _send_record(self, content_type: int, payload: bytes) -> None:
         assert self._transport is not None
+        if (
+            content_type == ContentType.HANDSHAKE
+            and payload[0] == HandshakeType.FINISHED
+        ):
+            self._finished_message = payload
+            self.finished_sent += 1
+            if self._finished_to_drop:
+                self._finished_to_drop -= 1
+                return
         fragment = payload
         if self._epoch > 0:
             assert self._server_protection is not None

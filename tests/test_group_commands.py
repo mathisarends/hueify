@@ -19,7 +19,7 @@ from hueify.models import (
     Scene,
     Zone,
 )
-from hueify.resources import RoomNamespace, ZoneNamespace
+from hueify.resources import GroupedLightNamespace, RoomNamespace, ZoneNamespace
 
 ROOM_ID = UUID("33333333-3333-3333-3333-333333333333")
 ZONE_ID = UUID("55555555-5555-5555-5555-555555555555")
@@ -124,6 +124,53 @@ async def test_room_commands_address_the_grouped_light_service() -> None:
         "on": {"on": True},
         "dimming": {"brightness": 70.0},
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "namespace,group_id", [(RoomNamespace, ROOM_ID), (ZoneNamespace, ZONE_ID)]
+)
+async def test_toggle_resolves_the_service_only_once(namespace, group_id) -> None:
+    client = bridge()
+    await namespace(client).toggle(group_id, transition=0.5)
+    assert [call.args[0] for call in client.get.await_args_list] == [
+        f"{namespace(client).resource_type}/{group_id}",
+        f"grouped_light/{GROUPED_LIGHT_ID}",
+    ]
+    assert client.put.await_count == 1
+    assert client.put.await_args.args[1].model_dump(exclude_none=True) == {
+        "on": {"on": False},
+        "dynamics": {"duration": 500},
+    }
+
+
+@pytest.mark.asyncio
+async def test_resolved_grouped_light_commands_need_no_further_group_queries() -> None:
+    client = bridge()
+    service_id = await RoomNamespace(client).grouped_light_id(ROOM_ID)
+    commands = GroupedLightNamespace(client)
+    await commands.turn_on(service_id)
+    await commands.set_brightness(service_id, 40)
+    await commands.turn_off(service_id)
+    assert client.get.await_count == 1
+    assert client.put.await_count == 3
+    assert all(
+        call.args[0] == f"grouped_light/{service_id}"
+        for call in client.put.await_args_list
+    )
+
+
+@pytest.mark.asyncio
+async def test_resolved_grouped_light_reads_always_fetch_current_state() -> None:
+    client = bridge()
+    commands = GroupedLightNamespace(client)
+    assert await commands.is_on(GROUPED_LIGHT_ID)
+    client.get.side_effect = None
+    client.get.return_value = HueApiResponse[GroupedLight].model_validate(
+        {"data": [{**GROUPED_LIGHT, "on": {"on": False}}]}
+    )
+    assert not await commands.is_on(GROUPED_LIGHT_ID)
+    assert client.get.await_count == 2
 
 
 @pytest.mark.asyncio

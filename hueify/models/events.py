@@ -1,4 +1,4 @@
-"""Partial resource changes and CLIP v2 event envelopes."""
+"""Partial resource changes, separate from snapshots and writable requests."""
 
 from datetime import datetime
 from typing import Annotated, Any, Literal
@@ -8,263 +8,396 @@ from pydantic import Discriminator, Field, Tag
 
 from hueify.models.base import (
     HueModel,
+    HueResource,
+    MetadataUpdate,
     ResourceReference,
     ResourceType,
 )
 from hueify.models.lighting import (
+    AlertState,
+    ColorState,
+    ColorTemperatureDelta,
+    ColorTemperatureState,
+    DimmingDelta,
     DimmingEventState,
+    DynamicsState,
+    EffectsState,
     EffectsV2State,
     EntertainmentChannel,
-    GradientState,
-    GroupedLight,
-    GroupUpdate,
-    LightUpdate,
+    EntertainmentConfigurationType,
+    EntertainmentLocations,
+    GradientEventState,
+    GroupMetadataUpdate,
+    LightMetadataUpdate,
+    LightStateMixin,
+    OnState,
+    PowerupEventState,
+    SceneActionTarget,
+    SceneMetadataUpdate,
+    ScenePalette,
     SceneStatus,
-    SceneUpdate,
     SignalingState,
     StreamingStatus,
+    StreamProxy,
+    TimedEffectsState,
 )
 from hueify.models.services import (
-    BehaviorInstance,
-    BehaviorScript,
-    BellButton,
-    Bridge,
-    BridgeHome,
-    Button,
-    CameraMotion,
-    Contact,
-    ConvenienceAreaMotion,
-    Device,
-    DevicePower,
-    DeviceSoftwareUpdate,
-    Entertainment,
-    GeofenceClient,
-    Geolocation,
-    GroupedLightLevel,
-    GroupedMotion,
-    Homekit,
-    LightLevel,
-    Matter,
-    MatterFabric,
-    MetadataUpdate,
-    Motion,
-    MotionAreaCandidate,
-    MotionAreaConfiguration,
-    RelativeRotary,
-    SecurityAreaMotion,
-    ServiceGroup,
-    SmartScene,
+    BellState,
+    ButtonState,
+    ContactReport,
+    ControlMetadata,
+    EntertainmentSegments,
+    LightLevelState,
+    LightLevelStateMixin,
+    MatterFabricData,
+    MotionSensitivity,
+    MotionState,
+    MotionStateMixin,
+    NamedServiceMixin,
+    PowerState,
+    ProductData,
+    RelativeRotaryState,
+    SmartSceneActiveTimeslot,
     SmartSceneDay,
-    Speaker,
-    SwitchInputConfiguration,
-    Tamper,
     TamperReport,
-    Temperature,
-    WifiConnectivity,
-    ZgpConnectivity,
-    ZigbeeConnectivity,
-    ZigbeeDeviceDiscovery,
+    TemperatureState,
+    TemperatureStateMixin,
+    TimeZone,
+    UserTest,
+    WifiSignalStrength,
+    ZigbeeChannel,
 )
 
 
-class HueEvent(HueModel):
-    id: UUID
-    type: ResourceType
+class HueEvent(HueResource):
+    """A partial resource change, with its envelope action and timestamp."""
+
+    operation: str | None = None
+    creationtime: datetime | None = None
 
 
-class LightEvent(LightUpdate, HueEvent):
-    type: Literal[ResourceType.LIGHT] = ResourceType.LIGHT
-    id_v1: str | None = None
+class _OwnedEvent(HueEvent):
     owner: ResourceReference | None = None
+
+
+class LightEvent(_OwnedEvent, LightStateMixin):
+    type: Literal[ResourceType.LIGHT] = ResourceType.LIGHT
+    metadata: LightMetadataUpdate | None = None
+    on: OnState | None = None
     dimming: DimmingEventState | None = None
-    gradient: GradientState | None = None
+    dimming_delta: DimmingDelta | None = None
+    color_temperature: ColorTemperatureState | None = None
+    color_temperature_delta: ColorTemperatureDelta | None = None
+    color: ColorState | None = None
+    gradient: GradientEventState | None = None
+    effects: EffectsState | None = None
     effects_v2: EffectsV2State | None = None
+    timed_effects: TimedEffectsState | None = None
+    dynamics: DynamicsState | None = None
+    alert: AlertState | None = None
     signaling: SignalingState | None = None
+    powerup: PowerupEventState | None = None
+    identify: HueModel | None = None
+    service_id: int | None = None
+    mode: str | None = None
 
 
-class RoomEvent(GroupUpdate, HueEvent):
+class _GroupEvent(HueEvent):
+    metadata: GroupMetadataUpdate | None = None
+    children: list[ResourceReference] | None = None
+    services: list[ResourceReference] | None = None
+
+
+class RoomEvent(_GroupEvent):
     type: Literal[ResourceType.ROOM] = ResourceType.ROOM
-    services: list[ResourceReference] | None = None
 
 
-class ZoneEvent(GroupUpdate, HueEvent):
+class ZoneEvent(_GroupEvent):
     type: Literal[ResourceType.ZONE] = ResourceType.ZONE
-    services: list[ResourceReference] | None = None
 
 
-class SceneEvent(SceneUpdate, HueEvent):
+class SceneEvent(HueEvent):
     type: Literal[ResourceType.SCENE] = ResourceType.SCENE
+    metadata: SceneMetadataUpdate | None = None
+    group: ResourceReference | None = None
+    actions: list[SceneActionTarget] | None = None
+    palette: ScenePalette | None = None
+    speed: float | None = Field(default=None, ge=0, le=1)
+    auto_dynamic: bool | None = None
     status: SceneStatus | None = None
 
 
 class EntertainmentConfigurationEvent(HueEvent):
-    """Reports that an area started or stopped streaming, and who owns it.
-
-    An area another application takes over arrives here, which is the only
-    notice a streaming session gets that the bridge stopped listening to it.
-    """
+    """Partial area state, including streaming status and ownership changes."""
 
     type: Literal[ResourceType.ENTERTAINMENT_CONFIGURATION] = (
         ResourceType.ENTERTAINMENT_CONFIGURATION
     )
+    metadata: MetadataUpdate | None = None
+    configuration_type: EntertainmentConfigurationType | None = None
     status: StreamingStatus | str | None = None
     active_streamer: ResourceReference | None = None
     channels: list[EntertainmentChannel] | None = None
+    locations: EntertainmentLocations | None = None
+    stream_proxy: StreamProxy | None = None
 
     @property
     def is_streaming(self) -> bool:
         return self.status == StreamingStatus.ACTIVE
 
 
-class DeviceEvent(Device, HueEvent):
+class DeviceEvent(_OwnedEvent, NamedServiceMixin):
+    type: Literal[ResourceType.DEVICE] = ResourceType.DEVICE
+    metadata: MetadataUpdate | None = None
+    product_data: ProductData | None = None
     services: list[ResourceReference] | None = None
+    identify: HueModel | None = None
+    usertest: UserTest | None = None
 
 
-class DevicePowerEvent(DevicePower, HueEvent):
-    pass
+class DevicePowerEvent(_OwnedEvent):
+    type: Literal[ResourceType.DEVICE_POWER] = ResourceType.DEVICE_POWER
+    power_state: PowerState | None = None
 
 
-class DeviceSoftwareUpdateEvent(DeviceSoftwareUpdate, HueEvent):
+class DeviceSoftwareUpdateEvent(_OwnedEvent):
+    type: Literal[ResourceType.DEVICE_SOFTWARE_UPDATE] = (
+        ResourceType.DEVICE_SOFTWARE_UPDATE
+    )
+    state: str | None = None
     problems: list[str] | None = None
 
 
-class BridgeEvent(Bridge, HueEvent):
-    pass
+class BridgeEvent(_OwnedEvent):
+    type: Literal[ResourceType.BRIDGE] = ResourceType.BRIDGE
+    bridge_id: str | None = None
+    time_zone: TimeZone | None = None
 
 
-class BridgeHomeEvent(BridgeHome, HueEvent):
+class BridgeHomeEvent(HueEvent):
+    type: Literal[ResourceType.BRIDGE_HOME] = ResourceType.BRIDGE_HOME
     children: list[ResourceReference] | None = None
     services: list[ResourceReference] | None = None
 
 
-class ServiceGroupEvent(ServiceGroup, HueEvent):
+class ServiceGroupEvent(HueEvent):
+    type: Literal[ResourceType.SERVICE_GROUP] = ResourceType.SERVICE_GROUP
     services: list[ResourceReference] | None = None
 
 
-class MotionEvent(Motion, HueEvent):
-    pass
+class _MotionEvent(_OwnedEvent, MotionStateMixin):
+    enabled: bool | None = None
+    motion: MotionState | None = None
 
 
-class CameraMotionEvent(CameraMotion, HueEvent):
-    pass
+class MotionEvent(_MotionEvent):
+    type: Literal[ResourceType.MOTION] = ResourceType.MOTION
+    sensitivity: MotionSensitivity | None = None
 
 
-class TemperatureEvent(Temperature, HueEvent):
-    pass
+class CameraMotionEvent(_MotionEvent):
+    type: Literal[ResourceType.CAMERA_MOTION] = ResourceType.CAMERA_MOTION
 
 
-class LightLevelEvent(LightLevel, HueEvent):
-    pass
+class TemperatureEvent(_OwnedEvent, TemperatureStateMixin):
+    type: Literal[ResourceType.TEMPERATURE] = ResourceType.TEMPERATURE
+    enabled: bool | None = None
+    temperature: TemperatureState | None = None
 
 
-class ButtonEvent(Button, HueEvent):
-    pass
+class LightLevelEvent(_OwnedEvent, LightLevelStateMixin):
+    type: Literal[ResourceType.LIGHT_LEVEL] = ResourceType.LIGHT_LEVEL
+    enabled: bool | None = None
+    light: LightLevelState | None = None
 
 
-class BellButtonEvent(BellButton, HueEvent):
-    pass
+class ButtonEvent(_OwnedEvent):
+    type: Literal[ResourceType.BUTTON] = ResourceType.BUTTON
+    metadata: ControlMetadata | None = None
+    button: ButtonState | None = None
 
 
-class RelativeRotaryEvent(RelativeRotary, HueEvent):
-    pass
+class BellButtonEvent(_OwnedEvent):
+    type: Literal[ResourceType.BELL_BUTTON] = ResourceType.BELL_BUTTON
+    metadata: ControlMetadata | None = None
+    bell: BellState | None = None
 
 
-class ContactEvent(Contact, HueEvent):
-    pass
+class RelativeRotaryEvent(_OwnedEvent):
+    type: Literal[ResourceType.RELATIVE_ROTARY] = ResourceType.RELATIVE_ROTARY
+    metadata: ControlMetadata | None = None
+    relative_rotary: RelativeRotaryState | None = None
 
 
-class TamperEvent(Tamper, HueEvent):
+class ContactEvent(_OwnedEvent):
+    type: Literal[ResourceType.CONTACT] = ResourceType.CONTACT
+    enabled: bool | None = None
+    contact_report: ContactReport | None = None
+
+
+class TamperEvent(_OwnedEvent):
+    type: Literal[ResourceType.TAMPER] = ResourceType.TAMPER
     tamper_reports: list[TamperReport] | None = None
 
 
-class GroupedMotionEvent(GroupedMotion, HueEvent):
-    pass
+class GroupedMotionEvent(_OwnedEvent, MotionStateMixin):
+    type: Literal[ResourceType.GROUPED_MOTION] = ResourceType.GROUPED_MOTION
+    motion: MotionState | None = None
 
 
-class GroupedLightLevelEvent(GroupedLightLevel, HueEvent):
-    pass
+class GroupedLightLevelEvent(_OwnedEvent, LightLevelStateMixin):
+    type: Literal[ResourceType.GROUPED_LIGHT_LEVEL] = ResourceType.GROUPED_LIGHT_LEVEL
+    light: LightLevelState | None = None
 
 
-class ZigbeeConnectivityEvent(ZigbeeConnectivity, HueEvent):
-    pass
+class ZigbeeConnectivityEvent(_OwnedEvent):
+    type: Literal[ResourceType.ZIGBEE_CONNECTIVITY] = ResourceType.ZIGBEE_CONNECTIVITY
+    status: str | None = None
+    mac_address: str | None = None
+    channel: ZigbeeChannel | None = None
+    extended_pan_id: str | None = None
 
 
-class ZgpConnectivityEvent(ZgpConnectivity, HueEvent):
-    pass
+class ZgpConnectivityEvent(_OwnedEvent):
+    type: Literal[ResourceType.ZGP_CONNECTIVITY] = ResourceType.ZGP_CONNECTIVITY
+    status: str | None = None
+    source_id: str | None = None
 
 
-class WifiConnectivityEvent(WifiConnectivity, HueEvent):
-    pass
+class WifiConnectivityEvent(_OwnedEvent):
+    type: Literal[ResourceType.WIFI_CONNECTIVITY] = ResourceType.WIFI_CONNECTIVITY
+    status: str | None = None
+    mac_address: str | None = None
+    signal_strength: WifiSignalStrength | None = None
 
 
-class ZigbeeDeviceDiscoveryEvent(ZigbeeDeviceDiscovery, HueEvent):
-    pass
+class ZigbeeDeviceDiscoveryEvent(_OwnedEvent):
+    type: Literal[ResourceType.ZIGBEE_DEVICE_DISCOVERY] = (
+        ResourceType.ZIGBEE_DEVICE_DISCOVERY
+    )
+    status: str | None = None
 
 
-class EntertainmentEvent(Entertainment, HueEvent):
-    pass
+class EntertainmentEvent(_OwnedEvent):
+    type: Literal[ResourceType.ENTERTAINMENT] = ResourceType.ENTERTAINMENT
+    renderer: bool | None = None
+    proxy: bool | None = None
+    max_streams: int | None = None
+    segments: EntertainmentSegments | None = None
 
 
-class SpeakerEvent(Speaker, HueEvent):
+class SpeakerEvent(_OwnedEvent):
+    type: Literal[ResourceType.SPEAKER] = ResourceType.SPEAKER
     alerts: list[str] | None = None
 
 
-class BehaviorScriptEvent(BehaviorScript, HueEvent):
-    pass
+class BehaviorScriptEvent(HueEvent, NamedServiceMixin):
+    type: Literal[ResourceType.BEHAVIOR_SCRIPT] = ResourceType.BEHAVIOR_SCRIPT
+    description: str | None = None
+    configuration_schema: dict[str, Any] | None = None
+    trigger_schema: dict[str, Any] | None = None
+    state_schema: dict[str, Any] | None = None
+    version: str | None = None
+    metadata: MetadataUpdate | None = None
 
 
-class BehaviorInstanceEvent(BehaviorInstance, HueEvent):
+class BehaviorInstanceEvent(HueEvent, NamedServiceMixin):
+    type: Literal[ResourceType.BEHAVIOR_INSTANCE] = ResourceType.BEHAVIOR_INSTANCE
+    script_id: UUID | None = None
+    enabled: bool | None = None
+    state: dict[str, Any] | None = None
+    configuration: dict[str, Any] | None = None
     dependees: list[ResourceReference] | None = None
+    status: str | None = None
+    last_error: str | None = None
+    metadata: MetadataUpdate | None = None
 
 
-class GeofenceClientEvent(GeofenceClient, HueEvent):
-    pass
+class GeofenceClientEvent(HueEvent):
+    type: Literal[ResourceType.GEOFENCE_CLIENT] = ResourceType.GEOFENCE_CLIENT
+    name: str | None = None
+    is_at_home: bool | None = None
 
 
-class GeolocationEvent(Geolocation, HueEvent):
-    pass
+class GeolocationEvent(HueEvent):
+    type: Literal[ResourceType.GEOLOCATION] = ResourceType.GEOLOCATION
+    is_configured: bool | None = None
 
 
-class HomekitEvent(Homekit, HueEvent):
-    pass
+class HomekitEvent(_OwnedEvent):
+    type: Literal[ResourceType.HOMEKIT] = ResourceType.HOMEKIT
+    status: str | None = None
+    action: str | None = None
 
 
-class MatterEvent(Matter, HueEvent):
-    pass
+class MatterEvent(_OwnedEvent):
+    type: Literal[ResourceType.MATTER] = ResourceType.MATTER
+    has_qr_code: bool | None = None
+    max_fabrics: int | None = None
 
 
-class MatterFabricEvent(MatterFabric, HueEvent):
-    pass
+class MatterFabricEvent(_OwnedEvent):
+    type: Literal[ResourceType.MATTER_FABRIC] = ResourceType.MATTER_FABRIC
+    status: str | None = None
+    fabric_data: MatterFabricData | None = None
+    creation_time: datetime | None = None
 
 
-class ConvenienceAreaMotionEvent(ConvenienceAreaMotion, HueEvent):
-    pass
+class ConvenienceAreaMotionEvent(_MotionEvent):
+    type: Literal[ResourceType.CONVENIENCE_AREA_MOTION] = (
+        ResourceType.CONVENIENCE_AREA_MOTION
+    )
 
 
-class SecurityAreaMotionEvent(SecurityAreaMotion, HueEvent):
-    pass
+class SecurityAreaMotionEvent(_MotionEvent):
+    type: Literal[ResourceType.SECURITY_AREA_MOTION] = ResourceType.SECURITY_AREA_MOTION
 
 
-class MotionAreaCandidateEvent(MotionAreaCandidate, HueEvent):
+class MotionAreaCandidateEvent(_OwnedEvent):
+    type: Literal[ResourceType.MOTION_AREA_CANDIDATE] = (
+        ResourceType.MOTION_AREA_CANDIDATE
+    )
     motion_sensors: list[ResourceReference] | None = None
 
 
-class MotionAreaConfigurationEvent(MotionAreaConfiguration, HueEvent):
+class MotionAreaConfigurationEvent(_OwnedEvent):
+    type: Literal[ResourceType.MOTION_AREA_CONFIGURATION] = (
+        ResourceType.MOTION_AREA_CONFIGURATION
+    )
+    enabled: bool | None = None
     motion_sensors: list[ResourceReference] | None = None
 
 
-class SwitchInputConfigurationEvent(SwitchInputConfiguration, HueEvent):
-    pass
+class SwitchInputConfigurationEvent(_OwnedEvent):
+    type: Literal[ResourceType.SWITCH_INPUT_CONFIGURATION] = (
+        ResourceType.SWITCH_INPUT_CONFIGURATION
+    )
+    switch_mode: str | HueModel | None = None
 
 
-class SmartSceneEvent(SmartScene, HueEvent):
+class SmartSceneEvent(HueEvent):
+    type: Literal[ResourceType.SMART_SCENE] = ResourceType.SMART_SCENE
     metadata: MetadataUpdate | None = None
     group: ResourceReference | None = None
     week_timeslots: list[SmartSceneDay] | None = None
+    transition_duration: int | None = Field(default=None, ge=0)
+    active_timeslot: SmartSceneActiveTimeslot | None = None
+    state: str | None = None
+
+    @property
+    def name(self) -> str | None:
+        return self.metadata.name if self.metadata else None
 
 
-class GroupedLightEvent(GroupedLight, HueEvent):
+class GroupedLightEvent(_OwnedEvent, LightStateMixin):
+    type: Literal[ResourceType.GROUPED_LIGHT] = ResourceType.GROUPED_LIGHT
+    on: OnState | None = None
     dimming: DimmingEventState | None = None
+    color_temperature: ColorTemperatureState | None = None
+    color: ColorState | None = None
+    dynamics: DynamicsState | None = None
+    alert: AlertState | None = None
+    signaling: SignalingState | None = None
 
 
 _UNTYPED_EVENT = "other"
@@ -378,4 +511,5 @@ class HueEventMessage(HueModel):
     """One container of an event stream payload, holding the changed resources."""
 
     data: list[AnyHueEvent] = Field(default_factory=list)
+    type: str | None = None
     creationtime: datetime | None = None

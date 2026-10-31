@@ -1,5 +1,3 @@
-from pydantic import TypeAdapter
-
 from hueify.credentials import HueBridgeCredentials
 from hueify.entertainment.stream import DEFAULT_RATE, EntertainmentStream
 from hueify.http import HttpClient
@@ -10,12 +8,14 @@ from hueify.models import (
     ResourceIdentifier,
     StreamAction,
 )
-from hueify.resources.base import ResourceId, ResourceNamespace
+from hueify.resources.base import ResourceId, UpdateNamespace
 
 ENTERTAINMENT_CONFIGURATION_RESOURCE_TYPE = "entertainment_configuration"
 
 
-class EntertainmentNamespace(ResourceNamespace[EntertainmentConfiguration]):
+class EntertainmentNamespace(
+    UpdateNamespace[EntertainmentConfiguration, EntertainmentConfigurationUpdate]
+):
     """The entertainment areas of the bridge, and the streams to them."""
 
     def __init__(
@@ -23,7 +23,8 @@ class EntertainmentNamespace(ResourceNamespace[EntertainmentConfiguration]):
     ) -> None:
         super().__init__(
             ENTERTAINMENT_CONFIGURATION_RESOURCE_TYPE,
-            TypeAdapter(HueApiResponse[EntertainmentConfiguration]),
+            EntertainmentConfiguration,
+            EntertainmentConfigurationUpdate,
             http_client,
         )
         self._credentials = credentials
@@ -31,7 +32,7 @@ class EntertainmentNamespace(ResourceNamespace[EntertainmentConfiguration]):
     async def update(
         self, area_id: ResourceId, data: EntertainmentConfigurationUpdate
     ) -> HueApiResponse[ResourceIdentifier]:
-        return await self._update(area_id, data)
+        return await super().update(area_id, data)
 
     async def start(self, area_id: ResourceId) -> HueApiResponse[ResourceIdentifier]:
         return await self.update(

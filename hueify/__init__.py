@@ -6,6 +6,7 @@ from hueify.entertainment import (
     Tick,
 )
 from hueify.errors import (
+    AmbiguousResourceError,
     EntertainmentAuthenticationError,
     EntertainmentError,
     HueifyError,
@@ -39,6 +40,7 @@ from hueify.models import (
     MotionUpdate,
     ResourceReference,
     ResourceType,
+    ResourceUpdate,
     Room,
     Scene,
     SceneCreate,
@@ -76,6 +78,7 @@ from hueify.resources import (
 from hueify.sse import ConnectionStatus, EventStream, ReconnectPolicy
 
 __all__ = [
+    "AmbiguousResourceError",
     "ColorXY",
     "ConnectionStatus",
     "Device",
@@ -122,6 +125,7 @@ __all__ = [
     "ResourceReference",
     "ResourceRegistry",
     "ResourceType",
+    "ResourceUpdate",
     "Room",
     "RoomNamespace",
     "Scene",

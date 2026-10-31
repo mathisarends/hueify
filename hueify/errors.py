@@ -6,6 +6,10 @@ class ResourceNotFoundError(HueifyError):
     """A resource addressed by ID or name does not exist on the bridge."""
 
 
+class AmbiguousResourceError(HueifyError):
+    """A name matches several resources; choose a specific ID or group."""
+
+
 class MissingCredentialsError(HueifyError):
     """No bridge IP and application key could be resolved for this client."""
 

@@ -73,6 +73,7 @@ class EntertainmentStream:
         self._error: Exception | None = None
         self._frames_sent = 0
         self._late_frames = 0
+        self._lifecycle_lock = asyncio.Lock()
 
     @property
     def area(self) -> EntertainmentConfiguration:
@@ -120,16 +121,26 @@ class EntertainmentStream:
 
     async def open(self) -> Self:
         """Take the area over and start sending; calling twice is harmless."""
+        async with self._lifecycle_lock:
+            return await self._open()
+
+    async def _open(self) -> Self:
         if self.sending:
             return self
 
+        await self._close()
         connection_type = _dtls_connection()
         self._area = await self._resolve_area()
         self._frame = Frame(channel.channel_id for channel in self._area.channels)
 
         area_started = False
         try:
-            await self._areas.start(self._area.id)
+            response = await self._areas.start(self._area.id)
+            if response.errors:
+                descriptions = "; ".join(error.description for error in response.errors)
+                raise EntertainmentError(
+                    f"Could not start entertainment area: {descriptions}"
+                )
             area_started = True
             self._connection = await connection_type.connect(
                 self._credentials.hue_bridge_ip,
@@ -146,10 +157,17 @@ class EntertainmentStream:
             raise
 
         self._started_at = datetime.now(UTC)
+        self._error = None
+        self._frames_sent = 0
+        self._late_frames = 0
         self._sender = asyncio.create_task(self._send_frames())
         return self
 
     async def close(self) -> None:
+        async with self._lifecycle_lock:
+            await self._close()
+
+    async def _close(self) -> None:
         await self._stop_sender()
 
         if self._connection is not None:

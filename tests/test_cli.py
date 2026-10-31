@@ -16,6 +16,7 @@ from hueify.models import (
     EntertainmentConfiguration,
     GroupArchetype,
     GroupMetadata,
+    HueApiError,
     HueApiResponse,
     Light,
     LightMetadata,
@@ -51,6 +52,49 @@ def update_response() -> HueApiResponse[ResourceIdentifier]:
     return HueApiResponse[ResourceIdentifier](
         data=[ResourceIdentifier(rid=RESOURCE_ID, rtype=ResourceType.LIGHT)]
     )
+
+
+@pytest.mark.parametrize("flags", [[], ["--plain"], ["--json"]])
+@pytest.mark.parametrize("partial_success", [False, True])
+def test_bridge_write_errors_fail_in_every_output_mode(flags, partial_success) -> None:
+    hue = bridge_mock()
+    response = (
+        update_response() if partial_success else HueApiResponse[ResourceIdentifier]()
+    )
+    response.errors = [HueApiError(description="bridge rejected command")]
+    hue.lights.turn_on = AsyncMock(return_value=response)
+    with patch("hueify.cli.operations.Hueify", return_value=hue):
+        result = runner.invoke(app, [*flags, "light", "on", str(RESOURCE_ID)])
+    assert result.exit_code == 1
+    assert "bridge rejected command" in result.stderr
+    if "--json" in flags:
+        assert json.loads(result.stdout) == response.model_dump(mode="json")
+    else:
+        assert result.stdout == ""
+
+
+@pytest.mark.parametrize(
+    "group,namespace",
+    [
+        ("light", "lights"),
+        ("room", "rooms"),
+        ("zone", "zones"),
+        ("scene", "scenes"),
+        ("entertainment", "entertainment"),
+    ],
+)
+def test_bridge_list_errors_fail(group, namespace) -> None:
+    hue = bridge_mock()
+    getattr(hue, namespace).list = AsyncMock(
+        return_value=HueApiResponse[Light](
+            errors=[HueApiError(description="read rejected")]
+        )
+    )
+    with patch("hueify.cli.operations.Hueify", return_value=hue):
+        result = runner.invoke(app, [group, "list", "--json"])
+    assert result.exit_code == 1
+    assert "read rejected" in result.stderr
+    assert result.stdout == ""
 
 
 def test_setup_command_runs_the_interactive_onboarding() -> None:
@@ -120,7 +164,7 @@ def test_light_list_uses_the_hueify_api_and_writes_stable_plain_output() -> None
         on=OnState(on=True),
     )
     hue = bridge_mock()
-    hue.lights.list = AsyncMock(return_value=SimpleNamespace(data=[light]))
+    hue.lights.list = AsyncMock(return_value=SimpleNamespace(errors=[], data=[light]))
 
     with patch("hueify.cli.operations.Hueify", return_value=hue):
         result = runner.invoke(app, ["--plain", "light", "list"])
@@ -138,7 +182,7 @@ def test_resource_list_json_is_a_compact_resource_summary() -> None:
         on=OnState(on=False),
     )
     hue = bridge_mock()
-    hue.lights.list = AsyncMock(return_value=SimpleNamespace(data=[light]))
+    hue.lights.list = AsyncMock(return_value=SimpleNamespace(errors=[], data=[light]))
 
     with patch("hueify.cli.operations.Hueify", return_value=hue):
         result = runner.invoke(app, ["light", "list", "--json"])
@@ -161,7 +205,7 @@ def test_no_color_is_accepted_after_the_subcommand() -> None:
         on=OnState(on=True),
     )
     hue = bridge_mock()
-    hue.lights.list = AsyncMock(return_value=SimpleNamespace(data=[light]))
+    hue.lights.list = AsyncMock(return_value=SimpleNamespace(errors=[], data=[light]))
 
     with patch("hueify.cli.operations.Hueify", return_value=hue):
         result = runner.invoke(
@@ -195,10 +239,12 @@ def test_every_resource_app_lists_its_typed_models_in_human_output() -> None:
         status=StreamingStatus.ACTIVE,
     )
     hue = bridge_mock()
-    hue.rooms.list = AsyncMock(return_value=SimpleNamespace(data=[room]))
-    hue.zones.list = AsyncMock(return_value=SimpleNamespace(data=[zone]))
-    hue.scenes.list = AsyncMock(return_value=SimpleNamespace(data=[scene]))
-    hue.entertainment.list = AsyncMock(return_value=SimpleNamespace(data=[area]))
+    hue.rooms.list = AsyncMock(return_value=SimpleNamespace(errors=[], data=[room]))
+    hue.zones.list = AsyncMock(return_value=SimpleNamespace(errors=[], data=[zone]))
+    hue.scenes.list = AsyncMock(return_value=SimpleNamespace(errors=[], data=[scene]))
+    hue.entertainment.list = AsyncMock(
+        return_value=SimpleNamespace(errors=[], data=[area])
+    )
 
     with patch("hueify.cli.operations.Hueify", return_value=hue):
         results = [
@@ -230,7 +276,7 @@ def test_scene_list_renders_only_the_active_status_value() -> None:
         ),
     )
     hue = bridge_mock()
-    hue.scenes.list = AsyncMock(return_value=SimpleNamespace(data=[scene]))
+    hue.scenes.list = AsyncMock(return_value=SimpleNamespace(errors=[], data=[scene]))
 
     with patch("hueify.cli.operations.Hueify", return_value=hue):
         result = runner.invoke(app, ["--plain", "scene", "list"])
@@ -245,7 +291,7 @@ def test_light_on_resolves_a_name_and_passes_all_control_options() -> None:
     hue.__aenter__ = AsyncMock(return_value=hue)
     hue.__aexit__ = AsyncMock(return_value=None)
     hue.lights.find_by_name = AsyncMock(return_value=SimpleNamespace(id=resource_id))
-    hue.lights.turn_on = AsyncMock(return_value=SimpleNamespace(data=[]))
+    hue.lights.turn_on = AsyncMock(return_value=SimpleNamespace(errors=[], data=[]))
 
     with patch("hueify.cli.operations.Hueify", return_value=hue):
         result = runner.invoke(
@@ -274,7 +320,7 @@ def test_light_off_uses_a_uuid_without_an_unnecessary_lookup() -> None:
     hue = MagicMock()
     hue.__aenter__ = AsyncMock(return_value=hue)
     hue.__aexit__ = AsyncMock(return_value=None)
-    hue.lights.turn_off = AsyncMock(return_value=SimpleNamespace(data=[]))
+    hue.lights.turn_off = AsyncMock(return_value=SimpleNamespace(errors=[], data=[]))
 
     with patch("hueify.cli.operations.Hueify", return_value=hue):
         result = runner.invoke(app, ["light", "off", resource_id])
@@ -372,7 +418,7 @@ def test_scene_activate_uses_the_scene_api() -> None:
     hue.__aenter__ = AsyncMock(return_value=hue)
     hue.__aexit__ = AsyncMock(return_value=None)
     hue.scenes.find_by_name = AsyncMock(return_value=SimpleNamespace(id=resource_id))
-    hue.scenes.activate = AsyncMock(return_value=SimpleNamespace(data=[]))
+    hue.scenes.activate = AsyncMock(return_value=SimpleNamespace(errors=[], data=[]))
 
     with patch("hueify.cli.operations.Hueify", return_value=hue):
         result = runner.invoke(
@@ -394,13 +440,95 @@ def test_entertainment_start_resolves_the_area_name() -> None:
     hue.entertainment.find_by_name = AsyncMock(
         return_value=SimpleNamespace(id=resource_id)
     )
-    hue.entertainment.start = AsyncMock(return_value=SimpleNamespace(data=[]))
+    hue.entertainment.start = AsyncMock(
+        return_value=SimpleNamespace(errors=[], data=[])
+    )
 
     with patch("hueify.cli.operations.Hueify", return_value=hue):
         result = runner.invoke(app, ["entertainment", "start", "TV"])
 
     assert result.exit_code == 0
     hue.entertainment.start.assert_awaited_once_with(resource_id)
+
+
+@pytest.mark.parametrize(
+    "args,namespace",
+    [
+        (["light", "on", "Desk"], "lights"),
+        (["room", "toggle", "Office"], "rooms"),
+        (["zone", "brightness", "Office", "40"], "zones"),
+        (["light", "color", "Desk", "#fff"], "lights"),
+        (["light", "temperature", "Desk", "2700"], "lights"),
+        (["light", "identify", "Desk"], "lights"),
+        (["light", "off", "Desk"], "lights"),
+        (["scene", "activate", "Relax"], "scenes"),
+        (["entertainment", "start", "TV"], "entertainment"),
+        (["entertainment", "stop", "TV"], "entertainment"),
+    ],
+)
+def test_no_fuzzy_is_forwarded_by_all_name_based_commands(args, namespace):
+    from hueify import ResourceNotFoundError
+
+    hue = bridge_mock()
+    lookup = AsyncMock(side_effect=ResourceNotFoundError("exact name missing"))
+    getattr(hue, namespace).find_by_name = lookup
+    with patch("hueify.cli.operations.Hueify", return_value=hue):
+        result = runner.invoke(app, [*args, "--no-fuzzy"])
+    assert result.exit_code == 1
+    lookup.assert_awaited_once_with(args[2], fuzzy=False)
+
+
+@pytest.mark.parametrize("scope,namespace", [("--room", "rooms"), ("--zone", "zones")])
+def test_scene_activation_resolves_scope_before_scene(scope, namespace):
+    hue = bridge_mock()
+    getattr(hue, namespace).find_by_name = AsyncMock(
+        return_value=SimpleNamespace(id=OWNER_ID)
+    )
+    hue.scenes.find_by_name = AsyncMock(return_value=SimpleNamespace(id=RESOURCE_ID))
+    hue.scenes.activate = AsyncMock(return_value=update_response())
+    with patch("hueify.cli.operations.Hueify", return_value=hue):
+        result = runner.invoke(
+            app, ["scene", "activate", "Relax", scope, "Office", "--no-fuzzy"]
+        )
+    assert result.exit_code == 0
+    getattr(hue, namespace).find_by_name.assert_awaited_once_with("Office", fuzzy=False)
+    hue.scenes.find_by_name.assert_awaited_once_with(
+        "Relax", group_id=OWNER_ID, fuzzy=False
+    )
+
+
+def test_scene_scope_rejects_conflicting_options_and_mismatched_ids():
+    hue = bridge_mock()
+    hue.scenes.get_one = AsyncMock(
+        return_value=SimpleNamespace(group=SimpleNamespace(rid=RESOURCE_ID))
+    )
+    with patch("hueify.cli.operations.Hueify", return_value=hue):
+        conflicting = runner.invoke(
+            app, ["scene", "activate", "Relax", "--room", "Office", "--zone", "Office"]
+        )
+        mismatch = runner.invoke(
+            app, ["scene", "activate", str(RESOURCE_ID), "--room", str(OWNER_ID)]
+        )
+    assert conflicting.exit_code == 2
+    assert mismatch.exit_code == 1
+    hue.scenes.activate.assert_not_called()
+
+
+@pytest.mark.parametrize("group_id", [str(OWNER_ID).upper(), OWNER_ID.hex])
+def test_scene_scope_accepts_equivalent_uuid_spellings(group_id):
+    hue = bridge_mock()
+    hue.scenes.get_one = AsyncMock(
+        return_value=SimpleNamespace(group=SimpleNamespace(rid=OWNER_ID))
+    )
+    hue.scenes.activate = AsyncMock(return_value=update_response())
+    with patch("hueify.cli.operations.Hueify", return_value=hue):
+        result = runner.invoke(
+            app, ["scene", "activate", str(RESOURCE_ID), "--room", group_id]
+        )
+    assert result.exit_code == 0
+    hue.scenes.activate.assert_awaited_once_with(
+        str(RESOURCE_ID), brightness=None, transition=None, dynamic=False
+    )
 
 
 def test_scene_and_entertainment_accept_uuids_without_name_lookups() -> None:

@@ -2,119 +2,15 @@
 
 import re
 from collections.abc import Iterable, Mapping
-from typing import Annotated, Any
+from typing import Any
 
-from pydantic import BaseModel, Discriminator, RootModel, Tag, TypeAdapter
+from pydantic import BaseModel, RootModel, TypeAdapter
 
 from hueify import models as m
 from hueify.http import HttpClient
 from hueify.resources.base import ResourceId, ResourceNamespace
 
-
-def _resource_tag(value: Any) -> str:
-    kind = (
-        value.get("type") if isinstance(value, dict) else getattr(value, "type", None)
-    )
-    tag = str(kind)
-    return tag if tag in _RESOURCE_TYPES else "other"
-
-
-_RESOURCE_TYPES = frozenset(
-    {
-        "light",
-        "grouped_light",
-        "room",
-        "zone",
-        "scene",
-        "smart_scene",
-        "device",
-        "device_power",
-        "device_software_update",
-        "bridge",
-        "bridge_home",
-        "service_group",
-        "motion",
-        "camera_motion",
-        "temperature",
-        "light_level",
-        "button",
-        "bell_button",
-        "relative_rotary",
-        "contact",
-        "tamper",
-        "grouped_motion",
-        "grouped_light_level",
-        "zigbee_connectivity",
-        "zgp_connectivity",
-        "wifi_connectivity",
-        "zigbee_device_discovery",
-        "entertainment",
-        "entertainment_configuration",
-        "speaker",
-        "behavior_script",
-        "behavior_instance",
-        "geofence_client",
-        "geolocation",
-        "homekit",
-        "matter",
-        "matter_fabric",
-        "convenience_area_motion",
-        "security_area_motion",
-        "motion_area_candidate",
-        "motion_area_configuration",
-        "switch_input_configuration",
-    }
-)
-
-
-AnyHueResource = Annotated[
-    Annotated[m.Light, Tag("light")]
-    | Annotated[m.GroupedLight, Tag("grouped_light")]
-    | Annotated[m.Room, Tag("room")]
-    | Annotated[m.Zone, Tag("zone")]
-    | Annotated[m.Scene, Tag("scene")]
-    | Annotated[m.SmartScene, Tag("smart_scene")]
-    | Annotated[m.Device, Tag("device")]
-    | Annotated[m.DevicePower, Tag("device_power")]
-    | Annotated[m.DeviceSoftwareUpdate, Tag("device_software_update")]
-    | Annotated[m.Bridge, Tag("bridge")]
-    | Annotated[m.BridgeHome, Tag("bridge_home")]
-    | Annotated[m.ServiceGroup, Tag("service_group")]
-    | Annotated[m.Motion, Tag("motion")]
-    | Annotated[m.CameraMotion, Tag("camera_motion")]
-    | Annotated[m.Temperature, Tag("temperature")]
-    | Annotated[m.LightLevel, Tag("light_level")]
-    | Annotated[m.Button, Tag("button")]
-    | Annotated[m.BellButton, Tag("bell_button")]
-    | Annotated[m.RelativeRotary, Tag("relative_rotary")]
-    | Annotated[m.Contact, Tag("contact")]
-    | Annotated[m.Tamper, Tag("tamper")]
-    | Annotated[m.GroupedMotion, Tag("grouped_motion")]
-    | Annotated[m.GroupedLightLevel, Tag("grouped_light_level")]
-    | Annotated[m.ZigbeeConnectivity, Tag("zigbee_connectivity")]
-    | Annotated[m.ZgpConnectivity, Tag("zgp_connectivity")]
-    | Annotated[m.WifiConnectivity, Tag("wifi_connectivity")]
-    | Annotated[m.ZigbeeDeviceDiscovery, Tag("zigbee_device_discovery")]
-    | Annotated[m.Entertainment, Tag("entertainment")]
-    | Annotated[m.EntertainmentConfiguration, Tag("entertainment_configuration")]
-    | Annotated[m.Speaker, Tag("speaker")]
-    | Annotated[m.BehaviorScript, Tag("behavior_script")]
-    | Annotated[m.BehaviorInstance, Tag("behavior_instance")]
-    | Annotated[m.GeofenceClient, Tag("geofence_client")]
-    | Annotated[m.Geolocation, Tag("geolocation")]
-    | Annotated[m.Homekit, Tag("homekit")]
-    | Annotated[m.Matter, Tag("matter")]
-    | Annotated[m.MatterFabric, Tag("matter_fabric")]
-    | Annotated[m.ConvenienceAreaMotion, Tag("convenience_area_motion")]
-    | Annotated[m.SecurityAreaMotion, Tag("security_area_motion")]
-    | Annotated[m.MotionAreaCandidate, Tag("motion_area_candidate")]
-    | Annotated[m.MotionAreaConfiguration, Tag("motion_area_configuration")]
-    | Annotated[m.SwitchInputConfiguration, Tag("switch_input_configuration")]
-    | Annotated[m.HueResource, Tag("other")],
-    Discriminator(_resource_tag),
-]
-
-_RESOURCE_RESPONSE = TypeAdapter(m.HueApiResponse[AnyHueResource])
+_RESOURCE_RESPONSE = TypeAdapter(m.HueApiResponse[m.AnyHueResource])
 _RAW_RESPONSE = TypeAdapter(m.HueApiResponse[m.HueResource])
 
 
@@ -181,8 +77,8 @@ class ResourceRegistry:
         """Return an explicit raw namespace, also for a known resource type."""
         return RawNamespace(str(resource_type), self._http_client)
 
-    async def list(self) -> m.HueApiResponse[AnyHueResource]:
+    async def list(self) -> m.HueApiResponse[m.AnyHueResource]:
         return await self._http_client.get("", _RESOURCE_RESPONSE)
 
-    async def get(self, reference: m.ResourceReference) -> BaseModel:
+    async def get(self, reference: m.ResourceReference) -> m.AnyHueResource:
         return await self[reference.rtype].get_one(reference.rid)

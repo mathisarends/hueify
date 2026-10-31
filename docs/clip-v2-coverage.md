@@ -27,9 +27,9 @@ raises ResourceNotFoundError if no named resource matches.
 | Resource | Namespace | Response model | Native operations | Update model |
 | --- | --- | --- | --- | --- |
 | `behavior_instance` | `hue.behavior_instances` | `BehaviorInstance` | GET / PUT | `BehaviorInstanceUpdate` |
-| `behavior_script` | `hue.behavior_scripts` | `BehaviorScript` | GET / PUT | `HueModel` |
-| `bell_button` | `hue.bell_buttons` | `BellButton` | GET / PUT | `HueModel` |
-| `bridge` | `hue.bridges` | `Bridge` | GET / PUT | `HueModel` |
+| `behavior_script` | `hue.behavior_scripts` | `BehaviorScript` | GET / PUT | `ResourceUpdate` |
+| `bell_button` | `hue.bell_buttons` | `BellButton` | GET / PUT | `ResourceUpdate` |
+| `bridge` | `hue.bridges` | `Bridge` | GET / PUT | `ResourceUpdate` |
 | `bridge_home` | `hue.bridge_homes` | `BridgeHome` | GET | N/A |
 | `button` | `hue.buttons` | `Button` | GET / PUT | `ButtonUpdate` |
 | `camera_motion` | `hue.camera_motions` | `CameraMotion` | GET / PUT | `EnabledUpdate` |
@@ -38,39 +38,42 @@ raises ResourceNotFoundError if no named resource matches.
 | `device` | `hue.devices` | `Device` | GET / PUT / DELETE | `DeviceUpdate` |
 | `device_power` | `hue.device_power` | `DevicePower` | GET | N/A |
 | `device_software_update` | `hue.device_software_updates` | `DeviceSoftwareUpdate` | GET / PUT | `DeviceSoftwareUpdateUpdate` |
-| `entertainment` | `hue.entertainment_services` | `Entertainment` | GET / PUT | `HueModel` |
+| `entertainment` | `hue.entertainment_services` | `Entertainment` | GET / PUT | `ResourceUpdate` |
 | `entertainment_configuration` | `hue.entertainment` | `EntertainmentConfiguration` | GET / PUT | `EntertainmentConfigurationUpdate` |
 | `geofence_client` | `hue.geofence_clients` | `GeofenceClient` | GET / PUT | `GeofenceClientUpdate` |
-| `geolocation` | `hue.geolocations` | `Geolocation` | GET / PUT | `HueModel` |
+| `geolocation` | `hue.geolocations` | `Geolocation` | GET / PUT | `ResourceUpdate` |
 | `grouped_light` | `hue.grouped_lights` | `GroupedLight` | GET / PUT | `LightUpdate` |
-| `grouped_light_level` | `hue.grouped_light_levels` | `GroupedLightLevel` | GET / PUT | `HueModel` |
-| `grouped_motion` | `hue.grouped_motions` | `GroupedMotion` | GET / PUT | `HueModel` |
+| `grouped_light_level` | `hue.grouped_light_levels` | `GroupedLightLevel` | GET / PUT | `ResourceUpdate` |
+| `grouped_motion` | `hue.grouped_motions` | `GroupedMotion` | GET / PUT | `ResourceUpdate` |
 | `homekit` | `hue.homekit` | `Homekit` | GET / PUT | `HomekitUpdate` |
 | `light` | `hue.lights` | `Light` | GET / PUT | `LightUpdate` |
 | `light_level` | `hue.light_levels` | `LightLevel` | GET / PUT | `EnabledUpdate` |
 | `matter` | `hue.matter` | `Matter` | GET / PUT | `MatterUpdate` |
-| `matter_fabric` | `hue.matter_fabrics` | `MatterFabric` | GET / PUT | `HueModel` |
+| `matter_fabric` | `hue.matter_fabrics` | `MatterFabric` | GET / PUT | `ResourceUpdate` |
 | `motion` | `hue.motions` | `Motion` | GET / PUT | `MotionUpdate` |
-| `motion_area_candidate` | `hue.motion_area_candidates` | `MotionAreaCandidate` | GET / PUT | `HueModel` |
+| `motion_area_candidate` | `hue.motion_area_candidates` | `MotionAreaCandidate` | GET / PUT | `ResourceUpdate` |
 | `motion_area_configuration` | `hue.motion_area_configurations` | `MotionAreaConfiguration` | GET / PUT | `EnabledUpdate` |
-| `relative_rotary` | `hue.relative_rotaries` | `RelativeRotary` | GET / PUT | `HueModel` |
+| `relative_rotary` | `hue.relative_rotaries` | `RelativeRotary` | GET / PUT | `ResourceUpdate` |
 | `room` | `hue.rooms` | `Room` | GET / PUT / DELETE / POST | `GroupUpdate` |
 | `scene` | `hue.scenes` | `Scene` | GET / PUT / DELETE / POST | `SceneUpdate` |
 | `security_area_motion` | `hue.security_area_motions` | `SecurityAreaMotion` | GET / PUT | `EnabledUpdate` |
 | `service_group` | `hue.service_groups` | `ServiceGroup` | GET / PUT | `ServiceGroupUpdate` |
 | `smart_scene` | `hue.smart_scenes` | `SmartScene` | GET / PUT / DELETE / POST | `SmartSceneUpdate` |
-| `speaker` | `hue.speakers` | `Speaker` | GET / PUT | `HueModel` |
-| `tamper` | `hue.tampers` | `Tamper` | GET / PUT | `HueModel` |
+| `speaker` | `hue.speakers` | `Speaker` | GET / PUT | `ResourceUpdate` |
+| `tamper` | `hue.tampers` | `Tamper` | GET / PUT | `ResourceUpdate` |
 | `temperature` | `hue.temperatures` | `Temperature` | GET / PUT | `EnabledUpdate` |
-| `wifi_connectivity` | `hue.wifi_connectivity` | `WifiConnectivity` | GET / PUT | `HueModel` |
-| `zgp_connectivity` | `hue.zgp_connectivity` | `ZgpConnectivity` | GET / PUT | `HueModel` |
+| `wifi_connectivity` | `hue.wifi_connectivity` | `WifiConnectivity` | GET / PUT | `ResourceUpdate` |
+| `zgp_connectivity` | `hue.zgp_connectivity` | `ZgpConnectivity` | GET / PUT | `ResourceUpdate` |
 | `zigbee_connectivity` | `hue.zigbee_connectivity` | `ZigbeeConnectivity` | GET / PUT | `ZigbeeConnectivityUpdate` |
 | `zigbee_device_discovery` | `hue.zigbee_device_discovery` | `ZigbeeDeviceDiscovery` | GET / PUT | `ZigbeeDeviceDiscoveryUpdate` |
 | `zone` | `hue.zones` | `Zone` | GET / PUT / DELETE / POST | `GroupUpdate` |
 
-A `HueModel` update in the table means the pinned PUT schema specifies no
+A `ResourceUpdate` update in the table means the pinned PUT schema specifies no
 mutable properties beyond the resource type. Hueify permits explicit extra
 fields for firmware additions without asserting their meaning or support.
+Pass an explicit `ResourceUpdate(future_setting=True)` to those endpoints;
+passing a resource snapshot is rejected before any HTTP request. Every typed
+namespace uses the same request-model validation for native updates.
 Read-only services have no typed create, update or delete method.
 
 `hue.entertainment` keeps the existing entertainment-area and streaming API;
@@ -182,13 +185,28 @@ Light levels convert the bridge's logarithmic units to lux.
 Public model imports go through `hueify.models.__init__`, for example
 `from hueify.models import Light, MotionEvent, SmartSceneCreate`. The models
 package separates base types, lighting, services and events into ordinary
-modules and re-exports them from that public entry point.
+modules and re-exports them from that public entry point. Mixed inventory
+responses use the public `AnyHueResource` union from `hueify.models.resources`.
+
+Name lookup detects duplicate exact matches and tied fuzzy matches for all
+namespaces, including services with a native name field. Use `fuzzy=False` for
+exact names only, or `scenes.find_by_name(name, group_id=room.id)` to scope a
+scene lookup. Ambiguous results raise `AmbiguousResourceError` with candidate
+IDs.
+
+Resource events retain the envelope action in `event.operation` and its
+timestamp in `event.creationtime`. Sparse deletion events require only ID and
+resource type. The bounded event queue, reconnect ordering and callback-safe
+shutdown behavior described in the README also apply to every added resource.
 
 Every modeled resource has its own event class, such as MotionEvent,
 ButtonEvent, DeviceEvent, SmartSceneEvent and GroupedLightEvent. Event fields
 may be absent. Lists such as device services stay None when absent, distinct
 from an explicit empty list. Unknown resource types use HueEvent and retain
 all their fields. Subscribe using `hue.on(ResourceType.MOTION)` or a type string.
+Events have dedicated partial models; they do not inherit writable update
+models or complete snapshots. This also applies to partial dimming, gradient
+and power-up state. An event cannot accidentally be passed to a typed write.
 
 ## Breaking changes
 

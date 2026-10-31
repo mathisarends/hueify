@@ -1,4 +1,4 @@
-from pydantic import TypeAdapter
+from uuid import UUID
 
 from hueify.http import HttpClient
 from hueify.models import (
@@ -12,13 +12,22 @@ from hueify.models import (
     SceneRecallRequest,
     SceneUpdate,
 )
-from hueify.resources.base import ResourceId, ResourceNamespace
+from hueify.resources.base import ResourceId, UpdateNamespace
 from hueify.resources.controls import Transition, _transition_to_milliseconds
 
 
-class SceneNamespace(ResourceNamespace[Scene]):
+class SceneNamespace(UpdateNamespace[Scene, SceneUpdate]):
     def __init__(self, http_client: HttpClient) -> None:
-        super().__init__("scene", TypeAdapter(HueApiResponse[Scene]), http_client)
+        super().__init__("scene", Scene, SceneUpdate, http_client)
+
+    async def find_by_name(
+        self, name: str, *, fuzzy: bool = True, group_id: ResourceId | None = None
+    ) -> Scene:
+        group_id = UUID(str(group_id)) if group_id is not None else None
+        resources = (await self.list()).data
+        if group_id is not None:
+            resources = [scene for scene in resources if scene.group.rid == group_id]
+        return self._find_by_name(name, resources, fuzzy=fuzzy)
 
     async def create(self, data: SceneCreate) -> HueApiResponse[ResourceIdentifier]:
         if not isinstance(data, SceneCreate):
@@ -28,7 +37,7 @@ class SceneNamespace(ResourceNamespace[Scene]):
     async def update(
         self, scene_id: ResourceId, data: SceneUpdate
     ) -> HueApiResponse[ResourceIdentifier]:
-        return await self._update(scene_id, data)
+        return await super().update(scene_id, data)
 
     async def delete(self, scene_id: ResourceId) -> HueApiResponse[ResourceIdentifier]:
         return await self._delete(scene_id)
@@ -38,6 +47,8 @@ class SceneNamespace(ResourceNamespace[Scene]):
         scene_id: ResourceId,
         request: SceneRecallRequest | None = None,
     ) -> HueApiResponse[ResourceIdentifier]:
+        if request is not None and not isinstance(request, SceneRecallRequest):
+            raise TypeError("scene.recall expects SceneRecallRequest")
         return await self._http_client.put(
             self._resource_path(scene_id), request or SceneRecallRequest()
         )

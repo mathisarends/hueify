@@ -6,6 +6,7 @@ import pytest
 from hueify import ConnectionStatus, EventStream, Hueify
 from hueify.models import LightEvent, ResourceType
 from hueify.resources import (
+    GroupedLightNamespace,
     LightNamespace,
     RoomNamespace,
     SceneNamespace,
@@ -39,6 +40,7 @@ async def test_exposes_lighting_and_extended_resource_namespaces() -> None:
         assert isinstance(hue.zones, ZoneNamespace)
         assert isinstance(hue.scenes, SceneNamespace)
         assert isinstance(hue.events, EventStream)
+        assert isinstance(hue.grouped_lights, GroupedLightNamespace)
         assert hue.grouped_lights.resource_type == "grouped_light"
         assert hue.geolocations.resource_type == "geolocation"
     finally:

@@ -7,7 +7,7 @@ from hueify.cli.operations import (
     start_entertainment_area,
     stop_entertainment_area,
 )
-from hueify.cli.output import write_resources, write_response
+from hueify.cli.output import OutputOptions, write_resources, write_response
 
 app = typer.Typer(help="Inspect entertainment areas.")
 
@@ -25,7 +25,11 @@ def start_entertainment_area_command(
     target: str = typer.Argument(help="An entertainment-area UUID or name."),
 ) -> None:
     """Take an entertainment area over for a streaming client."""
-    response = run(start_entertainment_area(target))
+    response = run(
+        start_entertainment_area(
+            target, fuzzy=OutputOptions.from_context(context).fuzzy
+        )
+    )
     write_response(context, response)
 
 
@@ -35,5 +39,7 @@ def stop_entertainment_area_command(
     target: str = typer.Argument(help="An entertainment-area UUID or name."),
 ) -> None:
     """Release an entertainment area held by this application."""
-    response = run(stop_entertainment_area(target))
+    response = run(
+        stop_entertainment_area(target, fuzzy=OutputOptions.from_context(context).fuzzy)
+    )
     write_response(context, response)

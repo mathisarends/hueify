@@ -1,6 +1,7 @@
 import contextlib
 import json
 from collections.abc import Iterator, Sequence
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -10,7 +11,13 @@ from httpx_sse import SSEError
 
 from hueify.credentials import HueBridgeCredentials
 from hueify.errors import StreamAuthenticationError
-from hueify.models import HueEvent, LightEvent
+from hueify.models import (
+    GroupedLightEvent,
+    HueEvent,
+    LightEvent,
+    MotionEvent,
+    SmartSceneEvent,
+)
 from hueify.sse.bus import EventBus
 from hueify.sse.connection import StreamConnection
 from hueify.sse.retry import ReconnectPolicy
@@ -105,6 +112,69 @@ def patched_bridge(
 
 
 class TestHandleSse:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("operation", ["add", "update", "delete", "future_action"])
+    @pytest.mark.parametrize(
+        "kind, event_model",
+        [
+            ("light", LightEvent),
+            ("grouped_light", GroupedLightEvent),
+            ("motion", MotionEvent),
+            ("smart_scene", SmartSceneEvent),
+        ],
+    )
+    async def test_resource_events_retain_container_operation_and_time(
+        self, operation: str, kind: str, event_model: type[HueEvent]
+    ) -> None:
+        stream, bus, _ = make_stream()
+        raw = make_raw_event(kind)
+        await stream._handle_sse(
+            make_sse(
+                [
+                    {
+                        "type": operation,
+                        "creationtime": "2026-10-31T12:00:00Z",
+                        "data": [raw, {"type": "light"}],
+                    },
+                    {"type": "update", "data": [make_raw_event("future_sensor")]},
+                ]
+            )
+        )
+        changed, future = (call.args[0] for call in bus.dispatch.await_args_list)
+        assert isinstance(changed, event_model)
+        assert changed.type == kind
+        assert changed.operation == operation
+        assert changed.creationtime == datetime(2026, 10, 31, 12, tzinfo=UTC)
+        assert str(changed.id) == raw["id"]
+        assert future.operation == "update"
+        assert future.creationtime is None
+
+    @pytest.mark.asyncio
+    async def test_future_types_and_invalid_events_do_not_hide_valid_siblings(
+        self,
+    ) -> None:
+        stream, bus, _ = make_stream()
+        first = make_raw_event()
+        future = {**make_raw_event("future_sensor"), "new_field": 42}
+        last = make_raw_event()
+        await stream._handle_sse(
+            make_sse(
+                [
+                    {"data": [first, future, {"type": "light"}, last]},
+                    {"data": "invalid container"},
+                    42,
+                    {"data": [make_raw_event()]},
+                ]
+            )
+        )
+        events = [call.args[0] for call in bus.dispatch.await_args_list]
+        assert len(events) == 4
+        assert isinstance(events[0], LightEvent)
+        assert type(events[1]) is HueEvent
+        assert events[1].type == "future_sensor"
+        assert events[1].model_extra == {"owner": future["owner"], "new_field": 42}
+        assert str(events[2].id) == last["id"]
+
     @pytest.mark.asyncio
     async def test_dispatches_event_from_valid_payload(self) -> None:
         stream, bus, _ = make_stream()
@@ -288,6 +358,24 @@ class TestRunOnce:
             await stream.run_once()
 
         assert "Last-Event-ID" not in sent["headers"]
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("failure", ["connect", "read", "server"])
+    async def test_transport_and_server_failures_preserve_the_resume_id(self, failure):
+        stream, _, _ = make_stream()
+        with patched_bridge([make_sse([{"data": [make_raw_event()]}], event_id="42")]):
+            await stream.run_once()
+
+        failures = {
+            "connect": {"connect_error": httpx.ConnectError("offline")},
+            "read": {"stream_error": httpx.ReadTimeout("silent")},
+            "server": {"status_code": 503},
+        }
+        with patched_bridge(**failures[failure]), pytest.raises(httpx.HTTPError):
+            await stream.run_once()
+        with patched_bridge() as sent:
+            await stream.run_once()
+        assert sent["headers"]["Last-Event-ID"] == "42"
 
     @pytest.mark.asyncio
     async def test_keeps_new_resume_id_after_attempt_fails_following_an_event(

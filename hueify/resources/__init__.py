@@ -1,4 +1,4 @@
-from hueify.resources.base import ResourceId, ResourceNamespace
+from hueify.resources.base import ResourceId, ResourceNamespace, UpdateNamespace
 from hueify.resources.controls import LightCommands, Transition
 from hueify.resources.grouped_lights import GroupedLightNamespace
 from hueify.resources.groups import GroupNamespace, RoomNamespace, ZoneNamespace
@@ -15,7 +15,6 @@ from hueify.resources.services import (
     MatterNamespace,
     MotionNamespace,
     SmartSceneNamespace,
-    UpdateNamespace,
     ZigbeeDeviceDiscoveryNamespace,
 )
 

@@ -121,6 +121,54 @@ class TestHueClientKeyValidation:
 
 
 class TestCredentialSources:
+    @pytest.mark.parametrize("source", ["environment", "dotenv"])
+    @pytest.mark.parametrize("explicit_ip", [True, False])
+    def test_partial_sources_are_merged_before_validation(
+        self, source, explicit_ip, without_stored_credentials, monkeypatch, tmp_path
+    ):
+        name, value = (
+            ("HUE_APP_KEY", VALID_APP_KEY)
+            if explicit_ip
+            else ("HUE_BRIDGE_IP", VALID_IP)
+        )
+        if source == "environment":
+            monkeypatch.setenv(name, value)
+        else:
+            (tmp_path / ".env").write_text(
+                f"{name}={value}\nHUE_CLIENT_KEY={VALID_CLIENT_KEY}\n", encoding="utf-8"
+            )
+        credentials = (
+            load_credentials(bridge_ip=VALID_IP)
+            if explicit_ip
+            else load_credentials(app_key=VALID_APP_KEY)
+        )
+        assert credentials.hue_bridge_ip == VALID_IP
+        assert credentials.hue_app_key == VALID_APP_KEY
+        if source == "dotenv":
+            assert credentials.hue_client_key == VALID_CLIENT_KEY
+
+    def test_explicit_values_override_invalid_stored_values(
+        self, without_stored_credentials, monkeypatch
+    ):
+        monkeypatch.setenv("HUE_BRIDGE_IP", "invalid")
+        monkeypatch.setenv("HUE_APP_KEY", "invalid")
+        assert load_credentials(VALID_IP, VALID_APP_KEY).hue_bridge_ip == VALID_IP
+
+    def test_explicit_empty_values_are_validated(
+        self, without_stored_credentials, monkeypatch
+    ):
+        monkeypatch.setenv("HUE_BRIDGE_IP", VALID_IP)
+        monkeypatch.setenv("HUE_APP_KEY", VALID_APP_KEY)
+        with pytest.raises(ValidationError):
+            load_credentials(bridge_ip="")
+
+    def test_invalid_optional_stored_key_is_not_silently_discarded(
+        self, without_stored_credentials, monkeypatch
+    ):
+        monkeypatch.setenv("HUE_CLIENT_KEY", "invalid")
+        with pytest.raises(ValidationError, match="32 hexadecimal"):
+            load_credentials(VALID_IP, VALID_APP_KEY)
+
     def test_reads_credentials_from_a_dotenv_file(self, tmp_path, monkeypatch):
         (tmp_path / ".env").write_text(
             f"HUE_BRIDGE_IP={OTHER_IP}\nHUE_APP_KEY={OTHER_APP_KEY}\n",

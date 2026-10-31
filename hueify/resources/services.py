@@ -1,7 +1,5 @@
 """Typed namespaces for CLIP v2 device and sensor services."""
 
-from pydantic import BaseModel, TypeAdapter
-
 from hueify.http import HttpClient
 from hueify.models import (
     BehaviorInstance,
@@ -17,7 +15,7 @@ from hueify.models import (
     Homekit,
     HomekitUpdate,
     HueApiResponse,
-    HueModel,
+    HueResource,
     IdentifyAction,
     Matter,
     MatterAction,
@@ -36,42 +34,10 @@ from hueify.models import (
     ZigbeeDeviceDiscovery,
     ZigbeeDeviceDiscoveryUpdate,
 )
-from hueify.resources.base import ResourceId, ResourceNamespace
+from hueify.resources.base import ResourceId, UpdateNamespace
 
 
-class UpdateNamespace[TResource: BaseModel, TUpdate: HueModel](
-    ResourceNamespace[TResource]
-):
-    """An endpoint with reads and typed partial updates.
-
-    HueModel's extra fields remain available for newer firmware. Use the
-    matching request model so accidentally passing a resource snapshot does
-    not resend its read-only state.
-    """
-
-    def __init__(
-        self,
-        resource_type: str,
-        resource_model: type[TResource],
-        update_model: type[TUpdate],
-        http_client: HttpClient,
-    ) -> None:
-        super().__init__(
-            resource_type, TypeAdapter(HueApiResponse[resource_model]), http_client
-        )
-        self._update_model = update_model
-
-    async def update(
-        self, resource_id: ResourceId, data: TUpdate
-    ) -> HueApiResponse[ResourceIdentifier]:
-        if not isinstance(data, self._update_model):
-            raise TypeError(
-                f"{self.resource_type}.update expects {self._update_model.__name__}"
-            )
-        return await self._update(resource_id, data)
-
-
-class EnabledNamespace[TResource: BaseModel, TUpdate: EnabledUpdate](
+class EnabledNamespace[TResource: HueResource, TUpdate: EnabledUpdate](
     UpdateNamespace[TResource, TUpdate]
 ):
     async def enable(

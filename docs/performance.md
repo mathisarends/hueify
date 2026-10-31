@@ -1,14 +1,16 @@
 # Performance checks
 
 The performance follow-up keeps the existing request and event interfaces and
-makes four small changes:
+makes three small changes:
 
 - Validate response JSON directly with Pydantic instead of first building a
   separate Python JSON tree.
 - Reuse the write-response, mixed-resource and raw-resource validators.
 - Return immediately when an event has no matching or wildcard subscribers.
-- Stop scanning resource names at an exact match. Fuzzy matching and the order
-  of suggested names retain their existing behavior.
+
+Name lookup scans all names to detect duplicate exact matches and tied fuzzy
+matches. It supports `fuzzy=False` and scoped scene lookup. Returning the first
+exact match would silently select an ambiguous resource.
 
 Successful HTTP responses containing malformed JSON or invalid resource data
 raise `pydantic.ValidationError`. HTTP status errors are raised before parsing
