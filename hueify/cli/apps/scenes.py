@@ -2,7 +2,7 @@ import typer
 from typer import Context
 
 from hueify.cli.operations import activate_scene, list_scenes, run
-from hueify.cli.output import write_resources, write_response
+from hueify.cli.output import OutputOptions, write_resources, write_response
 
 app = typer.Typer(help="Inspect and activate scenes.")
 
@@ -27,6 +27,12 @@ def activate_scene_command(
     dynamic: bool = typer.Option(
         False, "--dynamic", help="Start the scene's dynamic palette."
     ),
+    room: str | None = typer.Option(
+        None, "--room", help="Only match scenes in this room (UUID or name)."
+    ),
+    zone: str | None = typer.Option(
+        None, "--zone", help="Only match scenes in this zone (UUID or name)."
+    ),
 ) -> None:
     """Activate a scene, optionally with a brightness or fade."""
     response = run(
@@ -35,6 +41,9 @@ def activate_scene_command(
             brightness=brightness,
             transition=transition,
             dynamic=dynamic,
+            fuzzy=OutputOptions.from_context(context).fuzzy,
+            room=room,
+            zone=zone,
         )
     )
     write_response(context, response)

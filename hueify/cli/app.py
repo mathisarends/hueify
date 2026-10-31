@@ -13,7 +13,7 @@ from hueify.cli.apps import (
 )
 from hueify.cli.output import OutputOptions, print_json
 
-_GLOBAL_OUTPUT_OPTIONS = frozenset({"--json", "--plain", "--no-color"})
+_GLOBAL_OUTPUT_OPTIONS = frozenset({"--json", "--plain", "--no-color", "--no-fuzzy"})
 
 
 class _GlobalOptionsGroup(TyperGroup):
@@ -68,6 +68,11 @@ def callback(
         is_eager=True,
         help="Show the Hueify version and exit.",
     ),
+    no_fuzzy: bool = typer.Option(
+        False,
+        "--no-fuzzy",
+        help="Require exact names (ignoring case and surrounding space).",
+    ),
 ) -> None:
     """Global flags may appear before or after a Hue command."""
     if show_version:
@@ -75,7 +80,9 @@ def callback(
         raise typer.Exit()
     if json_output and plain:
         raise typer.BadParameter("Choose either --json or --plain, not both")
-    context.obj = OutputOptions(json=json_output, plain=plain, no_color=no_color)
+    context.obj = OutputOptions(
+        json=json_output, plain=plain, no_color=no_color, fuzzy=not no_fuzzy
+    )
 
 
 @app.command()

@@ -6,6 +6,7 @@ from hueify.entertainment import (
     Tick,
 )
 from hueify.errors import (
+    AmbiguousResourceError,
     EntertainmentAuthenticationError,
     EntertainmentError,
     HueifyError,
@@ -46,6 +47,7 @@ from hueify.resources import (
 from hueify.sse import ConnectionStatus, EventStream, ReconnectPolicy
 
 __all__ = [
+    "AmbiguousResourceError",
     "ColorXY",
     "ConnectionStatus",
     "EntertainmentAuthenticationError",

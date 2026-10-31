@@ -88,3 +88,40 @@ async def test_delete_removes_the_specific_scene_endpoint(client: AsyncMock) -> 
     await SceneNamespace(client).delete(SCENE_ID)
 
     client.delete.assert_awaited_once_with(f"scene/{SCENE_ID}")
+
+
+@pytest.mark.asyncio
+async def test_same_scene_name_can_be_scoped_to_a_group(client):
+    from hueify import AmbiguousResourceError, ResourceNotFoundError
+    from hueify.models import Scene
+
+    groups = [
+        "11111111-1111-1111-1111-111111111111",
+        "22222222-2222-2222-2222-222222222222",
+    ]
+    client.get.return_value = HueApiResponse[Scene].model_validate(
+        {
+            "data": [
+                {
+                    "id": str(SCENE_ID),
+                    "metadata": {"name": "Relax"},
+                    "group": {"rid": groups[0], "rtype": "room"},
+                },
+                {
+                    "id": "99999999-9999-9999-9999-999999999999",
+                    "metadata": {"name": "Relax"},
+                    "group": {"rid": groups[1], "rtype": "zone"},
+                },
+            ]
+        }
+    )
+    scenes = SceneNamespace(client)
+    with pytest.raises(AmbiguousResourceError):
+        await scenes.find_by_name("Relax")
+    assert (
+        await scenes.find_by_name("Relax", group_id=groups[0], fuzzy=False)
+    ).id == SCENE_ID
+    with pytest.raises(ResourceNotFoundError):
+        await scenes.find_by_name(
+            "Relax", group_id="33333333-3333-3333-3333-333333333333"
+        )

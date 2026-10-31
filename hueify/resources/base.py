@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 from difflib import SequenceMatcher
 from urllib.parse import quote
 from uuid import UUID
 
 from pydantic import BaseModel, TypeAdapter
 
-from hueify.errors import ResourceNotFoundError
+from hueify.errors import AmbiguousResourceError, ResourceNotFoundError
 from hueify.http import HttpClient
 from hueify.models import HueApiResponse, NamedResource, ResourceIdentifier
 
@@ -42,12 +44,18 @@ class ResourceNamespace[TResource: NamedResource]:
             )
         return response.data[0]
 
-    async def find_by_name(self, name: str) -> TResource:
+    async def find_by_name(self, name: str, *, fuzzy: bool = True) -> TResource:
+        return self._find_by_name(name, (await self.list()).data, fuzzy=fuzzy)
+
+    def _find_by_name(
+        self, name: str, resources: list[TResource], *, fuzzy: bool
+    ) -> TResource:
         wanted = _normalized(name)
-        resources = (await self.list()).data
-        for resource in resources:
-            if _normalized(resource.metadata.name) == wanted:
-                return resource
+        exact = [
+            resource for resource in resources if _normalized(resource.name) == wanted
+        ]
+        if exact:
+            return self._unique_match(name, exact)
 
         ranked_resources = sorted(
             resources,
@@ -58,15 +66,32 @@ class ResourceNamespace[TResource: NamedResource]:
             ),
         )
         if (
-            ranked_resources
+            fuzzy
+            and ranked_resources
             and _similarity(wanted, ranked_resources[0].metadata.name)
             >= _FUZZY_MATCH_CUTOFF
         ):
-            return ranked_resources[0]
+            best_score = _similarity(wanted, ranked_resources[0].name)
+            matches = [
+                resource
+                for resource in ranked_resources
+                if _similarity(wanted, resource.name) == best_score
+            ]
+            return self._unique_match(name, matches)
 
         known = ", ".join(resource.metadata.name for resource in ranked_resources)
         raise ResourceNotFoundError(
             f"No {self.resource_type} named {name!r}. Known names: {known or 'none'}"
+        )
+
+    def _unique_match(self, name: str, matches: list[TResource]) -> TResource:
+        if len(matches) == 1:
+            return matches[0]
+        candidates = "; ".join(
+            f"{resource.name!r} (ID {resource.id})" for resource in matches
+        )
+        raise AmbiguousResourceError(
+            f"Ambiguous {self.resource_type} name {name!r}. Candidates: {candidates}. Use an ID or narrow the group."
         )
 
     async def _create(self, data: BaseModel) -> HueApiResponse[ResourceIdentifier]:

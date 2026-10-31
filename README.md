@@ -83,6 +83,7 @@ hueify light on "Desk" --brightness 60 --transition 0.3
 hueify room off Office
 hueify zone color Garden "#ff8800"
 hueify scene activate "Movie time" --dynamic
+hueify scene activate Relax --room Office --no-fuzzy
 hueify entertainment start TV
 ```
 
@@ -220,6 +221,12 @@ light = await hue.lights.get_one(light.id)          # by ID, the resource itself
 name above a similarity cutoff. If nothing is close enough it raises
 `ResourceNotFoundError` listing the names it did find, which is usually enough to
 spot the typo.
+
+Names shared by several resources raise `AmbiguousResourceError` with the
+candidate IDs. The same applies to tied fuzzy matches. Pass `fuzzy=False` to
+`find_by_name` for exact names only, or use the global CLI flag `--no-fuzzy`.
+Scene lookups accept `group_id=room.id` (or a zone ID); CLI activation accepts
+`--room NAME_OR_UUID` or `--zone NAME_OR_UUID`.
 
 The envelope-returning reads stay available for callers that want the errors
 alongside the data:

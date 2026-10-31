@@ -298,3 +298,39 @@ async def test_find_by_name_reports_known_names_by_relevance(
         await LightNamespace(client).find_by_name("Ceiling")
 
     assert "Known names: Kitchen, Desk, Bedroom" in str(error.value)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "query,names", [("desk", ["Desk", " DESK "]), ("Dsek", ["Desk", "desk"])]
+)
+async def test_ambiguous_names_report_all_candidate_ids(client, query, names):
+    from hueify import AmbiguousResourceError
+
+    ids = [
+        "11111111-1111-1111-1111-111111111111",
+        "22222222-2222-2222-2222-222222222222",
+    ]
+    client.get.return_value = HueApiResponse[Light].model_validate(
+        {
+            "data": [
+                {**light_payload(name=name), "id": resource_id}
+                for name, resource_id in zip(names, ids, strict=True)
+            ]
+        }
+    )
+    with pytest.raises(AmbiguousResourceError) as error:
+        await LightNamespace(client).find_by_name(query)
+    assert all(resource_id in str(error.value) for resource_id in ids)
+    client.put.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_fuzzy_lookup_can_be_disabled(client):
+    client.get.return_value = HueApiResponse[Light].model_validate(
+        {"data": [light_payload()]}
+    )
+    namespace = LightNamespace(client)
+    with pytest.raises(ResourceNotFoundError):
+        await namespace.find_by_name("Dsek", fuzzy=False)
+    assert (await namespace.find_by_name(" DESK ", fuzzy=False)).id == LIGHT_ID

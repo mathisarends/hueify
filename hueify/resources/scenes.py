@@ -19,6 +19,16 @@ class SceneNamespace(ResourceNamespace[Scene]):
     def __init__(self, http_client: HttpClient) -> None:
         super().__init__("scene", TypeAdapter(HueApiResponse[Scene]), http_client)
 
+    async def find_by_name(
+        self, name: str, *, fuzzy: bool = True, group_id: ResourceId | None = None
+    ) -> Scene:
+        resources = (await self.list()).data
+        if group_id is not None:
+            resources = [
+                scene for scene in resources if str(scene.group.rid) == str(group_id)
+            ]
+        return self._find_by_name(name, resources, fuzzy=fuzzy)
+
     async def create(self, data: SceneUpdate) -> HueApiResponse[ResourceIdentifier]:
         return await self._create(data)
 

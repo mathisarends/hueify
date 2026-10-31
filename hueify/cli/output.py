@@ -29,6 +29,7 @@ class OutputOptions:
     json: bool
     plain: bool
     no_color: bool
+    fuzzy: bool = True
 
     @classmethod
     def from_context(cls, context: Context) -> "OutputOptions":

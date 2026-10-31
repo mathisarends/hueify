@@ -451,6 +451,69 @@ def test_entertainment_start_resolves_the_area_name() -> None:
     hue.entertainment.start.assert_awaited_once_with(resource_id)
 
 
+@pytest.mark.parametrize(
+    "args,namespace",
+    [
+        (["light", "on", "Desk"], "lights"),
+        (["room", "toggle", "Office"], "rooms"),
+        (["zone", "brightness", "Office", "40"], "zones"),
+        (["light", "color", "Desk", "#fff"], "lights"),
+        (["light", "temperature", "Desk", "2700"], "lights"),
+        (["light", "identify", "Desk"], "lights"),
+        (["light", "off", "Desk"], "lights"),
+        (["scene", "activate", "Relax"], "scenes"),
+        (["entertainment", "start", "TV"], "entertainment"),
+        (["entertainment", "stop", "TV"], "entertainment"),
+    ],
+)
+def test_no_fuzzy_is_forwarded_by_all_name_based_commands(args, namespace):
+    from hueify import ResourceNotFoundError
+
+    hue = bridge_mock()
+    lookup = AsyncMock(side_effect=ResourceNotFoundError("exact name missing"))
+    getattr(hue, namespace).find_by_name = lookup
+    with patch("hueify.cli.operations.Hueify", return_value=hue):
+        result = runner.invoke(app, [*args, "--no-fuzzy"])
+    assert result.exit_code == 1
+    lookup.assert_awaited_once_with(args[2], fuzzy=False)
+
+
+@pytest.mark.parametrize("scope,namespace", [("--room", "rooms"), ("--zone", "zones")])
+def test_scene_activation_resolves_scope_before_scene(scope, namespace):
+    hue = bridge_mock()
+    getattr(hue, namespace).find_by_name = AsyncMock(
+        return_value=SimpleNamespace(id=OWNER_ID)
+    )
+    hue.scenes.find_by_name = AsyncMock(return_value=SimpleNamespace(id=RESOURCE_ID))
+    hue.scenes.activate = AsyncMock(return_value=update_response())
+    with patch("hueify.cli.operations.Hueify", return_value=hue):
+        result = runner.invoke(
+            app, ["scene", "activate", "Relax", scope, "Office", "--no-fuzzy"]
+        )
+    assert result.exit_code == 0
+    getattr(hue, namespace).find_by_name.assert_awaited_once_with("Office", fuzzy=False)
+    hue.scenes.find_by_name.assert_awaited_once_with(
+        "Relax", group_id=OWNER_ID, fuzzy=False
+    )
+
+
+def test_scene_scope_rejects_conflicting_options_and_mismatched_ids():
+    hue = bridge_mock()
+    hue.scenes.get_one = AsyncMock(
+        return_value=SimpleNamespace(group=SimpleNamespace(rid=RESOURCE_ID))
+    )
+    with patch("hueify.cli.operations.Hueify", return_value=hue):
+        conflicting = runner.invoke(
+            app, ["scene", "activate", "Relax", "--room", "Office", "--zone", "Office"]
+        )
+        mismatch = runner.invoke(
+            app, ["scene", "activate", str(RESOURCE_ID), "--room", str(OWNER_ID)]
+        )
+    assert conflicting.exit_code == 2
+    assert mismatch.exit_code == 1
+    hue.scenes.activate.assert_not_called()
+
+
 def test_scene_and_entertainment_accept_uuids_without_name_lookups() -> None:
     resource_id = str(RESOURCE_ID)
     response = update_response()

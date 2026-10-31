@@ -12,12 +12,14 @@ from hueify.errors import (
     EntertainmentAuthenticationError,
     HueifyError,
     MissingCredentialsError,
+    ResourceNotFoundError,
     StreamAuthenticationError,
 )
 from hueify.models import (
     EntertainmentConfiguration,
     HueApiResponse,
     Light,
+    NamedResource,
     ResourceIdentifier,
     Room,
     Scene,
@@ -29,6 +31,7 @@ from hueify.resources import (
     RoomNamespace,
     ZoneNamespace,
 )
+from hueify.resources.base import ResourceNamespace
 
 type ControlNamespace = LightNamespace | RoomNamespace | ZoneNamespace
 
@@ -120,12 +123,16 @@ def _control_namespace(hue: Hueify, group: ControlGroup) -> ControlNamespace:
 
 
 async def _resolve_target(
-    namespace: ControlNamespace,
+    namespace: ResourceNamespace[NamedResource],
     target: str,
+    *,
+    fuzzy: bool = True,
 ) -> ResourceId:
     try:
         UUID(target)
     except ValueError:
+        if not fuzzy:
+            return (await namespace.find_by_name(target, fuzzy=False)).id
         return (await namespace.find_by_name(target)).id
     return target
 
@@ -136,10 +143,11 @@ async def turn_on(
     *,
     brightness: float | None,
     transition: float | None,
+    fuzzy: bool = True,
 ) -> HueApiResponse[ResourceIdentifier]:
     async with Hueify() as hue:
         namespace = _control_namespace(hue, group)
-        resource_id = await _resolve_target(namespace, target)
+        resource_id = await _resolve_target(namespace, target, fuzzy=fuzzy)
         return await namespace.turn_on(
             resource_id,
             brightness=brightness,
@@ -152,10 +160,11 @@ async def turn_off(
     target: str,
     *,
     transition: float | None,
+    fuzzy: bool = True,
 ) -> HueApiResponse[ResourceIdentifier]:
     async with Hueify() as hue:
         namespace = _control_namespace(hue, group)
-        resource_id = await _resolve_target(namespace, target)
+        resource_id = await _resolve_target(namespace, target, fuzzy=fuzzy)
         return await namespace.turn_off(resource_id, transition=transition)
 
 
@@ -164,10 +173,11 @@ async def toggle(
     target: str,
     *,
     transition: float | None,
+    fuzzy: bool = True,
 ) -> HueApiResponse[ResourceIdentifier]:
     async with Hueify() as hue:
         namespace = _control_namespace(hue, group)
-        resource_id = await _resolve_target(namespace, target)
+        resource_id = await _resolve_target(namespace, target, fuzzy=fuzzy)
         return await namespace.toggle(resource_id, transition=transition)
 
 
@@ -177,10 +187,11 @@ async def set_brightness(
     percent: float,
     *,
     transition: float | None,
+    fuzzy: bool = True,
 ) -> HueApiResponse[ResourceIdentifier]:
     async with Hueify() as hue:
         namespace = _control_namespace(hue, group)
-        resource_id = await _resolve_target(namespace, target)
+        resource_id = await _resolve_target(namespace, target, fuzzy=fuzzy)
         return await namespace.set_brightness(
             resource_id,
             percent,
@@ -195,10 +206,11 @@ async def set_color(
     *,
     brightness: float | None,
     transition: float | None,
+    fuzzy: bool = True,
 ) -> HueApiResponse[ResourceIdentifier]:
     async with Hueify() as hue:
         namespace = _control_namespace(hue, group)
-        resource_id = await _resolve_target(namespace, target)
+        resource_id = await _resolve_target(namespace, target, fuzzy=fuzzy)
         return await namespace.set_hex(
             resource_id,
             hex_color,
@@ -214,10 +226,11 @@ async def set_temperature(
     *,
     brightness: float | None,
     transition: float | None,
+    fuzzy: bool = True,
 ) -> HueApiResponse[ResourceIdentifier]:
     async with Hueify() as hue:
         namespace = _control_namespace(hue, group)
-        resource_id = await _resolve_target(namespace, target)
+        resource_id = await _resolve_target(namespace, target, fuzzy=fuzzy)
         return await namespace.set_color_temperature(
             resource_id,
             kelvin,
@@ -229,10 +242,12 @@ async def set_temperature(
 async def identify(
     group: ControlGroup,
     target: str,
+    *,
+    fuzzy: bool = True,
 ) -> HueApiResponse[ResourceIdentifier]:
     async with Hueify() as hue:
         namespace = _control_namespace(hue, group)
-        resource_id = await _resolve_target(namespace, target)
+        resource_id = await _resolve_target(namespace, target, fuzzy=fuzzy)
         return await namespace.identify(resource_id)
 
 
@@ -242,14 +257,37 @@ async def activate_scene(
     brightness: float | None,
     transition: float | None,
     dynamic: bool,
+    fuzzy: bool = True,
+    room: str | None = None,
+    zone: str | None = None,
 ) -> HueApiResponse[ResourceIdentifier]:
     async with Hueify() as hue:
+        if room is not None and zone is not None:
+            raise ValueError("Choose either --room or --zone, not both")
+        group_id = None
+        if room is not None:
+            group_id = await _resolve_target(hue.rooms, room, fuzzy=fuzzy)
+        elif zone is not None:
+            group_id = await _resolve_target(hue.zones, zone, fuzzy=fuzzy)
         try:
             UUID(target)
         except ValueError:
-            resource_id = (await hue.scenes.find_by_name(target)).id
+            if group_id is not None:
+                resource_id = (
+                    await hue.scenes.find_by_name(
+                        target, group_id=group_id, fuzzy=fuzzy
+                    )
+                ).id
+            else:
+                resource_id = await _resolve_target(hue.scenes, target, fuzzy=fuzzy)
         else:
             resource_id = target
+            if group_id is not None and str(
+                (await hue.scenes.get_one(target)).group.rid
+            ) != str(group_id):
+                raise ResourceNotFoundError(
+                    f"Scene {target} does not belong to group {group_id}"
+                )
         return await hue.scenes.activate(
             resource_id,
             brightness=brightness,
@@ -260,25 +298,19 @@ async def activate_scene(
 
 async def start_entertainment_area(
     target: str,
+    *,
+    fuzzy: bool = True,
 ) -> HueApiResponse[ResourceIdentifier]:
     async with Hueify() as hue:
-        try:
-            UUID(target)
-        except ValueError:
-            resource_id = (await hue.entertainment.find_by_name(target)).id
-        else:
-            resource_id = target
+        resource_id = await _resolve_target(hue.entertainment, target, fuzzy=fuzzy)
         return await hue.entertainment.start(resource_id)
 
 
 async def stop_entertainment_area(
     target: str,
+    *,
+    fuzzy: bool = True,
 ) -> HueApiResponse[ResourceIdentifier]:
     async with Hueify() as hue:
-        try:
-            UUID(target)
-        except ValueError:
-            resource_id = (await hue.entertainment.find_by_name(target)).id
-        else:
-            resource_id = target
+        resource_id = await _resolve_target(hue.entertainment, target, fuzzy=fuzzy)
         return await hue.entertainment.stop(resource_id)
