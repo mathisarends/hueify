@@ -12,6 +12,9 @@ MotionAware resources and integrations are also exposed through namespaces.
 See the [CLIP v2 coverage and migration guide](docs/clip-v2-coverage.md) for
 every endpoint, its request model, and the limits of the public specification.
 
+See the [changelog](CHANGELOG.md) and [migration guide](docs/migration.md)
+for unreleased changes and breaking API migrations.
+
 ```bash
 pip install hueify
 ```
