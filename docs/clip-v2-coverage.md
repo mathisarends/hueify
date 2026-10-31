@@ -221,19 +221,9 @@ and power-up state. An event cannot accidentally be passed to a typed write.
 
 ## Breaking changes
 
-- `scenes.create` now requires SceneCreate, including metadata, group and
-  actions. `rooms.create` and `zones.create` require GroupCreate; empty children
-  are supported. Update models remain partial and are rejected by create.
-- LightUpdate uses GradientUpdate, EffectsV2Update and SignalingUpdate for
-  those writable features. Snapshot models still describe the read state.
-- GroupMetadataUpdate and SceneMetadataUpdate support metadata-only partial
-  changes without requiring unrelated fields.
-- ScenePalette.dimming contains DimmingState objects directly, and
-  ScenePalette.effects contains EffectAction objects. Color and color-temperature
-  palette entries retain their optional dimming.
-- Sensor and other service events now arrive as their typed event class.
-  ResourceType retains unknown firmware values while preserving enum identity
-  for the built-in values.
+For the changes since `v0.9.0`, including concrete upgrade examples, see the
+[migration guide](migration.md#from-v090-to-unreleased). Track future changes in
+[CHANGELOG.md](../CHANGELOG.md), with migration instructions for breaking changes.
 
 ## Reference and hardware checks still required
 
