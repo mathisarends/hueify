@@ -13,6 +13,7 @@ from pydantic import Field, model_validator
 
 from hueify.models.base import (
     HueModel,
+    HueRequest,
     HueResource,
     IdentifyAction,
     MetadataUpdate,
@@ -26,7 +27,7 @@ class UserTest(HueModel):
     status: str | None = None
 
 
-class UserTestUpdate(HueModel):
+class UserTestUpdate(HueRequest):
     usertest: bool
 
 
@@ -61,7 +62,7 @@ class Device(OwnedResource, NamedServiceMixin):
     usertest: UserTest | None = None
 
 
-class DeviceUpdate(HueModel):
+class DeviceUpdate(HueRequest):
     metadata: MetadataUpdate | None = None
     identify: IdentifyAction | None = None
     usertest: UserTestUpdate | None = None
@@ -77,7 +78,7 @@ class DevicePower(OwnedResource):
     power_state: PowerState | None = None
 
 
-class SoftwareInstall(HueModel):
+class SoftwareInstall(HueRequest):
     install_state: Literal["install"] = "install"
 
 
@@ -89,7 +90,7 @@ class DeviceSoftwareUpdate(OwnedResource):
     problems: list[str] = Field(default_factory=list)
 
 
-class DeviceSoftwareUpdateUpdate(HueModel):
+class DeviceSoftwareUpdateUpdate(HueRequest):
     install: SoftwareInstall | None = None
 
 
@@ -114,11 +115,11 @@ class ServiceGroup(HueResource):
     services: list[ResourceReference] = Field(default_factory=list)
 
 
-class ServiceGroupUpdate(HueModel):
+class ServiceGroupUpdate(HueRequest):
     services: list[ResourceReference] | None = None
 
 
-class EnabledUpdate(HueModel):
+class EnabledUpdate(HueRequest):
     enabled: bool | None = None
 
 
@@ -145,7 +146,7 @@ class MotionSensitivity(HueModel):
     status: str | None = None
 
 
-class MotionSensitivityUpdate(HueModel):
+class MotionSensitivityUpdate(HueRequest):
     sensitivity: int = Field(ge=0)
 
 
@@ -272,11 +273,11 @@ class Button(OwnedResource):
     button: ButtonState | None = None
 
 
-class ButtonConfiguration(HueModel):
+class ButtonConfiguration(HueRequest):
     repeat_interval: int | None = Field(default=None, ge=0)
 
 
-class ButtonUpdate(HueModel):
+class ButtonUpdate(HueRequest):
     metadata: ControlMetadata | None = None
     button: ButtonConfiguration | None = None
 
@@ -355,7 +356,7 @@ class ZigbeeConnectivity(OwnedResource):
     extended_pan_id: str | None = None
 
 
-class ZigbeeConnectivityUpdate(HueModel):
+class ZigbeeConnectivityUpdate(HueRequest):
     channel: ZigbeeChannel | None = None
 
 
@@ -377,7 +378,7 @@ class WifiConnectivity(OwnedResource):
     signal_strength: WifiSignalStrength | None = None
 
 
-class DiscoveryAction(HueModel):
+class DiscoveryAction(HueRequest):
     action_type: Literal["search"] = "search"
 
 
@@ -388,7 +389,7 @@ class ZigbeeDeviceDiscovery(OwnedResource):
     status: str | None = None
 
 
-class ZigbeeDeviceDiscoveryUpdate(HueModel):
+class ZigbeeDeviceDiscoveryUpdate(HueRequest):
     action: DiscoveryAction | None = None
 
 
@@ -449,7 +450,7 @@ class GeofenceClient(HueResource):
     is_at_home: bool | None = None
 
 
-class GeofenceClientUpdate(HueModel):
+class GeofenceClientUpdate(HueRequest):
     name: str | None = None
     is_at_home: bool | None = None
 
@@ -465,7 +466,7 @@ class Homekit(OwnedResource):
     action: str | None = None
 
 
-class HomekitUpdate(HueModel):
+class HomekitUpdate(HueRequest):
     action: Literal["homekit_reset"] | None = None
 
 
@@ -475,11 +476,11 @@ class Matter(OwnedResource):
     max_fabrics: int | None = None
 
 
-class MatterAction(HueModel):
+class MatterAction(HueRequest):
     action_type: Literal["matter_reset"] = "matter_reset"
 
 
-class MatterUpdate(HueModel):
+class MatterUpdate(HueRequest):
     action: MatterAction | None = None
 
 
@@ -533,7 +534,7 @@ class SwitchInputConfiguration(OwnedResource):
     switch_mode: str | HueModel | None = None
 
 
-class SwitchInputConfigurationUpdate(HueModel):
+class SwitchInputConfigurationUpdate(HueRequest):
     switch_mode: str | HueModel | None = None
 
 
@@ -588,11 +589,11 @@ class SmartScene(HueResource):
         return self.metadata.name if self.metadata else None
 
 
-class SmartSceneRecall(HueModel):
+class SmartSceneRecall(HueRequest):
     action: Literal["activate", "deactivate"]
 
 
-class SmartSceneUpdate(HueModel):
+class SmartSceneUpdate(HueRequest):
     metadata: MetadataUpdate | None = None
     week_timeslots: list[SmartSceneDay] | None = None
     transition_duration: int | None = Field(default=None, ge=0)

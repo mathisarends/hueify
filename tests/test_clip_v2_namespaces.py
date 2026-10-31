@@ -9,7 +9,7 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from hueify import models as m
-from hueify.errors import AmbiguousResourceError, ResourceNotFoundError
+from hueify.errors import AmbiguousResourceError, BridgeError, ResourceNotFoundError
 
 RESOURCE_ID = UUID("00000000-0000-0000-0000-000000000001")
 OWNER_ID = UUID("00000000-0000-0000-0000-000000000002")
@@ -192,11 +192,60 @@ async def test_collection_discovery_parses_mixed_and_future_resources(bridge) ->
 async def test_resource_references_resolve_through_their_namespace(bridge) -> None:
     hue, requests, responses = bridge
     responses.append({"data": [resource_payload("motion")]})
-    result = await hue.resources.get(
+    result = await hue.resources.get_one(
         m.ResourceReference(rid=RESOURCE_ID, rtype="motion")
     )
     assert isinstance(result, m.Motion)
     assert requests[0].url.path.endswith(f"/motion/{RESOURCE_ID}")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["motion", "future_sensor"])
+async def test_registry_get_keeps_the_response_envelope(bridge, kind) -> None:
+    hue, requests, responses = bridge
+    payload = {"data": [resource_payload(kind)], "errors": [{"description": "warning"}]}
+    responses.append(payload)
+
+    result = await hue.resources.get(m.ResourceReference(rid=RESOURCE_ID, rtype=kind))
+
+    assert result.data[0].type == kind
+    assert result.errors[0].description == "warning"
+    assert requests[0].url.path.endswith(f"/{kind}/{RESOURCE_ID}")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("partial_success", [False, True])
+@pytest.mark.parametrize(
+    "operation", ["get_one", "find_by_name", "scoped_scene", "reference"]
+)
+async def test_unwrapped_reads_raise_with_all_bridge_errors(
+    bridge, operation, partial_success
+) -> None:
+    hue, _, responses = bridge
+    kind = "scene" if operation == "scoped_scene" else "light"
+    errors = [
+        {"description": "backend unavailable", "code": "backend"},
+        {"description": "try again later"},
+    ]
+    responses.append(
+        {"data": [resource_payload(kind)] if partial_success else [], "errors": errors}
+    )
+
+    with pytest.raises(
+        BridgeError, match="backend unavailable; try again later"
+    ) as caught:
+        if operation == "reference":
+            await hue.resources.get_one(
+                m.ResourceReference(rid=RESOURCE_ID, rtype=kind)
+            )
+        elif operation == "scoped_scene":
+            await hue.scenes.find_by_name("Focus", group_id=OWNER_ID)
+        elif operation == "find_by_name":
+            await hue.lights.find_by_name("Desk")
+        else:
+            await hue.lights.get_one(RESOURCE_ID)
+
+    assert [error.model_dump() for error in caught.value.errors] == errors
 
 
 @pytest.mark.asyncio
@@ -355,3 +404,73 @@ def test_partial_updates_do_not_add_state_or_clear_unrelated_fields(
         model.model_validate(values).model_dump(mode="json", exclude_none=True)
         == values
     )
+    with pytest.raises(ValidationError) as caught:
+        model.model_validate({**values, "misspelled_setting": True})
+    assert any(
+        error["type"] == "extra_forbidden" and error["loc"] == ("misspelled_setting",)
+        for error in caught.value.errors()
+    )
+
+
+@pytest.mark.parametrize(
+    ("model", "payload", "location"),
+    [
+        (m.LightUpdate, {"brightness": 50}, ("brightness",)),
+        (
+            m.LightUpdate,
+            {"dimming": {"brightness": 50, "brightnes": 40}},
+            ("dimming", "brightnes"),
+        ),
+        (
+            m.DeviceUpdate,
+            {"metadata": {"name": "Office", "naem": "typo"}},
+            ("metadata", "naem"),
+        ),
+        (
+            m.SceneUpdate,
+            {"palette": {"color": [{"color": {"xy": {"x": 0.5, "y": 0.4, "z": 0.1}}}]}},
+            ("palette", "color", 0, "color", "xy", "z"),
+        ),
+    ],
+)
+def test_typed_requests_reject_misspelled_fields_at_every_schema_depth(
+    model, payload, location
+):
+    with pytest.raises(ValidationError) as caught:
+        model.model_validate(payload)
+
+    assert any(
+        error["type"] == "extra_forbidden" and error["loc"] == location
+        for error in caught.value.errors()
+    )
+
+
+def test_typed_requests_also_check_preconstructed_nested_models():
+    dimming = m.DimmingState(brightness=50, brightnes=40)
+    with pytest.raises(ValidationError, match="extra_forbidden"):
+        m.LightUpdate(dimming=dimming)
+
+
+def test_explicitly_open_request_fields_keep_arbitrary_configuration():
+    config = {"future_option": {"any_key": True}}
+    request = m.BehaviorInstanceUpdate(configuration=config)
+    assert request.model_dump(exclude_none=True) == {"configuration": config}
+
+
+@pytest.mark.asyncio
+async def test_scene_reads_keep_extensions_in_reused_request_fragments(bridge):
+    hue, _, responses = bridge
+    action = {"on": {"on": True, "future_on": 1}, "future_action": 2}
+    payload = {
+        **resource_payload("scene"),
+        "metadata": {"name": "Focus", "future_metadata": 3},
+        "actions": [
+            {"target": {"rid": str(RESOURCE_ID), "rtype": "light"}, "action": action}
+        ],
+    }
+    responses.append({"data": [payload]})
+
+    result = await hue.scenes.get_one(RESOURCE_ID)
+
+    assert result.actions[0].action.model_dump(exclude_none=True) == action
+    assert result.metadata.model_extra == {"future_metadata": 3}

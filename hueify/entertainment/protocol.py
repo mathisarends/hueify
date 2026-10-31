@@ -48,12 +48,16 @@ class Frame:
         self._require_channel(channel_id)
         return self._colors[channel_id]
 
-    def set(self, channel_id: int, color: Color, brightness: float = 1.0) -> None:
+    def set(
+        self, channel_id: int, color: Color, *, brightness_fraction: float = 1.0
+    ) -> None:
         self._require_channel(channel_id)
-        self._colors[channel_id] = to_stream_rgb(color, brightness)
+        self._colors[channel_id] = to_stream_rgb(
+            color, brightness_fraction=brightness_fraction
+        )
 
-    def set_all(self, color: Color, brightness: float = 1.0) -> None:
-        rgb = to_stream_rgb(color, brightness)
+    def set_all(self, color: Color, *, brightness_fraction: float = 1.0) -> None:
+        rgb = to_stream_rgb(color, brightness_fraction=brightness_fraction)
         self._colors = dict.fromkeys(self._colors, rgb)
 
     def clear(self) -> None:
@@ -74,16 +78,18 @@ class Frame:
             )
 
 
-def to_stream_rgb(color: Color, brightness: float = 1.0) -> Rgb:
-    if not 0.0 <= brightness <= 1.0:
-        raise ValueError(f"Brightness must be between 0 and 1, got {brightness}")
+def to_stream_rgb(color: Color, *, brightness_fraction: float = 1.0) -> Rgb:
+    if not 0.0 <= brightness_fraction <= 1.0:
+        raise ValueError(
+            f"Brightness must be between 0 and 1, got {brightness_fraction}"
+        )
 
     if isinstance(color, ColorXY):
         red, green, blue = xy_to_rgb(color)
     else:
         red, green, blue = to_rgb(color)
 
-    scale = brightness / _UINT8_MAX
+    scale = brightness_fraction / _UINT8_MAX
     return (red * scale, green * scale, blue * scale)
 
 

@@ -189,6 +189,17 @@ class TestHandleSse:
         assert dispatched.model_extra == {"unknown_future_field": {"nested": [1, 2, 3]}}
 
     @pytest.mark.asyncio
+    async def test_request_fragments_in_events_keep_firmware_extensions(self) -> None:
+        stream, bus, _ = make_stream()
+        event = make_raw_event()
+        event["metadata"] = {"name": "Desk", "future_metadata": {"kept": True}}
+
+        await stream._handle_sse(make_sse([{"data": [event]}]))
+
+        dispatched = bus.dispatch.await_args.args[0]
+        assert dispatched.metadata.model_dump(exclude_none=True) == event["metadata"]
+
+    @pytest.mark.asyncio
     async def test_dispatches_multiple_events_from_single_payload(self) -> None:
         stream, bus, _ = make_stream()
         sse = make_sse([{"data": [make_raw_event(), make_raw_event()]}])

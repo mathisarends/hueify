@@ -1,6 +1,8 @@
 import asyncio
+import ssl
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 
 from hueify import ConnectionStatus, EventStream, Hueify
@@ -15,6 +17,42 @@ from hueify.resources import (
 
 VALID_IP = "192.168.1.100"
 VALID_APP_KEY = "a" * 40
+
+
+@pytest.mark.asyncio
+async def test_rest_configuration_reaches_the_http_client_and_transport_is_closed():
+    class RecordingTransport(httpx.AsyncBaseTransport):
+        closed = False
+
+        async def handle_async_request(self, request):
+            assert request.headers["hue-application-key"] == VALID_APP_KEY
+            assert request.extensions["timeout"] == {
+                "connect": 1,
+                "read": 5,
+                "write": 5,
+                "pool": 5,
+            }
+            return httpx.Response(200, json={"data": [], "errors": []})
+
+        async def aclose(self):
+            self.closed = True
+
+    transport = RecordingTransport()
+    tls = ssl.create_default_context()
+    with patch(
+        "hueify.http.client.httpx.AsyncClient", wraps=httpx.AsyncClient
+    ) as client:
+        async with Hueify(
+            bridge_ip=VALID_IP,
+            app_key=VALID_APP_KEY,
+            timeout=httpx.Timeout(5, connect=1),
+            verify_ssl=tls,
+            transport=transport,
+        ) as hue:
+            assert (await hue.lights.list()).data == []
+
+    assert client.call_args.kwargs["verify"] is tls
+    assert transport.closed
 
 
 async def _never_returns() -> None:

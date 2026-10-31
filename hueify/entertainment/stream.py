@@ -113,11 +113,13 @@ class EntertainmentStream:
             rate=self._rate,
         )
 
-    def set(self, channel_id: int, color: Color, brightness: float = 1.0) -> None:
-        self.frame.set(channel_id, color, brightness)
+    def set(
+        self, channel_id: int, color: Color, *, brightness_fraction: float = 1.0
+    ) -> None:
+        self.frame.set(channel_id, color, brightness_fraction=brightness_fraction)
 
-    def set_all(self, color: Color, brightness: float = 1.0) -> None:
-        self.frame.set_all(color, brightness)
+    def set_all(self, color: Color, *, brightness_fraction: float = 1.0) -> None:
+        self.frame.set_all(color, brightness_fraction=brightness_fraction)
 
     async def open(self) -> Self:
         """Take the area over and start sending; calling twice is harmless."""
@@ -186,15 +188,16 @@ class EntertainmentStream:
             self._render = None
 
     async def wait_closed(self) -> None:
+        """Wait for the sender and re-raise its failure, even after close()."""
         sender = self._sender
-        if sender is None:
-            return
-        try:
-            await asyncio.shield(sender)
-        except asyncio.CancelledError:
-            if sender.cancelled():
-                return
-            raise
+        if sender is not None:
+            try:
+                await asyncio.shield(sender)
+            except asyncio.CancelledError:
+                if not sender.cancelled():
+                    raise
+        if self._error is not None:
+            raise self._error
 
     async def __aenter__(self) -> Self:
         return await self.open()

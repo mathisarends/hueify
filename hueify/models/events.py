@@ -142,8 +142,10 @@ class EntertainmentConfigurationEvent(HueEvent):
     stream_proxy: StreamProxy | None = None
 
     @property
-    def is_streaming(self) -> bool:
-        return self.status == StreamingStatus.ACTIVE
+    def is_streaming(self) -> bool | None:
+        return (
+            self.status == StreamingStatus.ACTIVE if self.status is not None else None
+        )
 
 
 class DeviceEvent(_OwnedEvent, NamedServiceMixin):

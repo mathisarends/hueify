@@ -7,6 +7,7 @@ from hueify.entertainment import (
 )
 from hueify.errors import (
     AmbiguousResourceError,
+    BridgeError,
     EntertainmentAuthenticationError,
     EntertainmentError,
     HueifyError,
@@ -32,6 +33,7 @@ from hueify.models import (
     HueApiError,
     HueApiResponse,
     HueModel,
+    HueRequest,
     HueResource,
     Light,
     LightUpdate,
@@ -79,6 +81,7 @@ from hueify.sse import ConnectionStatus, EventStream, ReconnectPolicy
 
 __all__ = [
     "AmbiguousResourceError",
+    "BridgeError",
     "ColorXY",
     "ConnectionStatus",
     "Device",
@@ -106,6 +109,7 @@ __all__ = [
     "HueApiError",
     "HueApiResponse",
     "HueModel",
+    "HueRequest",
     "HueResource",
     "Hueify",
     "HueifyError",

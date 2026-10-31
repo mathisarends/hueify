@@ -56,7 +56,7 @@ async def main() -> None:
 
             # Or dim the whole area on a curve, one write per step.
             for step in range(50):
-                stream.set_all("#ffaa00", brightness=abs(math.cos(step / 8)))
+                stream.set_all("#ffaa00", brightness_fraction=abs(math.cos(step / 8)))
                 await asyncio.sleep(0.04)
 
             # Pull: hand over every frame to a source until it is done.

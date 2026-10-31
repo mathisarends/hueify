@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, TypeAdapter, ValidationError
 from hueify.credentials import HueBridgeCredentials
 from hueify.errors import StreamAuthenticationError
 from hueify.models import AnyHueEvent, HueEvent
+from hueify.models.base import _BRIDGE_READ_CONTEXT
 from hueify.sse.bus import EventBus
 from hueify.sse.connection import StreamConnection
 from hueify.sse.queue import EventQueue
@@ -113,7 +114,9 @@ class ServerSentEventStream:
                 continue
             for raw_event in message.data:
                 try:
-                    event = _EVENT.validate_python(raw_event)
+                    event = _EVENT.validate_python(
+                        raw_event, extra="allow", context=_BRIDGE_READ_CONTEXT
+                    )
                 except ValidationError as error:
                     logger.warning("Failed to parse SSE event: %s", error)
                     continue

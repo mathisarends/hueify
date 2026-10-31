@@ -244,3 +244,17 @@ def test_event_message_without_data_holds_no_events() -> None:
 def test_event_message_rejects_an_event_without_an_id() -> None:
     with pytest.raises(ValidationError):
         HueEventMessage.model_validate(_make_message({"type": "light"}))
+
+
+@pytest.mark.parametrize(
+    ("status", "expected"), [(None, None), ("active", True), ("inactive", False)]
+)
+def test_partial_entertainment_events_only_report_included_status(status, expected):
+    from hueify.models import EntertainmentConfigurationEvent
+
+    payload = {"id": uuid4(), "metadata": {"name": "Renamed"}}
+    if status is not None:
+        payload["status"] = status
+    event = EntertainmentConfigurationEvent.model_validate(payload)
+
+    assert event.is_streaming is expected

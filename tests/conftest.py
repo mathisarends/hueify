@@ -27,10 +27,10 @@ async def bridge():
             json={} if isinstance(result, int) else result,
         )
 
-    async with Hueify(bridge_ip="192.168.1.10", app_key="a" * 40) as hue:
-        await hue._http_client._client.aclose()
-        hue._http_client._client = httpx.AsyncClient(
-            transport=httpx.MockTransport(respond)
-        )
+    async with Hueify(
+        bridge_ip="192.168.1.10",
+        app_key="a" * 40,
+        transport=httpx.MockTransport(respond),
+    ) as hue:
         yield hue, requests, responses
         assert not responses, "Expected HTTP responses were not consumed"

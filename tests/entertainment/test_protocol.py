@@ -106,12 +106,23 @@ class TestStreamColors:
         assert red[0] > red[1] and red[0] > red[2]
 
     def test_brightness_scales_every_channel(self) -> None:
-        assert to_stream_rgb("white", brightness=0.5) == (0.5, 0.5, 0.5)
-        assert to_stream_rgb("white", brightness=0.0) == BLACK
+        assert to_stream_rgb("white", brightness_fraction=0.5) == (0.5, 0.5, 0.5)
+        assert to_stream_rgb("white", brightness_fraction=0.0) == BLACK
 
     def test_brightness_outside_zero_to_one_is_refused(self) -> None:
         with pytest.raises(ValueError, match="between 0 and 1"):
-            to_stream_rgb("white", brightness=1.5)
+            to_stream_rgb("white", brightness_fraction=1.5)
+
+    @pytest.mark.parametrize("value", [-0.1, 100, float("nan"), float("inf")])
+    def test_fraction_rejects_percent_values_and_nonfinite_numbers(self, value) -> None:
+        with pytest.raises(ValueError, match="between 0 and 1"):
+            to_stream_rgb("white", brightness_fraction=value)
+
+    def test_ambiguous_brightness_keyword_and_positional_scale_are_rejected(self):
+        with pytest.raises(TypeError):
+            Frame([0]).set_all("white", brightness=1)
+        with pytest.raises(TypeError):
+            to_stream_rgb("white", 1)
 
     def test_an_eight_bit_channel_fills_its_sixteen_bits(self) -> None:
         frame = encode_frame(AREA_ID, {0: to_stream_rgb((255, 136, 0))})

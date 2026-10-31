@@ -566,6 +566,46 @@ def test_missing_credentials_are_a_clean_error_with_a_stable_exit_code() -> None
 
 
 @pytest.mark.parametrize(
+    ("variable", "value"),
+    [
+        ("HUE_APP_KEY", "short"),
+        ("HUE_APP_KEY", "!" * 20),
+        ("HUE_CLIENT_KEY", "invalid"),
+    ],
+)
+def test_invalid_credentials_use_exit_code_three(
+    without_stored_credentials, monkeypatch, variable, value
+) -> None:
+    monkeypatch.setenv("HUE_BRIDGE_IP", "192.168.1.10")
+    monkeypatch.setenv("HUE_APP_KEY", "a" * 40)
+    monkeypatch.setenv(variable, value)
+
+    result = runner.invoke(app, ["light", "list"])
+
+    assert result.exit_code == 3
+    assert "Invalid HUE_" in result.output
+    assert value not in result.output
+
+
+@pytest.mark.parametrize(("status", "code"), [(401, 3), (403, 3), (404, 4), (503, 4)])
+def test_http_status_errors_have_stable_exit_codes(status, code) -> None:
+    hue = bridge_mock()
+    response = httpx.Response(
+        status, request=httpx.Request("GET", "https://bridge/clip/v2/resource/light")
+    )
+    hue.lights.list = AsyncMock(
+        side_effect=httpx.HTTPStatusError(
+            "bridge rejected request", request=response.request, response=response
+        )
+    )
+    with patch("hueify.cli.operations.Hueify", return_value=hue):
+        result = runner.invoke(app, ["light", "list"])
+
+    assert result.exit_code == code
+    assert result.output == "bridge rejected request\n"
+
+
+@pytest.mark.parametrize(
     ("error", "exit_code"),
     [
         (ValueError("invalid command value"), 2),

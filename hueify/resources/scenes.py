@@ -24,7 +24,9 @@ class SceneNamespace(UpdateNamespace[Scene, SceneUpdate]):
         self, name: str, *, fuzzy: bool = True, group_id: ResourceId | None = None
     ) -> Scene:
         group_id = UUID(str(group_id)) if group_id is not None else None
-        resources = (await self.list()).data
+        response = await self.list()
+        response.raise_for_errors()
+        resources = response.data
         if group_id is not None:
             resources = [scene for scene in resources if scene.group.rid == group_id]
         return self._find_by_name(name, resources, fuzzy=fuzzy)

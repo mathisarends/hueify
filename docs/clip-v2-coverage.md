@@ -90,7 +90,7 @@ from hueify.models import DeviceUpdate, MetadataUpdate
 async with Hueify() as hue:
     all_resources = await hue.resources.list()
     light = await hue.lights.find_by_name("Desk")
-    device = await hue.resources.get(light.owner)
+    device = await hue.resources.get_one(light.owner)
     await hue.devices.update(
         device.id, DeviceUpdate(metadata=MetadataUpdate(name="Desk lamp"))
     )
@@ -114,7 +114,18 @@ await hue.resources.of("light").update(light.id, {"future_setting": None})
 Typed update models omit optional None fields. Use the raw dictionary path
 when an operation explicitly requires a JSON null. Errors in successful HTTP
 responses remain in `HueApiResponse.errors`; HTTP errors raise
-`httpx.HTTPStatusError`. `get_one()` raises ResourceNotFoundError for empty data.
+`httpx.HTTPStatusError`. Unwrapped `get_one()` and `find_by_name()` reads raise
+`BridgeError` for any API errors, including partial-success results, retaining
+the original entries in `exception.errors`. Only empty successful lookups raise
+`ResourceNotFoundError`. `hue.resources.get(reference)` retains the response
+envelope; use `hue.resources.get_one(reference)` for the resource itself.
+
+Typed requests reject unknown fields, including nested schema fields; bridge
+reads continue to retain firmware extensions. Use `ResourceUpdate` for explicitly
+unspecified request schemas or `hue.resources.of(type)` for arbitrary raw JSON.
+Streaming and frame setters now take keyword-only `brightness_fraction` (0–1),
+replacing the former `brightness` argument. REST `brightness` remains 0–100.
+HTTP settings are public via `Hueify(timeout=..., verify_ssl=..., transport=...)`.
 
 ## Task-oriented commands
 

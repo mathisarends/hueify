@@ -1,8 +1,11 @@
+import ssl
+
 import httpx
 from pydantic import BaseModel, TypeAdapter
 
 from hueify.credentials import HueBridgeCredentials
 from hueify.models import HueApiResponse, ResourceIdentifier
+from hueify.models.base import _BRIDGE_READ_CONTEXT
 
 _WRITE_RESPONSE = TypeAdapter(HueApiResponse[ResourceIdentifier])
 
@@ -13,15 +16,19 @@ class HttpClient:
     def __init__(
         self,
         credentials: HueBridgeCredentials,
-        timeout: float = 10.0,
-        verify_ssl: bool = False,
+        timeout: float | httpx.Timeout | None = 10.0,
+        verify_ssl: bool | ssl.SSLContext = False,
+        *,
+        transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self._base_url = f"https://{credentials.hue_bridge_ip}{self._HUE_API_BASE_PATH}"
         self._headers = {
             "hue-application-key": credentials.hue_app_key,
             "Content-Type": "application/json",
         }
-        self._client = httpx.AsyncClient(timeout=timeout, verify=verify_ssl, http2=True)
+        self._client = httpx.AsyncClient(
+            timeout=timeout, verify=verify_ssl, http2=True, transport=transport
+        )
 
     async def __aenter__(self):
         return self
@@ -36,7 +43,9 @@ class HttpClient:
     ) -> HueApiResponse[T]:
         response = await self._client.get(self._url(endpoint), headers=self._headers)
         response.raise_for_status()
-        return response_adapter.validate_json(response.content)
+        return response_adapter.validate_json(
+            response.content, extra="allow", context=_BRIDGE_READ_CONTEXT
+        )
 
     async def post(
         self, endpoint: str, data: BaseModel

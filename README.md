@@ -69,6 +69,20 @@ hue = Hueify(bridge_ip="192.168.1.10", app_key="…")
 Without any of these, `Hueify()` raises `MissingCredentialsError` and names
 what is missing.
 
+REST requests accept HTTP timeout and TLS options on the public client:
+
+```python
+async with Hueify(timeout=5.0, verify_ssl=True) as hue:
+    lights = await hue.lights.list()
+```
+
+`timeout` also accepts `httpx.Timeout` or `None`; `verify_ssl` accepts an
+`ssl.SSLContext`. Defaults remain 10 seconds and `verify_ssl=False` for bridges
+with self-signed certificates. Pass an `httpx.AsyncBaseTransport` through
+`transport=` for custom networking or a `httpx.MockTransport` for tests.
+Closing Hueify closes this REST transport. Event-stream timing and reconnection
+are configured separately through `ReconnectPolicy`.
+
 ## CLI
 
 The Python library has no command-line dependency. Install the optional CLI
@@ -255,7 +269,7 @@ and returns a mixed, typed inventory. References can be followed directly:
 ```python
 inventory = await hue.resources.list()
 light = await hue.lights.find_by_name("Desk")
-device = await hue.resources.get(light.owner)
+device = await hue.resources.get_one(light.owner)
 
 await hue.devices.rename(device.id, "Desk lamp")
 await hue.devices.identify(device.id)
@@ -270,8 +284,19 @@ await hue.motions.disable(motion.id)
 await hue.motions.set_sensitivity(motion.id, 1)
 ```
 
+`hue.resources.get(reference)` retains the `HueApiResponse` envelope, just like
+`hue.lights.get(id)`. Use `get_one()` for the resource itself. Unwrapped reads
+(`get_one()` and `find_by_name()`) raise `BridgeError` when the bridge reports
+errors, including partial-success responses; the original entries are available
+in `exception.errors`. An empty successful result raises `ResourceNotFoundError`.
+
 Use native request models for multi-field updates, for example
 `hue.behavior_instances.update(id, BehaviorInstanceUpdate(enabled=False))`.
+Typed requests reject unknown fields, including nested schema fields, so
+`LightUpdate(brightness=50)` raises a validation error. Use
+`LightUpdate(dimming=DimmingState(brightness=50))` instead. Bridge responses and
+events retain firmware extensions. Explicitly open schema fields, `ResourceUpdate`
+for unspecified schemas, and `hue.resources.of(type)` remain extension points.
 Built-in namespaces expose create and delete only where the pinned public
 specification documents them. A resource unavailable on a particular bridge
 returns its native HTTP error or Hue error envelope.
@@ -507,9 +532,13 @@ Opening a stream takes the area over, and leaving it gives the area back:
 async with hue.entertainment.stream(area) as stream:
     stream.set_all("#ff8800")
     await asyncio.sleep(2)
-    stream.set(channel_id=0, color="blue", brightness=0.4)
+    stream.set(channel_id=0, color="blue", brightness_fraction=0.4)
     await asyncio.sleep(2)
 ```
+
+Streaming uses the keyword-only `brightness_fraction` in the range 0–1
+(default 1). REST commands use `brightness` in percent, 0–100. When migrating
+stream or frame code, replace `brightness=0.4` with `brightness_fraction=0.4`.
 
 `set` and `set_all` do not send anything - they write into the next frame, which
 a loop of its own sends on a fixed clock, 50 times a second by default. That
@@ -534,7 +563,7 @@ from hueify.entertainment import Frame, Tick
 
 class Pulse:
     def render(self, frame: Frame, tick: Tick) -> None:
-        frame.set_all("#ffffff", brightness=abs(math.sin(tick.elapsed)))
+        frame.set_all("#ffffff", brightness_fraction=abs(math.sin(tick.elapsed)))
 
 
 async with hue.entertainment.stream(area) as stream:
@@ -568,6 +597,7 @@ until the source overwrites those channels again.
 A stream that stops on its own - because the bridge dropped it, or a source
 failed - leaves the reason in `stream.error`, and `await stream.wait_closed()`
 raises it. `stream.stats` reports frames sent, late frames and the rate.
+`wait_closed()` continues to raise the stored error after `close()`.
 Calling `await stream.open()` again after a failure first releases the previous
 session. A successful open resets the error and statistics for the new session;
 closing preserves the last session's statistics and error for inspection.
@@ -578,9 +608,11 @@ notice it subscribes to the [event stream](#event-stream):
 ```python
 @hue.on(ResourceType.ENTERTAINMENT_CONFIGURATION)
 async def on_area(event: EntertainmentConfigurationEvent) -> None:
-    if not event.is_streaming:
+    if event.is_streaming is False:
         print("The bridge stopped listening to us.")
 ```
+
+`event.is_streaming` is `None` when the partial event does not include `status`.
 
 ## Examples
 

@@ -2,13 +2,51 @@ from enum import StrEnum
 from typing import Literal, Self
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    ValidationInfo,
+    model_validator,
+)
+
+from hueify.errors import BridgeError
+
+_BRIDGE_READ_CONTEXT = {"hueify_bridge_read": True}
 
 
 class HueModel(BaseModel):
     """Base for Hue payloads that preserves fields added by bridge firmware."""
 
     model_config = ConfigDict(extra="allow")
+
+
+class HueRequest(HueModel):
+    """Typed write payloads reject unknown fields; use raw requests to extend them."""
+
+    @model_validator(mode="after")
+    def _reject_nested_extras(self, info: ValidationInfo) -> Self:
+        # Some schema fragments also appear inside snapshots and events. Bridge
+        # reads need both storage and serialization of extensions, so reject
+        # extras here rather than disabling their serializer with extra=forbid.
+        if isinstance(info.context, dict) and info.context.get("hueify_bridge_read"):
+            return self
+        errors = list(_request_extra_errors(self))
+        if errors:
+            raise ValidationError.from_exception_data(type(self).__name__, errors)
+        return self
+
+
+def _request_extra_errors(value: object, path: tuple = ()):
+    if isinstance(value, HueModel) and type(value) is not HueModel:
+        for name, extra in (value.model_extra or {}).items():
+            yield {"type": "extra_forbidden", "loc": (*path, name), "input": extra}
+        for name in type(value).model_fields:
+            yield from _request_extra_errors(getattr(value, name), (*path, name))
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            yield from _request_extra_errors(item, (*path, index))
 
 
 class ResourceUpdate(HueModel):
@@ -91,6 +129,11 @@ class HueApiError(HueModel):
 class HueApiResponse[T: BaseModel](HueModel):
     errors: list[HueApiError] = Field(default_factory=list)
     data: list[T] = Field(default_factory=list)
+
+    def raise_for_errors(self) -> None:
+        """Raise with every bridge error, including partial-success responses."""
+        if self.errors:
+            raise BridgeError(self.errors)
 
 
 class NamedMetadata(HueModel):

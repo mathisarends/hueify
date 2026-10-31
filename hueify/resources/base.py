@@ -38,6 +38,7 @@ class ResourceNamespace[TResource: HueResource]:
 
     async def get_one(self, resource_id: ResourceId) -> TResource:
         response = await self.get(resource_id)
+        response.raise_for_errors()
         if not response.data:
             raise ResourceNotFoundError(
                 f"No {self.resource_type.replace('_', ' ')} with ID {resource_id}"
@@ -45,7 +46,9 @@ class ResourceNamespace[TResource: HueResource]:
         return response.data[0]
 
     async def find_by_name(self, name: str, *, fuzzy: bool = True) -> TResource:
-        return self._find_by_name(name, (await self.list()).data, fuzzy=fuzzy)
+        response = await self.list()
+        response.raise_for_errors()
+        return self._find_by_name(name, response.data, fuzzy=fuzzy)
 
     def _find_by_name(
         self, name: str, resources: list[TResource], *, fuzzy: bool

@@ -1,7 +1,9 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 
+from hueify.errors import BridgeError, HueifyError
 from hueify.onboarding.registration import register_app_key
 
 
@@ -36,7 +38,9 @@ async def test_register_app_key_succeeds_once_the_link_button_was_pressed() -> N
 
 @pytest.mark.asyncio
 async def test_register_app_key_polls_until_the_link_button_is_pressed() -> None:
-    not_pressed = response_with([{"error": {"description": "link button not pressed"}}])
+    not_pressed = response_with(
+        [{"error": {"type": 101, "description": "link button not pressed"}}]
+    )
     success = response_with([{"success": {"username": "def456"}}])
     with (
         patch("asyncio.sleep", new_callable=AsyncMock),
@@ -65,7 +69,9 @@ async def test_register_app_key_tolerates_a_bridge_without_a_client_key() -> Non
 async def test_register_app_key_times_out_after_the_link_button_is_never_pressed() -> (
     None
 ):
-    not_pressed = response_with([{"error": {"description": "link button not pressed"}}])
+    not_pressed = response_with(
+        [{"error": {"type": 101, "description": "link button not pressed"}}]
+    )
     with (
         patch("asyncio.sleep", new_callable=AsyncMock),
         patch(
@@ -85,3 +91,76 @@ async def test_register_app_key_uses_a_custom_device_type() -> None:
         await register_app_key("192.168.1.50", device_type="my-app#laptop")
 
     assert post.await_args.kwargs["json"]["devicetype"] == "my-app#laptop"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("with_link_error", [False, True])
+async def test_non_link_errors_fail_immediately_with_the_original_details(
+    with_link_error,
+):
+    payload = [
+        {
+            "error": {
+                "type": 7,
+                "address": "/devicetype",
+                "description": "invalid value for devicetype",
+            }
+        }
+    ]
+    if with_link_error:
+        payload.insert(
+            0, {"error": {"type": 101, "description": "link button not pressed"}}
+        )
+    with (
+        patch("asyncio.sleep", new_callable=AsyncMock) as sleep,
+        patch(
+            "httpx.AsyncClient.post",
+            new_callable=AsyncMock,
+            return_value=response_with(payload),
+        ) as post,
+        pytest.raises(BridgeError, match="invalid value for devicetype") as caught,
+    ):
+        await register_app_key("192.168.1.50")
+
+    assert caught.value.errors[-1].model_dump() == payload[-1]["error"]
+    post.assert_awaited_once()
+    sleep.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [403, 500, 503])
+async def test_http_registration_errors_are_not_retried(status):
+    response = httpx.Response(
+        status,
+        json=[{"success": {"username": "ignore"}}],
+        request=httpx.Request("POST", "https://bridge/api"),
+    )
+    with (
+        patch("asyncio.sleep", new_callable=AsyncMock) as sleep,
+        patch(
+            "httpx.AsyncClient.post", new_callable=AsyncMock, return_value=response
+        ) as post,
+        pytest.raises(httpx.HTTPStatusError) as caught,
+    ):
+        await register_app_key("192.168.1.50")
+
+    assert caught.value.response.status_code == status
+    post.assert_awaited_once()
+    sleep.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("payload", [[], [{}]])
+async def test_empty_registration_results_do_not_become_link_button_timeouts(payload):
+    with (
+        patch("asyncio.sleep", new_callable=AsyncMock) as sleep,
+        patch(
+            "httpx.AsyncClient.post",
+            new_callable=AsyncMock,
+            return_value=response_with(payload),
+        ),
+        pytest.raises(HueifyError, match="no registration result"),
+    ):
+        await register_app_key("192.168.1.50")
+
+    sleep.assert_not_awaited()

@@ -8,6 +8,7 @@ import typer
 from pydantic import BaseModel, ValidationError
 
 from hueify import Hueify
+from hueify.credentials import HueBridgeCredentials
 from hueify.errors import (
     EntertainmentAuthenticationError,
     HueifyError,
@@ -53,12 +54,18 @@ def run[T](coroutine: Coroutine[object, object, T]) -> T:
     ) as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(3) from error
+    except httpx.HTTPStatusError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(
+            3 if error.response.status_code in {401, 403} else 4
+        ) from error
     except httpx.HTTPError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(4) from error
     except ValidationError as error:
         typer.echo(_validation_error_message(error), err=True)
-        raise typer.Exit(2) from error
+        code = 3 if error.title == HueBridgeCredentials.__name__ else 2
+        raise typer.Exit(code) from error
     except ValueError as error:
         typer.echo(str(error), err=True)
         raise typer.Exit(2) from error

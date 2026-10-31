@@ -8,6 +8,7 @@ from pydantic import Field, model_validator
 
 from hueify.models.base import (
     HueModel,
+    HueRequest,
     HueResource,
     IdentifyAction,
     NamedMetadata,
@@ -94,7 +95,7 @@ class GradientState(HueModel):
     pixel_count: int | None = None
 
 
-class GradientUpdate(HueModel):
+class GradientUpdate(HueRequest):
     points: list[GradientPoint] | None = Field(default=None, min_length=2, max_length=5)
     mode: str | None = None
 
@@ -136,7 +137,7 @@ class EffectsV2State(HueModel):
     status: EffectStatus | None = None
 
 
-class EffectsV2Update(HueModel):
+class EffectsV2Update(HueRequest):
     action: EffectAction
 
 
@@ -187,7 +188,7 @@ class SignalingState(HueModel):
     estimated_end: int | None = None
 
 
-class SignalingUpdate(HueModel):
+class SignalingUpdate(HueRequest):
     signal: Literal["no_signal", "on_off", "on_off_color", "alternating"]
     duration: int | None = Field(default=None, ge=0, le=65534000)
     color: list[ColorState] | None = Field(default=None, min_length=1, max_length=2)
@@ -263,7 +264,7 @@ class LightMetadata(NamedMetadata):
     fixed_mired: int | None = None
 
 
-class LightMetadataUpdate(HueModel):
+class LightMetadataUpdate(HueRequest):
     name: str | None = None
     archetype: LightArchetype | str | None = None
     function: str | None = None
@@ -320,7 +321,7 @@ class Light(NamedResource, LightStateMixin):
     mode: str | None = None
 
 
-class LightUpdate(HueModel, LightStateMixin):
+class LightUpdate(HueRequest, LightStateMixin):
     metadata: LightMetadataUpdate | None = None
     identify: IdentifyAction | None = None
     on: OnState | None = None
@@ -387,7 +388,7 @@ class GroupMetadata(NamedMetadata):
     archetype: GroupArchetype | str
 
 
-class GroupMetadataUpdate(HueModel):
+class GroupMetadataUpdate(HueRequest):
     name: str | None = Field(default=None, min_length=1, max_length=32)
     archetype: GroupArchetype | str | None = None
 
@@ -406,7 +407,7 @@ class Zone(Group):
     type: Literal[ResourceType.ZONE] = ResourceType.ZONE
 
 
-class GroupUpdate(HueModel):
+class GroupUpdate(HueRequest):
     metadata: GroupMetadataUpdate | GroupMetadata | None = None
     children: list[ResourceReference] | None = None
 
@@ -466,7 +467,7 @@ class SceneMetadata(NamedMetadata):
     appdata: str | None = Field(default=None, min_length=1, max_length=16)
 
 
-class SceneMetadataUpdate(HueModel):
+class SceneMetadataUpdate(HueRequest):
     name: str | None = Field(default=None, min_length=1, max_length=32)
     image: ImageResourceReference | None = None
     appdata: str | None = Field(default=None, min_length=1, max_length=16)
@@ -516,13 +517,13 @@ class Scene(NamedResource):
     id_v1: str | None = None
 
 
-class SceneRecall(HueModel):
+class SceneRecall(HueRequest):
     action: SceneAction = SceneAction.ACTIVE
     duration: int | None = Field(default=None, ge=0)
     dimming: DimmingState | None = None
 
 
-class SceneUpdate(HueModel):
+class SceneUpdate(HueRequest):
     metadata: SceneMetadataUpdate | SceneMetadata | None = None
     actions: list[SceneActionTarget] | None = None
     palette: ScenePalette | None = None
@@ -531,7 +532,7 @@ class SceneUpdate(HueModel):
     recall: SceneRecall | None = None
 
 
-class SceneCreate(HueModel):
+class SceneCreate(HueRequest):
     metadata: SceneMetadata
     group: ResourceReference
     actions: list[SceneActionTarget]
@@ -548,7 +549,7 @@ class SceneCreate(HueModel):
         return self
 
 
-class SceneRecallRequest(HueModel):
+class SceneRecallRequest(HueRequest):
     recall: SceneRecall = Field(default_factory=SceneRecall)
 
 
@@ -634,7 +635,7 @@ class StreamAction(StrEnum):
     STOP = "stop"
 
 
-class EntertainmentConfigurationUpdate(HueModel):
+class EntertainmentConfigurationUpdate(HueRequest):
     action: StreamAction | None = None
     metadata: NamedMetadata | None = None
     configuration_type: EntertainmentConfigurationType | None = None

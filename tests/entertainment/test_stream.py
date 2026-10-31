@@ -386,7 +386,7 @@ class TestSources:
     ) -> None:
         class Pulse:
             def render(self, frame, tick: Tick) -> None:
-                frame.set_all("white", brightness=0.5)
+                frame.set_all("white", brightness_fraction=0.5)
 
         async with make_stream(areas, credentials) as stream:
             running = asyncio.create_task(stream.run(Pulse()))
@@ -415,6 +415,35 @@ class TestSources:
 
 
 class TestFailures:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("wait_before_close", [False, True])
+    async def test_wait_closed_preserves_the_failure_after_cleanup(
+        self, areas, credentials, monkeypatch, wait_before_close
+    ):
+        error = EntertainmentError("stream gone")
+        failed = FakeConnection(fail_on_send=error)
+        FakeDtls(failed).install(monkeypatch)
+        stream = make_stream(areas, credentials)
+        await stream.open()
+        try:
+            if wait_before_close:
+                with pytest.raises(EntertainmentError) as caught:
+                    await stream.wait_closed()
+                assert caught.value is error
+            else:
+                async with asyncio.timeout(1):
+                    while stream.sending:
+                        await asyncio.sleep(0)
+        finally:
+            await stream.close()
+
+        for _ in range(2):
+            with pytest.raises(EntertainmentError) as caught:
+                await stream.wait_closed()
+            assert caught.value is error
+        assert stream.error is error
+        assert failed.closed
+
     @pytest.mark.asyncio
     async def test_reopening_after_failure_releases_old_connection_and_resets_session(
         self, areas, credentials, monkeypatch

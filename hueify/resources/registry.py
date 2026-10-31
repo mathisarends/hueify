@@ -80,5 +80,12 @@ class ResourceRegistry:
     async def list(self) -> m.HueApiResponse[m.AnyHueResource]:
         return await self._http_client.get("", _RESOURCE_RESPONSE)
 
-    async def get(self, reference: m.ResourceReference) -> m.AnyHueResource:
+    async def get(
+        self, reference: m.ResourceReference
+    ) -> m.HueApiResponse[m.AnyHueResource]:
+        """Fetch a reference and retain its response envelope, like namespace.get()."""
+        return await self[reference.rtype].get(reference.rid)
+
+    async def get_one(self, reference: m.ResourceReference) -> m.AnyHueResource:
+        """Resolve a reference to one resource, raising on bridge errors."""
         return await self[reference.rtype].get_one(reference.rid)

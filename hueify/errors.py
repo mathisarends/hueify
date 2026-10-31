@@ -1,5 +1,22 @@
+from __future__ import annotations
+
+from collections.abc import Iterable
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from hueify.models import HueApiError
+
+
 class HueifyError(Exception):
     """Base class for errors raised by hueify itself rather than by httpx."""
+
+
+class BridgeError(HueifyError):
+    """The bridge returned API errors; the original payloads are in ``errors``."""
+
+    def __init__(self, errors: Iterable[HueApiError]) -> None:
+        self.errors = tuple(errors)
+        super().__init__("; ".join(error.description for error in self.errors))
 
 
 class ResourceNotFoundError(HueifyError):

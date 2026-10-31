@@ -15,7 +15,7 @@ async def main() -> None:
 
         lights = (await hue.lights.list()).data
         if lights:
-            device = await hue.resources.get(lights[0].owner)
+            device = await hue.resources.get_one(lights[0].owner)
             print("first light belongs to:", device.model_dump(mode="json"))
 
 

@@ -1,7 +1,9 @@
+import ssl
 from collections.abc import Callable
 from types import TracebackType
 from typing import Self, overload
 
+import httpx
 from pydantic import TypeAdapter
 
 from hueify import models as m
@@ -60,12 +62,20 @@ class Hueify:
         reconnect: ReconnectPolicy | None = None,
         *,
         event_queue_size: int = DEFAULT_EVENT_QUEUE_SIZE,
+        timeout: float | httpx.Timeout | None = 10.0,
+        verify_ssl: bool | ssl.SSLContext = False,
+        transport: httpx.AsyncBaseTransport | None = None,
     ) -> None:
         self._credentials = load_credentials(bridge_ip, app_key, client_key)
         self.events = EventStream(
             self._credentials, reconnect, queue_size=event_queue_size
         )
-        self._http_client = HttpClient(self._credentials)
+        self._http_client = HttpClient(
+            self._credentials,
+            timeout=timeout,
+            verify_ssl=verify_ssl,
+            transport=transport,
+        )
         self.lights = LightNamespace(self._http_client)
         self.grouped_lights = GroupedLightNamespace(self._http_client)
         self.rooms = RoomNamespace(self._http_client)
