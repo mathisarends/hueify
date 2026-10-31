@@ -160,7 +160,7 @@ class DtlsPskConnection:
         self._psk = psk
 
         self._epoch = 0
-        self._send_sequence = 0
+        self._send_sequences = {0: 0}
         self._message_seq = 0
         self._transcript = bytearray()
         self._keys: SessionKeys | None = None
@@ -230,8 +230,8 @@ class DtlsPskConnection:
         server_random = await self._exchange_hello(client_random, cookie)
 
         self._keys = SessionKeys.derive(self._psk, client_random, server_random)
-        self._send_client_flight()
-        await self._verify_server_finished()
+        resend = self._send_client_flight()
+        await self._verify_server_finished(resend)
         logger.debug("DTLS handshake complete")
 
     async def _request_cookie(self, client_random: bytes) -> bytes:
@@ -261,10 +261,10 @@ class DtlsPskConnection:
         )
         return _parse_server_random(messages[HandshakeType.SERVER_HELLO].body)
 
-    def _send_client_flight(self) -> None:
+    def _send_client_flight(self) -> _SendFlight:
         assert self._keys is not None
 
-        self._send_handshake(
+        key_exchange = self._send_handshake(
             HandshakeType.CLIENT_KEY_EXCHANGE, _client_key_exchange(self._identity)
         )
         self._send_record(ContentType.CHANGE_CIPHER_SPEC, b"\x01")
@@ -272,31 +272,52 @@ class DtlsPskConnection:
         self._protection = self._keys.client_protection()
         self._server_protection = self._keys.server_protection()
         self._epoch += 1
-        self._send_sequence = 0
+        self._send_sequences[self._epoch] = 0
 
-        self._send_handshake(
+        finished = self._send_handshake(
             HandshakeType.FINISHED,
             self._keys.client_finished(bytes(self._transcript)),
         )
 
-    async def _verify_server_finished(self) -> None:
+        def resend() -> None:
+            # Retransmit the same handshake messages with fresh record sequence
+            # numbers, retaining the cipher state of each original record.
+            self._send_record(ContentType.HANDSHAKE, key_exchange, epoch=0)
+            self._send_record(ContentType.CHANGE_CIPHER_SPEC, b"\x01", epoch=0)
+            self._send_record(ContentType.HANDSHAKE, finished)
+
+        return resend
+
+    async def _verify_server_finished(self, resend: _SendFlight) -> None:
         assert self._keys is not None
         expected = self._keys.server_finished(bytes(self._transcript))
-        try:
-            async with asyncio.timeout(_SERVER_FINISHED_TIMEOUT):
-                while True:
-                    messages = self._read_handshake(await self._receive())
-                    finished = messages.get(HandshakeType.FINISHED)
-                    if finished is None:
-                        continue
-                    if finished.body != expected:
-                        raise EntertainmentAuthenticationError(
-                            "The bridge finished the DTLS handshake with a different "
-                            "client key than the one hueify used"
-                        )
-                    return
-        except TimeoutError:
-            logger.debug("The bridge did not send its Finished message; continuing")
+        for attempt in range(_FLIGHT_ATTEMPTS):
+            if attempt:
+                resend()
+            try:
+                async with asyncio.timeout(_SERVER_FINISHED_TIMEOUT * 2**attempt):
+                    while True:
+                        messages = self._read_handshake(await self._receive())
+                        finished = messages.get(HandshakeType.FINISHED)
+                        if finished is None:
+                            continue
+                        if finished.body != expected:
+                            raise EntertainmentAuthenticationError(
+                                "The bridge finished the DTLS handshake with a different "
+                                "client key than the one hueify used"
+                            )
+                        return
+            except TimeoutError:
+                logger.debug(
+                    "DTLS server Finished timed out (%d/%d)",
+                    attempt + 1,
+                    _FLIGHT_ATTEMPTS,
+                )
+
+        raise EntertainmentError(
+            f"The bridge did not confirm the DTLS handshake on {self._peer} "
+            f"with a Finished message after {_FLIGHT_ATTEMPTS} attempts"
+        )
 
     async def _flight(
         self,
@@ -328,7 +349,7 @@ class DtlsPskConnection:
 
     def _send_handshake(
         self, message_type: HandshakeType, body: bytes, transcript: bool = True
-    ) -> None:
+    ) -> bytes:
         header = struct.pack(
             "!B3sH3s3s",
             message_type,
@@ -342,25 +363,28 @@ class DtlsPskConnection:
         if transcript:
             self._transcript.extend(message)
         self._send_record(ContentType.HANDSHAKE, message)
+        return message
 
-    def _send_record(self, content_type: ContentType, payload: bytes) -> None:
+    def _send_record(
+        self, content_type: ContentType, payload: bytes, *, epoch: int | None = None
+    ) -> None:
+        epoch = self._epoch if epoch is None else epoch
+        sequence = self._send_sequences[epoch]
         fragment = (
             payload
-            if self._protection is None
-            else self._protection.protect(
-                content_type, self._epoch, self._send_sequence, payload
-            )
+            if epoch == 0 or self._protection is None
+            else self._protection.protect(content_type, epoch, sequence, payload)
         )
         header = struct.pack(
             "!BHH6sH",
             content_type,
             DTLS_1_2,
-            self._epoch,
-            self._send_sequence.to_bytes(6, "big"),
+            epoch,
+            sequence.to_bytes(6, "big"),
             len(fragment),
         )
         self._transport.sendto(header + fragment)
-        self._send_sequence += 1
+        self._send_sequences[epoch] += 1
 
     async def _receive(self) -> bytes:
         datagram = await self._datagrams.received.get()

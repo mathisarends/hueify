@@ -177,6 +177,41 @@ class TestClientHelloOnTheWire:
 
 class TestHandshake:
     @pytest.mark.asyncio
+    async def test_retries_a_lost_server_finished(
+        self, impatient_handshake: None
+    ) -> None:
+        bridge, port = await FakeBridge.listening(finished_to_drop=1)
+        try:
+            async with asyncio.timeout(3):
+                connection = await DtlsPskConnection.connect(
+                    "127.0.0.1", APP_KEY, CLIENT_KEY, port
+                )
+            connection.send(b"confirmed")
+            assert await bridge.wait_for_frames(1) == [b"confirmed"]
+            assert bridge.finished_sent == 2
+            connection.close()
+        finally:
+            bridge.close()
+
+    @pytest.mark.asyncio
+    async def test_missing_server_finished_fails_after_bounded_retries(
+        self, impatient_handshake: None
+    ) -> None:
+        bridge, port = await FakeBridge.listening(finished_to_drop=100)
+        try:
+            async with asyncio.timeout(3):
+                with pytest.raises(
+                    EntertainmentError, match="Finished message after 3 attempts"
+                ):
+                    await DtlsPskConnection.connect(
+                        "127.0.0.1", APP_KEY, CLIENT_KEY, port
+                    )
+            assert bridge.finished_sent == 3
+            assert bridge.frames == []
+        finally:
+            bridge.close()
+
+    @pytest.mark.asyncio
     async def test_completes_against_a_bridge_and_carries_frames(self) -> None:
         bridge, port = await FakeBridge.listening()
         try:
