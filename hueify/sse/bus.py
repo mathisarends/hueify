@@ -1,11 +1,11 @@
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
-from typing import Literal, cast, overload
+from typing import cast, overload
 
 from hueify.models import HueEvent, ResourceType
 
-type EventResourceType = ResourceType | Literal["*"]
+type EventResourceType = ResourceType | str
 type EventHandler[T: HueEvent] = Callable[[T], Awaitable[None]]
 
 logger = logging.getLogger(__name__)

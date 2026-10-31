@@ -106,6 +106,32 @@ def patched_bridge(
 
 class TestHandleSse:
     @pytest.mark.asyncio
+    async def test_future_types_and_invalid_events_do_not_hide_valid_siblings(
+        self,
+    ) -> None:
+        stream, bus, _ = make_stream()
+        first = make_raw_event()
+        future = {**make_raw_event("future_sensor"), "new_field": 42}
+        last = make_raw_event()
+        await stream._handle_sse(
+            make_sse(
+                [
+                    {"data": [first, future, {"type": "light"}, last]},
+                    {"data": "invalid container"},
+                    42,
+                    {"data": [make_raw_event()]},
+                ]
+            )
+        )
+        events = [call.args[0] for call in bus.dispatch.await_args_list]
+        assert len(events) == 4
+        assert isinstance(events[0], LightEvent)
+        assert type(events[1]) is HueEvent
+        assert events[1].type == "future_sensor"
+        assert events[1].model_extra == {"owner": future["owner"], "new_field": 42}
+        assert str(events[2].id) == last["id"]
+
+    @pytest.mark.asyncio
     async def test_dispatches_event_from_valid_payload(self) -> None:
         stream, bus, _ = make_stream()
         event = make_raw_event()

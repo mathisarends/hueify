@@ -583,7 +583,7 @@ class EntertainmentConfigurationUpdate(HueModel):
 
 class HueEvent(HueModel):
     id: UUID
-    type: ResourceType
+    type: ResourceType | str
 
 
 class LightEvent(LightUpdate, HueEvent):
