@@ -129,7 +129,12 @@ class EntertainmentStream:
 
         area_started = False
         try:
-            await self._areas.start(self._area.id)
+            response = await self._areas.start(self._area.id)
+            if response.errors:
+                descriptions = "; ".join(error.description for error in response.errors)
+                raise EntertainmentError(
+                    f"Could not start entertainment area: {descriptions}"
+                )
             area_started = True
             self._connection = await connection_type.connect(
                 self._credentials.hue_bridge_ip,

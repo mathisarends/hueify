@@ -17,7 +17,12 @@ from hueify.errors import (
     MissingCredentialsError,
     MissingDependencyError,
 )
-from hueify.models import EntertainmentConfiguration
+from hueify.models import (
+    EntertainmentConfiguration,
+    HueApiError,
+    HueApiResponse,
+    ResourceIdentifier,
+)
 
 AREA_ID = UUID("a1b2c3d4-1111-2222-3333-444455556666")
 BRIDGE_IP = "192.168.1.10"
@@ -96,6 +101,7 @@ def credentials() -> HueBridgeCredentials:
 def areas() -> AsyncMock:
     namespace = AsyncMock(spec=EntertainmentNamespace)
     namespace.get_one.return_value = make_area()
+    namespace.start.return_value = HueApiResponse[ResourceIdentifier]()
     return namespace
 
 
@@ -121,6 +127,23 @@ def make_stream(
 
 
 class TestOpening:
+    @pytest.mark.asyncio
+    async def test_bridge_error_response_does_not_connect_or_stop(
+        self, areas: AsyncMock, credentials: HueBridgeCredentials, dtls: FakeDtls
+    ) -> None:
+        areas.start.return_value = HueApiResponse[ResourceIdentifier](
+            errors=[HueApiError(description="area is busy")]
+        )
+        stream = make_stream(areas, credentials)
+        with pytest.raises(EntertainmentError, match="area is busy"):
+            await stream.open()
+        await stream.close()
+        areas.stop.assert_not_awaited()
+        assert dtls.connection.connected_to is None
+        assert not stream.sending
+        with pytest.raises(EntertainmentError, match="not open"):
+            _ = stream.frame
+
     def test_a_missing_client_key_says_where_to_get_one(
         self, areas: AsyncMock, without_stored_credentials: None
     ) -> None:
