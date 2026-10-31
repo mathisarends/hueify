@@ -20,6 +20,7 @@ from hueify.sse import (
     EventStream,
     ReconnectPolicy,
 )
+from hueify.sse.queue import DEFAULT_EVENT_QUEUE_SIZE
 
 
 class Hueify:
@@ -41,8 +42,13 @@ class Hueify:
         app_key: str | None = None,
         client_key: str | None = None,
         reconnect: ReconnectPolicy | None = None,
+        *,
+        event_queue_size: int = DEFAULT_EVENT_QUEUE_SIZE,
     ) -> None:
         self._credentials = load_credentials(bridge_ip, app_key, client_key)
+        self.events = EventStream(
+            self._credentials, reconnect, queue_size=event_queue_size
+        )
         self._http_client = HttpClient(self._credentials)
         self.lights = LightNamespace(self._http_client)
         self.grouped_lights = GroupedLightNamespace(self._http_client)
@@ -52,7 +58,6 @@ class Hueify:
         self.entertainment = EntertainmentNamespace(
             self._http_client, self._credentials
         )
-        self.events = EventStream(self._credentials, reconnect)
 
     async def __aenter__(self) -> Self:
         return self

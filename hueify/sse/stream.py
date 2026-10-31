@@ -10,6 +10,7 @@ from hueify.errors import StreamAuthenticationError
 from hueify.models import AnyHueEvent, HueEvent
 from hueify.sse.bus import EventBus
 from hueify.sse.connection import StreamConnection
+from hueify.sse.queue import EventQueue
 from hueify.sse.retry import ReconnectPolicy
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ class ServerSentEventStream:
     def __init__(
         self,
         credentials: HueBridgeCredentials,
-        event_bus: EventBus,
+        event_bus: EventBus | EventQueue,
         connection: StreamConnection,
         policy: ReconnectPolicy,
     ) -> None:

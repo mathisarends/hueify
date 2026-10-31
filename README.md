@@ -329,6 +329,18 @@ matching update model plus an ID, so a `LightEvent` reads like a light, includin
 the flat accessors. Anything else arrives as the base `HueEvent`. A `"*"` handler
 receives every event, in addition to the type-specific ones.
 
+Unknown resource type names are preserved as strings in `HueEvent`. Malformed
+events are logged and skipped individually, so valid events in the same payload
+still arrive.
+
+Reception and handlers run in separate tasks with a bounded queue of 256 events.
+Change its capacity with `Hueify(event_queue_size=512)` and inspect the waiting
+count at `hue.events.pending_events`. Events are handled in arrival order; all
+handlers for one event finish before the next event begins. When the queue fills,
+reception waits for space and logs the backpressure, without dropping events.
+The queue survives reconnects. Stopping the stream cancels the active handlers
+and discards pending events, so shutdown does not wait on a slow handler.
+
 `hue.off(resource_type, handler)` removes a handler and `hue.stop_stream()` ends
 the stream. Leaving the context manager closes a started stream along with the
 HTTP client. Subscribing and starting live on the client; `hue.events` owns the

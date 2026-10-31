@@ -13,6 +13,7 @@ from hueify.errors import StreamAuthenticationError
 from hueify.models import HueEvent
 from hueify.sse.bus import EventBus, EventHandler, EventResourceType
 from hueify.sse.connection import ConnectionHandler, ConnectionStatus, StreamConnection
+from hueify.sse.queue import DEFAULT_EVENT_QUEUE_SIZE, EventQueue
 from hueify.sse.retry import Backoff, ReconnectPolicy
 from hueify.sse.stream import ServerSentEventStream
 
@@ -31,12 +32,15 @@ class EventStream:
         self,
         credentials: HueBridgeCredentials,
         policy: ReconnectPolicy | None = None,
+        *,
+        queue_size: int = DEFAULT_EVENT_QUEUE_SIZE,
     ) -> None:
         self._policy = policy or ReconnectPolicy()
         self._bus = EventBus()
+        self._queue = EventQueue(self._bus, queue_size)
         self._connection = StreamConnection()
         self._stream = ServerSentEventStream(
-            credentials, self._bus, self._connection, self._policy
+            credentials, self._queue, self._connection, self._policy
         )
         self._task: asyncio.Task[None] | None = None
         self._last_error: Exception | None = None
@@ -59,6 +63,11 @@ class EventStream:
     @property
     def last_event_at(self) -> datetime | None:
         return self._connection.last_event_at
+
+    @property
+    def pending_events(self) -> int:
+        """Events waiting for handlers, excluding the event currently being handled."""
+        return self._queue.pending
 
     @property
     def last_error(self) -> Exception | None:
@@ -124,6 +133,7 @@ class EventStream:
         await self._connection.closed()
 
     async def _supervise(self) -> None:
+        dispatcher = asyncio.create_task(self._queue.run())
         try:
             await self._reconnect_forever()
         except StreamAuthenticationError as error:
@@ -132,6 +142,11 @@ class EventStream:
         except Exception as error:
             self._last_error = error
             logger.exception("Event stream supervisor stopped unexpectedly")
+        finally:
+            dispatcher.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await dispatcher
+            self._queue.clear()
 
     async def _reconnect_forever(self) -> None:
         backoff = Backoff(self._policy)
