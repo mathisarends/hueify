@@ -5,7 +5,7 @@ from uuid import UUID
 
 import httpx
 import typer
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from hueify import Hueify
 from hueify.errors import (
@@ -80,27 +80,33 @@ def _validation_error_message(error: ValidationError) -> str:
 
 async def list_lights() -> list[Light]:
     async with Hueify() as hue:
-        return (await hue.lights.list()).data
+        return _list_data(await hue.lights.list())
 
 
 async def list_rooms() -> list[Room]:
     async with Hueify() as hue:
-        return (await hue.rooms.list()).data
+        return _list_data(await hue.rooms.list())
 
 
 async def list_zones() -> list[Zone]:
     async with Hueify() as hue:
-        return (await hue.zones.list()).data
+        return _list_data(await hue.zones.list())
 
 
 async def list_scenes() -> list[Scene]:
     async with Hueify() as hue:
-        return (await hue.scenes.list()).data
+        return _list_data(await hue.scenes.list())
 
 
 async def list_entertainment_areas() -> list[EntertainmentConfiguration]:
     async with Hueify() as hue:
-        return (await hue.entertainment.list()).data
+        return _list_data(await hue.entertainment.list())
+
+
+def _list_data[T: BaseModel](response: HueApiResponse[T]) -> list[T]:
+    if response.errors:
+        raise HueifyError("; ".join(error.description for error in response.errors))
+    return response.data
 
 
 def _control_namespace(hue: Hueify, group: ControlGroup) -> ControlNamespace:

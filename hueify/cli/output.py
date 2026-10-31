@@ -106,10 +106,19 @@ def write_response(
     output = OutputOptions.from_context(context)
     if output.json:
         print_json(cast("dict[str, JsonValue]", response.model_dump(mode="json")))
+        _check_response_errors(response)
         return
 
+    _check_response_errors(response)
     if output.plain:
         for identifier in response.data:
             typer.echo(f"{identifier.rid}\t{identifier.rtype}")
         return
     typer.echo(f"Updated {len(response.data)} resource(s).")
+
+
+def _check_response_errors(response: HueApiResponse[ResourceIdentifier]) -> None:
+    if response.errors:
+        for error in response.errors:
+            typer.echo(error.description, err=True)
+        raise typer.Exit(1)
