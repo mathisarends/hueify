@@ -1,4 +1,5 @@
 import asyncio
+from unittest.mock import MagicMock
 
 import pytest
 from conftest import (
@@ -18,6 +19,7 @@ from hueify.entertainment.dtls import (
     ContentType,
     DtlsPskConnection,
     HandshakeType,
+    _Datagrams,
     parse_handshake_messages,
     parse_records,
 )
@@ -25,6 +27,71 @@ from hueify.errors import EntertainmentAuthenticationError, EntertainmentError
 
 DTLS_1_2_ON_THE_WIRE = 0xFEFD
 RANDOM_LENGTH = 32
+
+
+class TestHandshakeOrdering:
+    def make_connection(self) -> DtlsPskConnection:
+        return DtlsPskConnection(
+            MagicMock(), _Datagrams(), APP_KEY.encode(), bytes.fromhex(CLIENT_KEY)
+        )
+
+    def test_duplicate_datagrams_do_not_change_the_transcript(self) -> None:
+        connection = self.make_connection()
+        hello = handshake_message(HandshakeType.SERVER_HELLO, 0, b"hello")
+        packet = record(ContentType.HANDSHAKE, 0, 0, hello)
+        assert connection._read_handshake(packet)
+        assert connection._read_handshake(packet) == {}
+        assert connection._transcript == hello
+
+    def test_messages_are_processed_in_sequence_across_datagrams(self) -> None:
+        connection = self.make_connection()
+        hello = handshake_message(HandshakeType.SERVER_HELLO, 0, b"hello")
+        done = handshake_message(HandshakeType.SERVER_HELLO_DONE, 1, b"")
+        assert (
+            connection._read_handshake(record(ContentType.HANDSHAKE, 0, 1, done)) == {}
+        )
+        messages = connection._read_handshake(
+            record(ContentType.HANDSHAKE, 0, 0, hello)
+        )
+        assert list(messages) == [
+            HandshakeType.SERVER_HELLO,
+            HandshakeType.SERVER_HELLO_DONE,
+        ]
+        assert connection._transcript == hello + done
+
+    @pytest.mark.asyncio
+    async def test_partial_server_flight_survives_a_retry(
+        self, impatient_handshake: None
+    ) -> None:
+        connection = self.make_connection()
+        connection._receive_message_seq = 1
+        hello = handshake_message(
+            HandshakeType.SERVER_HELLO, 1, b"\xfe\xfd" + bytes(32)
+        )
+        done = handshake_message(HandshakeType.SERVER_HELLO_DONE, 2, b"")
+        packets = [hello, hello + done]
+
+        def answer(_: bytes) -> None:
+            connection._datagrams.received.put_nowait(
+                record(ContentType.HANDSHAKE, 0, 0, packets.pop(0))
+            )
+
+        connection._transport.sendto.side_effect = answer
+        await connection._exchange_hello(bytes(32), b"cookie")
+        sent = connection._transport.sendto.call_args_list
+        first = parse_records(sent[0].args[0])[0].fragment
+        assert len(sent) == 2
+        assert parse_records(sent[1].args[0])[0].fragment == first
+        assert connection._transcript == first + hello + done
+
+    def test_plaintext_finished_is_not_accepted(self) -> None:
+        connection = self.make_connection()
+        finished = handshake_message(HandshakeType.FINISHED, 0, b"unprotected")
+        assert (
+            connection._read_handshake(record(ContentType.HANDSHAKE, 0, 0, finished))
+            == {}
+        )
+        assert connection._transcript == b""
 
 
 async def first_client_hello() -> bytes:

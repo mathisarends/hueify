@@ -162,6 +162,8 @@ class DtlsPskConnection:
         self._epoch = 0
         self._send_sequences = {0: 0}
         self._message_seq = 0
+        self._receive_message_seq = 0
+        self._pending_handshakes: dict[int, HandshakeMessage] = {}
         self._transcript = bytearray()
         self._keys: SessionKeys | None = None
         self._protection: RecordProtection | None = None
@@ -247,12 +249,18 @@ class DtlsPskConnection:
         return _parse_cookie(messages[HandshakeType.HELLO_VERIFY_REQUEST].body)
 
     async def _exchange_hello(self, client_random: bytes, cookie: bytes) -> bytes:
+        hello: bytes | None = None
+
         def send() -> None:
+            nonlocal hello
+            if hello is not None:
+                self._send_record(ContentType.HANDSHAKE, hello)
+                return
             # RFC 6347: the repeated hello continues the sequence at one and is
             # the first message of the transcript.
             self._message_seq = 1
             self._transcript.clear()
-            self._send_handshake(
+            hello = self._send_handshake(
                 HandshakeType.CLIENT_HELLO, _client_hello(client_random, cookie)
             )
 
@@ -326,7 +334,6 @@ class DtlsPskConnection:
     ) -> dict[int, HandshakeMessage]:
         collected: dict[int, HandshakeMessage] = {}
         for attempt in range(_FLIGHT_ATTEMPTS):
-            collected.clear()
             send()
             try:
                 async with asyncio.timeout(_FLIGHT_TIMEOUT * 2**attempt):
@@ -407,12 +414,19 @@ class DtlsPskConnection:
                 continue
 
             for message in parse_handshake_messages(fragment):
-                if message.type in messages:
+                if message.type == HandshakeType.FINISHED and record.epoch != 1:
                     continue
-                messages[message.type] = message
-                # DTLS starts the transcript after its stateless cookie exchange.
-                if message.type != HandshakeType.HELLO_VERIFY_REQUEST:
-                    self._transcript.extend(message.raw)
+                if message.message_seq < self._receive_message_seq:
+                    continue
+                self._pending_handshakes.setdefault(message.message_seq, message)
+
+        while self._receive_message_seq in self._pending_handshakes:
+            message = self._pending_handshakes.pop(self._receive_message_seq)
+            self._receive_message_seq += 1
+            messages[message.type] = message
+            # DTLS starts the transcript after its stateless cookie exchange.
+            if message.type != HandshakeType.HELLO_VERIFY_REQUEST:
+                self._transcript.extend(message.raw)
         return messages
 
     def _unprotect(self, record: Record) -> bytes | None:
