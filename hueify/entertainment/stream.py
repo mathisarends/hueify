@@ -73,6 +73,7 @@ class EntertainmentStream:
         self._error: Exception | None = None
         self._frames_sent = 0
         self._late_frames = 0
+        self._lifecycle_lock = asyncio.Lock()
 
     @property
     def area(self) -> EntertainmentConfiguration:
@@ -120,9 +121,14 @@ class EntertainmentStream:
 
     async def open(self) -> Self:
         """Take the area over and start sending; calling twice is harmless."""
+        async with self._lifecycle_lock:
+            return await self._open()
+
+    async def _open(self) -> Self:
         if self.sending:
             return self
 
+        await self._close()
         connection_type = _dtls_connection()
         self._area = await self._resolve_area()
         self._frame = Frame(channel.channel_id for channel in self._area.channels)
@@ -151,10 +157,17 @@ class EntertainmentStream:
             raise
 
         self._started_at = datetime.now(UTC)
+        self._error = None
+        self._frames_sent = 0
+        self._late_frames = 0
         self._sender = asyncio.create_task(self._send_frames())
         return self
 
     async def close(self) -> None:
+        async with self._lifecycle_lock:
+            await self._close()
+
+    async def _close(self) -> None:
         await self._stop_sender()
 
         if self._connection is not None:

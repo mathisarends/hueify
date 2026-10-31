@@ -514,6 +514,23 @@ def test_scene_scope_rejects_conflicting_options_and_mismatched_ids():
     hue.scenes.activate.assert_not_called()
 
 
+@pytest.mark.parametrize("group_id", [str(OWNER_ID).upper(), OWNER_ID.hex])
+def test_scene_scope_accepts_equivalent_uuid_spellings(group_id):
+    hue = bridge_mock()
+    hue.scenes.get_one = AsyncMock(
+        return_value=SimpleNamespace(group=SimpleNamespace(rid=OWNER_ID))
+    )
+    hue.scenes.activate = AsyncMock(return_value=update_response())
+    with patch("hueify.cli.operations.Hueify", return_value=hue):
+        result = runner.invoke(
+            app, ["scene", "activate", str(RESOURCE_ID), "--room", group_id]
+        )
+    assert result.exit_code == 0
+    hue.scenes.activate.assert_awaited_once_with(
+        str(RESOURCE_ID), brightness=None, transition=None, dynamic=False
+    )
+
+
 def test_scene_and_entertainment_accept_uuids_without_name_lookups() -> None:
     resource_id = str(RESOURCE_ID)
     response = update_response()

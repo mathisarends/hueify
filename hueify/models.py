@@ -584,6 +584,9 @@ class EntertainmentConfigurationUpdate(HueModel):
 class HueEvent(HueModel):
     id: UUID
     type: ResourceType | str
+    # Container metadata accompanies each resource without replacing its type.
+    operation: str | None = None
+    creationtime: datetime | None = None
 
 
 class LightEvent(LightUpdate, HueEvent):

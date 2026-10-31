@@ -416,6 +416,91 @@ class TestSources:
 
 class TestFailures:
     @pytest.mark.asyncio
+    async def test_reopening_after_failure_releases_old_connection_and_resets_session(
+        self, areas, credentials, monkeypatch
+    ):
+        failed = FakeConnection(fail_on_send=EntertainmentError("stream gone"))
+        FakeDtls(failed).install(monkeypatch)
+        stream = make_stream(areas, credentials)
+        await stream.open()
+        with pytest.raises(EntertainmentError, match="stream gone"):
+            await stream.wait_closed()
+        previous_start = stream.stats.started_at
+        replacement = FakeConnection()
+        FakeDtls(replacement).install(monkeypatch)
+        try:
+            await stream.open()
+            assert failed.closed
+            areas.stop.assert_awaited_once_with(AREA_ID)
+            assert stream.sending
+            assert stream.error is None
+            assert stream.stats.frames_sent == 0
+            assert stream.stats.late_frames == 0
+            assert stream.stats.started_at > previous_start
+        finally:
+            await stream.close()
+        assert replacement.closed
+        assert areas.stop.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_successful_sessions_reset_frame_counts_when_reopened(
+        self, areas, credentials, monkeypatch
+    ):
+        first = FakeConnection()
+        FakeDtls(first).install(monkeypatch)
+        stream = make_stream(areas, credentials)
+        await stream.open()
+        try:
+            async with asyncio.timeout(1):
+                while not first.sent:
+                    await asyncio.sleep(0.01)
+        finally:
+            await stream.close()
+        assert stream.stats.frames_sent > 0
+        second = FakeConnection()
+        FakeDtls(second).install(monkeypatch)
+        try:
+            await stream.open()
+            assert stream.stats.frames_sent == 0
+        finally:
+            await stream.close()
+
+    @pytest.mark.asyncio
+    async def test_concurrent_open_calls_share_one_connection(
+        self, areas, credentials, dtls, connection, monkeypatch
+    ):
+        entered, release = asyncio.Event(), asyncio.Event()
+
+        async def connect(*args):
+            entered.set()
+            await release.wait()
+            return connection
+
+        connector = AsyncMock(side_effect=connect)
+        monkeypatch.setattr(dtls, "connect", connector)
+        stream = make_stream(areas, credentials)
+        first = asyncio.create_task(stream.open())
+        second = None
+        try:
+            async with asyncio.timeout(1):
+                await entered.wait()
+                second = asyncio.create_task(stream.open())
+                release.set()
+                assert await first is stream
+                assert await second is stream
+            connector.assert_awaited_once()
+            areas.start.assert_awaited_once()
+        finally:
+            first.cancel()
+            if second is not None:
+                second.cancel()
+            await asyncio.gather(
+                first, *([second] if second else []), return_exceptions=True
+            )
+            await stream.close()
+        assert connection.closed
+
+    @pytest.mark.asyncio
     async def test_a_broken_connection_surfaces_where_it_is_awaited(
         self,
         areas: AsyncMock,

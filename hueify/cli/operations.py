@@ -282,9 +282,9 @@ async def activate_scene(
                 resource_id = await _resolve_target(hue.scenes, target, fuzzy=fuzzy)
         else:
             resource_id = target
-            if group_id is not None and str(
-                (await hue.scenes.get_one(target)).group.rid
-            ) != str(group_id):
+            if group_id is not None and (
+                await hue.scenes.get_one(target)
+            ).group.rid != UUID(str(group_id)):
                 raise ResourceNotFoundError(
                     f"Scene {target} does not belong to group {group_id}"
                 )

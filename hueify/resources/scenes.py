@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from pydantic import TypeAdapter
 
 from hueify.http import HttpClient
@@ -22,11 +24,10 @@ class SceneNamespace(ResourceNamespace[Scene]):
     async def find_by_name(
         self, name: str, *, fuzzy: bool = True, group_id: ResourceId | None = None
     ) -> Scene:
+        group_id = UUID(str(group_id)) if group_id is not None else None
         resources = (await self.list()).data
         if group_id is not None:
-            resources = [
-                scene for scene in resources if str(scene.group.rid) == str(group_id)
-            ]
+            resources = [scene for scene in resources if scene.group.rid == group_id]
         return self._find_by_name(name, resources, fuzzy=fuzzy)
 
     async def create(self, data: SceneUpdate) -> HueApiResponse[ResourceIdentifier]:

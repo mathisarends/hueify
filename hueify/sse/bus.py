@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable
 from typing import cast, overload
 
 from hueify.models import HueEvent, ResourceType
+from hueify.sse.callbacks import CallbackContext
 
 type EventResourceType = ResourceType | str
 type EventHandler[T: HueEvent] = Callable[[T], Awaitable[None]]
@@ -14,6 +15,11 @@ logger = logging.getLogger(__name__)
 class EventBus:
     def __init__(self) -> None:
         self._handlers: dict[str, list[EventHandler[HueEvent]]] = {}
+        self._callbacks = CallbackContext()
+
+    @property
+    def in_handler(self) -> bool:
+        return self._callbacks.active
 
     @overload
     def on[T: HueEvent](
@@ -55,10 +61,11 @@ class EventBus:
             *self._handlers.get(str(event.type), []),
             *self._handlers.get("*", []),
         ]
-        results = await asyncio.gather(
-            *(handler(event) for handler in handlers),
-            return_exceptions=True,
-        )
+        with self._callbacks.enter():
+            results = await asyncio.gather(
+                *(handler(event) for handler in handlers),
+                return_exceptions=True,
+            )
         for result in results:
             if isinstance(result, Exception):
                 logger.error("Handler failed for %s: %s", event.type, result)

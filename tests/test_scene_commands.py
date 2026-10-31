@@ -125,3 +125,41 @@ async def test_same_scene_name_can_be_scoped_to_a_group(client):
         await scenes.find_by_name(
             "Relax", group_id="33333333-3333-3333-3333-333333333333"
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("representation", ["uuid", "canonical", "uppercase", "hex"])
+async def test_scene_group_filter_normalizes_uuid_representations(
+    client, representation
+):
+    from hueify.models import Scene
+
+    group_id = UUID("abcdefab-1234-4234-8234-abcdefabcdef")
+    representations = {
+        "uuid": group_id,
+        "canonical": str(group_id),
+        "uppercase": str(group_id).upper(),
+        "hex": group_id.hex,
+    }
+    client.get.return_value = HueApiResponse[Scene].model_validate(
+        {
+            "data": [
+                {
+                    "id": str(SCENE_ID),
+                    "metadata": {"name": "Relax"},
+                    "group": {"rid": str(group_id), "rtype": "room"},
+                }
+            ]
+        }
+    )
+    scene = await SceneNamespace(client).find_by_name(
+        "Relax", group_id=representations[representation]
+    )
+    assert scene.id == SCENE_ID
+
+
+@pytest.mark.asyncio
+async def test_invalid_scene_group_id_fails_before_reading_the_bridge(client):
+    with pytest.raises(ValueError):
+        await SceneNamespace(client).find_by_name("Relax", group_id="not-a-uuid")
+    client.get.assert_not_awaited()

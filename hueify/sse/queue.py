@@ -41,6 +41,10 @@ class EventQueue:
             finally:
                 self._queue.task_done()
 
+    async def join(self) -> None:
+        """Wait until queued events and their active handlers have finished."""
+        await self._queue.join()
+
     def clear(self) -> None:
         while not self._queue.empty():
             self._queue.get_nowait()

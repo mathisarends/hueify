@@ -38,7 +38,7 @@ class EventStream:
         self._policy = policy or ReconnectPolicy()
         self._bus = EventBus()
         self._queue = EventQueue(self._bus, queue_size)
-        self._connection = StreamConnection()
+        self._connection = StreamConnection(before_open_notify=self._queue.join)
         self._stream = ServerSentEventStream(
             credentials, self._queue, self._connection, self._policy
         )
@@ -125,11 +125,21 @@ class EventStream:
         return await self._connection.wait_connected(timeout)
 
     async def stop(self) -> None:
-        if self._task is not None:
-            self._task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._task
-            self._task = None
+        """Stop and await cleanup; callbacks only request their own shutdown."""
+        task = self._task
+        if task is not None:
+            if not task.cancelling():
+                task.cancel()
+            if self._bus.in_handler or self._connection.in_handler:
+                return
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                caller = asyncio.current_task()
+                if caller is not None and caller.cancelling():
+                    raise
+            if self._task is task:
+                self._task = None
         await self._connection.closed()
 
     async def _supervise(self) -> None:

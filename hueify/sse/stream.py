@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import Any
 
 import httpx
@@ -21,6 +22,8 @@ _EVENT = TypeAdapter(AnyHueEvent)
 
 class _EventContainer(BaseModel):
     data: list[Any] = Field(default_factory=list)
+    type: str | None = None
+    creationtime: datetime | None = None
 
 
 _REJECTED_KEY_STATUS = frozenset({401, 403})
@@ -77,8 +80,10 @@ class ServerSentEventStream:
                     self._connection.record_event()
                     self._last_event_id = sse.id or self._last_event_id
                     await self._handle_sse(sse)
-        except Exception:
-            if not received_event:
+        except httpx.HTTPStatusError as error:
+            # A rejected resume request may need a fresh subscription. Network
+            # failures and server outages do not invalidate the last event ID.
+            if not received_event and error.response.status_code == 400:
                 self._last_event_id = None
             raise
 
@@ -112,6 +117,8 @@ class ServerSentEventStream:
                 except ValidationError as error:
                     logger.warning("Failed to parse SSE event: %s", error)
                     continue
+                event.operation = message.type
+                event.creationtime = message.creationtime
                 await self._dispatch(event)
 
     async def _dispatch(self, event: HueEvent) -> None:

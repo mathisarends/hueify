@@ -329,6 +329,18 @@ matching update model plus an ID, so a `LightEvent` reads like a light, includin
 the flat accessors. Anything else arrives as the base `HueEvent`. A `"*"` handler
 receives every event, in addition to the type-specific ones.
 
+`event.type` identifies the resource, such as `light`. `event.operation` carries
+the envelope's action (`add`, `update` or `delete`), and `event.creationtime` its
+timestamp. Both are `None` when absent; future action names are kept as strings.
+Deletion events may contain only the resource ID and type:
+
+```python
+@hue.on(ResourceType.LIGHT)
+async def on_light(event: LightEvent) -> None:
+    if event.operation == "delete":
+        print("Removed light:", event.id)
+```
+
 Unknown resource type names are preserved as strings in `HueEvent`. Malformed
 events are logged and skipped individually, so valid events in the same payload
 still arrive.
@@ -338,13 +350,20 @@ Change its capacity with `Hueify(event_queue_size=512)` and inspect the waiting
 count at `hue.events.pending_events`. Events are handled in arrival order; all
 handlers for one event finish before the next event begins. When the queue fills,
 reception waits for space and logs the backpressure, without dropping events.
-The queue survives reconnects. Stopping the stream cancels the active handlers
-and discards pending events, so shutdown does not wait on a slow handler.
+The queue survives reconnects. Before connected callbacks run, previously queued
+events and their handlers finish, so an older queued event cannot overwrite the
+state refreshed by those callbacks. Stopping the stream cancels the active
+handlers and discards pending events; cancellation cleanup is still awaited.
 
 `hue.off(resource_type, handler)` removes a handler and `hue.stop_stream()` ends
 the stream. Leaving the context manager closes a started stream along with the
 HTTP client. Subscribing and starting live on the client; `hue.events` owns the
 connection itself and reports its state.
+
+Calling `await hue.stop_stream()` from an event or connection callback requests
+shutdown and returns without waiting on that callback itself. Outside callbacks,
+the same call waits for cleanup to finish. Active callbacks should return after
+requesting shutdown and may be cancelled at their next await.
 
 ### Reconnects
 
@@ -381,6 +400,10 @@ connection and raises if the bridge does not answer - with the rejected key or
 connection error as the cause, rather than a bare timeout. The stream keeps
 reconnecting either way. To wait for a *re*connection later on, use
 `await hue.events.wait_connected(timeout=5)`, which returns `False` on timeout.
+These waits report the open transport; they do not wait for queued handlers or
+the recovery callbacks to finish. A queued handler can therefore wait for the
+transport to reconnect. It must not wait for a recovery callback, since that
+callback runs after the queued handlers.
 
 Because the bridge stays silent while nothing changes, silence is not a health
 signal - `read_timeout` (90s by default) only bounds how long a dead socket can
@@ -479,6 +502,9 @@ until the source overwrites those channels again.
 A stream that stops on its own - because the bridge dropped it, or a source
 failed - leaves the reason in `stream.error`, and `await stream.wait_closed()`
 raises it. `stream.stats` reports frames sent, late frames and the rate.
+Calling `await stream.open()` again after a failure first releases the previous
+session. A successful open resets the error and statistics for the new session;
+closing preserves the last session's statistics and error for inspection.
 
 Because a takeover is not visible on the UDP socket, an application that has to
 notice it subscribes to the [event stream](#event-stream):
