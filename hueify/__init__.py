@@ -34,6 +34,7 @@ from hueify.models import (
     Zone,
 )
 from hueify.resources import (
+    GroupedLightNamespace,
     GroupNamespace,
     LightNamespace,
     ResourceId,
@@ -60,6 +61,7 @@ __all__ = [
     "GroupNamespace",
     "GroupUpdate",
     "GroupedLight",
+    "GroupedLightNamespace",
     "HueApiError",
     "HueApiResponse",
     "Hueify",

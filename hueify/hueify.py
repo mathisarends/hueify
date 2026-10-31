@@ -7,6 +7,7 @@ from hueify.entertainment import EntertainmentNamespace
 from hueify.http import HttpClient
 from hueify.models import HueEvent
 from hueify.resources import (
+    GroupedLightNamespace,
     LightNamespace,
     RoomNamespace,
     SceneNamespace,
@@ -44,6 +45,7 @@ class Hueify:
         self._credentials = load_credentials(bridge_ip, app_key, client_key)
         self._http_client = HttpClient(self._credentials)
         self.lights = LightNamespace(self._http_client)
+        self.grouped_lights = GroupedLightNamespace(self._http_client)
         self.rooms = RoomNamespace(self._http_client)
         self.zones = ZoneNamespace(self._http_client)
         self.scenes = SceneNamespace(self._http_client)

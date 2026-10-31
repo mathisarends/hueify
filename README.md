@@ -280,6 +280,18 @@ scenes also expose their native create, update and delete operations, and
 `hue.scenes.recall(id, SceneRecallRequest(...))` remains available next to
 `activate` for the full recall payload.
 
+For repeated commands, resolve the service once and address it directly:
+
+```python
+service_id = await hue.rooms.grouped_light_id(office.id)
+await hue.grouped_lights.turn_on(service_id, brightness=70)
+await hue.grouped_lights.set_hex(service_id, "#ff8800")
+```
+
+Each direct write takes one PUT. Group `toggle` resolves the service once, reads
+its current state and sends one PUT. State is always read fresh; if a group is
+deleted and recreated, resolve its service again.
+
 ## Event stream
 
 Entering `Hueify` does not connect to the SSE stream. Register handlers with the
